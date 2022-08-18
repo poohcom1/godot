@@ -265,6 +265,8 @@ void ConnectDialog::_bind_methods() {
 	ClassDB::bind_method("_add_bind", &ConnectDialog::_add_bind);
 	ClassDB::bind_method("_remove_bind", &ConnectDialog::_remove_bind);
 	ClassDB::bind_method("_update_ok_enabled", &ConnectDialog::_update_ok_enabled);
+	ClassDB::bind_method("_select_method_pressed", &ConnectDialog::_select_method_pressed);
+	ClassDB::bind_method("_select_method_confirmed", &ConnectDialog::_select_method_confirmed);
 
 	ADD_SIGNAL(MethodInfo("connected"));
 }
@@ -383,6 +385,54 @@ void ConnectDialog::_advanced_pressed() {
 	set_position((get_viewport_rect().size - get_custom_minimum_size()) / 2);
 }
 
+void ConnectDialog::_select_method_pressed() {
+	dst_method_select_popup->popup_centered();
+
+	dst_method_select_list->clear();
+
+	Node *target = tree->get_selected();
+
+	if (target == nullptr) {
+		return;
+	}
+
+	if (!advanced->is_pressed() && target->get_script().is_null()) {
+		return;
+	}
+
+	List<MethodInfo> dst_methods;
+
+	target->get_script_instance()->get_method_list(&dst_methods);
+
+	int i = 0;
+	for (List<MethodInfo>::Element *E = dst_methods.front(); E; E = E->next()) {
+		String methodName = E->get().name;
+
+		dst_method_select_list->add_item(E->get().name, i);
+
+		++i;
+	}
+
+	dst_method_select_list->select(0);
+}
+
+void ConnectDialog::_select_method_confirmed() {
+	Node *target = tree->get_selected();
+
+	if (target == nullptr) {
+		return;
+	}
+
+	if (!advanced->is_pressed() && target->get_script().is_null()) {
+		return;
+	}
+
+	List<MethodInfo> dst_methods;
+	target->get_script_instance()->get_method_list(&dst_methods);
+
+	dst_method->set_text(dst_methods[dst_method_select_list->get_selected_id()].name);
+}
+
 ConnectDialog::ConnectDialog() {
 	set_custom_minimum_size(Size2(600, 500) * EDSCALE);
 
@@ -465,6 +515,11 @@ ConnectDialog::ConnectDialog() {
 	dst_method->connect("text_entered", this, "_builtin_text_entered");
 	dstm_hb->add_child(dst_method);
 
+	Button *method_option_btn = memnew(Button);
+	method_option_btn->set_text("Select method...");
+	method_option_btn->connect("pressed", this, "_select_method_pressed");
+	dstm_hb->add_child(method_option_btn);
+
 	advanced = memnew(CheckButton);
 	dstm_hb->add_child(advanced);
 	advanced->set_text(TTR("Advanced"));
@@ -481,6 +536,17 @@ ConnectDialog::ConnectDialog() {
 	oneshot->set_text(TTR("Oneshot"));
 	oneshot->set_tooltip(TTR("Disconnects the signal after its first emission."));
 	vbc_right->add_child(oneshot);
+
+	dst_method_select_popup = memnew(ConfirmationDialog);
+	dst_method_select_popup->set_title("Select a method");
+	dst_method_select_popup->get_ok()->set_text("Select");
+	dst_method_select_popup->connect("confirmed", this, "_select_method_confirmed");
+
+	dst_method_select_list = memnew(OptionButton);
+	dst_method_select_list->set_h_size_flags(SIZE_EXPAND_FILL);
+	dst_method_select_popup->add_child(dst_method_select_list);
+
+	add_child(dst_method_select_popup);
 
 	set_as_toplevel(true);
 

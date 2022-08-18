@@ -57,6 +57,8 @@ class ConnectDialog : public ConfirmationDialog {
 	Node *source;
 	StringName signal;
 	LineEdit *dst_method;
+	ConfirmationDialog *dst_method_select_popup;
+	OptionButton *dst_method_select_list;
 	ConnectDialogBinds *cdbinds;
 	bool bEditMode;
 	NodePath dst_path;
@@ -79,6 +81,9 @@ class ConnectDialog : public ConfirmationDialog {
 	void _remove_bind();
 	void _advanced_pressed();
 	void _update_ok_enabled();
+	void _update_method_list();
+	void _select_method_pressed();
+	void _select_method_confirmed();
 
 protected:
 	void _notification(int p_what);
