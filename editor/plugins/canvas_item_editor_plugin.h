@@ -242,8 +242,8 @@ private:
 	bool key_pos = true;
 	bool key_rot = true;
 	bool key_scale = false;
-    bool show_anim_bones = false;
-    bool always_apply_anim_bones = false;
+    bool show_anim_bones = true;
+    bool anim_bones_always_apply = false;
 
 	bool pan_pressed = false;
 
@@ -290,7 +290,7 @@ private:
 		}
 	};
 
-	HashMap<BoneKey, BoneList> bone_list;
+	RBMap<BoneKey, BoneList> anim_bone_list;
 
 	struct PoseClipboard {
 		Vector2 pos;
@@ -511,7 +511,7 @@ private:
 	HSplitContainer *right_panel_split = nullptr;
 	VSplitContainer *bottom_split = nullptr;
 
-	bool anim_bone_list_dirty;
+	bool anim_bone_list_dirty = false;
 	void _queue_update_bone_list();
 	void _update_bone_list();
 	void _tree_changed(Node *);

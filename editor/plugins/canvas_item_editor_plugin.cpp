@@ -2282,7 +2282,7 @@ bool CanvasItemEditor::_gui_input_move(const Ref<InputEvent> &p_event) {
 				}
 			}
 
-			bool apply_anim_IK = (animation_hb->is_visible() || always_apply_anim_bones) && !m->is_alt_pressed();
+			bool apply_anim_IK = (animation_hb->is_visible() || anim_bones_always_apply) && !m->is_alt_pressed();
 			int index = 0;
 			for (CanvasItem *canvas_item : drag_selection) {
 				Transform2D xform = canvas_item->get_global_transform_with_canvas().affine_inverse() * canvas_item->get_transform();
@@ -3858,7 +3858,7 @@ void CanvasItemEditor::_draw_axis() {
 void CanvasItemEditor::_draw_anim_bones() {
 	RID ci = viewport->get_canvas_item();
 
-	if (show_anim_bones && (animation_hb->is_visible() || always_apply_anim_bones)) {
+	if (show_anim_bones && (animation_hb->is_visible() || anim_bones_always_apply)) {
 		Color bone_color1 = EditorSettings::get_singleton()->get("editors/2d/bone_color1");
 		Color bone_color2 = EditorSettings::get_singleton()->get("editors/2d/bone_color2");
 		Color bone_ik_color = EditorSettings::get_singleton()->get("editors/2d/bone_ik_color");
@@ -5096,8 +5096,8 @@ void CanvasItemEditor::_popup_callback(int p_op) {
         case ANIM_SKELETON_ALWAYS_APPLY: {
             int idx = animation_skeleton_menu->get_popup()->get_item_index(ANIM_SKELETON_ALWAYS_APPLY);
 
-            always_apply_anim_bones = !animation_skeleton_menu->get_popup()->is_item_checked(idx);
-            animation_skeleton_menu->get_popup()->set_item_checked(idx, always_apply_anim_bones);
+            anim_bones_always_apply = !animation_skeleton_menu->get_popup()->is_item_checked(idx);
+            animation_skeleton_menu->get_popup()->set_item_checked(idx, anim_bones_always_apply);
             viewport->update();
         } break;
 		case ANIM_SKELETON_MAKE_BONES: {
@@ -5282,7 +5282,7 @@ void CanvasItemEditor::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("update_viewport"), &CanvasItemEditor::update_viewport);
 	ClassDB::bind_method(D_METHOD("_zoom_on_position"), &CanvasItemEditor::_zoom_on_position);
 
-	ClassDB::bind_method(D_METHOD("_queue_update_bone_list"), &CanvasItemEditor::_update_bone_list);
+	ClassDB::bind_method(D_METHOD("_queue_update_bone_list"), &CanvasItemEditor::_queue_update_bone_list);
 	ClassDB::bind_method(D_METHOD("_update_bone_list"), &CanvasItemEditor::_update_bone_list);
 	ClassDB::bind_method(D_METHOD("_reset_create_position"), &CanvasItemEditor::_reset_create_position);
 	ClassDB::bind_method(D_METHOD("_tree_changed"), &CanvasItemEditor::_tree_changed);
@@ -5326,6 +5326,7 @@ Dictionary CanvasItemEditor::get_state() const {
 	state["snap_relative"] = snap_relative;
 	state["snap_pixel"] = snap_pixel;
 	state["show_anim_bones"] = show_anim_bones;
+    state["anim_bones_always_apply"] = anim_bones_always_apply;
 	return state;
 }
 
@@ -5496,6 +5497,12 @@ void CanvasItemEditor::set_state(const Dictionary &p_state) {
 		int idx = animation_skeleton_menu->get_popup()->get_item_index(ANIM_SKELETON_SHOW_BONES);
         animation_skeleton_menu->get_popup()->set_item_checked(idx, show_anim_bones);
 	}
+
+    if (state.has("always_show_anim_bones")) {
+        anim_bones_always_apply = state["anim_bones_always_apply"];
+        int idx = animation_skeleton_menu->get_popup()->get_item_index(ANIM_SKELETON_ALWAYS_APPLY);
+        animation_skeleton_menu->get_popup()->set_item_checked(idx, anim_bones_always_apply);
+    }
 
 	if (update_scrollbars) {
 		_update_scrollbars();
@@ -5967,12 +5974,12 @@ CanvasItemEditor::CanvasItemEditor() {
     animation_skeleton_menu = memnew(MenuButton);
     animation_skeleton_menu->set_shortcut_context(this);
     animation_hb->add_child(animation_skeleton_menu);
-    animation_skeleton_menu->set_tooltip(TTR("Puppet Options"));
+    animation_skeleton_menu->set_tooltip(TTR("Guide Bones"));
     animation_skeleton_menu->set_switch_on_hover(true);
     animation_skeleton_menu->get_popup()->connect("id_pressed", callable_mp(this, &CanvasItemEditor::_popup_callback));
 
     p = animation_skeleton_menu->get_popup();
-    p->add_check_shortcut(ED_SHORTCUT("canvas_item_editor/anim_skeleton_show_bones", TTR("Show Bones")), ANIM_SKELETON_SHOW_BONES);
+    p->add_check_shortcut(ED_SHORTCUT("canvas_item_editor/anim_skeleton_show_bones", TTR("Show Guide Bones")), ANIM_SKELETON_SHOW_BONES);
     p->add_check_shortcut(ED_SHORTCUT("canvas_item_editor/anim_skeleton_always_apply", TTR("Always Apply")), ANIM_SKELETON_ALWAYS_APPLY);
     p->add_separator();
     p->add_shortcut(ED_SHORTCUT("canvas_item_editor/anim_skeleton_set_ik_chain", TTR("Make IK Chain")), ANIM_SKELETON_SET_IK_CHAIN);
