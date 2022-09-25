@@ -38,6 +38,11 @@
 #include "editor/editor_node.h"
 #include "editor/editor_properties.h"
 #include "editor/editor_scale.h"
+#include "editor/editor_undo_redo_manager.h"
+
+#ifdef DEBUG_ENABLED
+#include "servers/navigation_server_3d.h"
+#endif // DEBUG_ENABLED
 
 void TileDataEditor::_tile_set_changed_plan_update() {
 	_tile_set_changed_update_needed = true;
@@ -239,16 +244,23 @@ void GenericTilePolygonEditor::_base_control_draw() {
 
 void GenericTilePolygonEditor::_center_view() {
 	panning = Vector2();
-	base_control->update();
+	base_control->queue_redraw();
 	button_center_view->set_disabled(true);
 }
 
 void GenericTilePolygonEditor::_zoom_changed() {
-	base_control->update();
+	base_control->queue_redraw();
 }
 
 void GenericTilePolygonEditor::_advanced_menu_item_pressed(int p_item_pressed) {
-	UndoRedo *undo_redo = use_undo_redo ? editor_undo_redo : memnew(UndoRedo);
+	Ref<EditorUndoRedoManager> undo_redo;
+	if (use_undo_redo) {
+		undo_redo = editor_undo_redo;
+	} else {
+		// This nice hack allows for discarding undo actions without making code too complex.
+		undo_redo.instantiate();
+	}
+
 	switch (p_item_pressed) {
 		case RESET_TO_DEFAULT_TILE: {
 			undo_redo->create_action(TTR("Reset Polygons"));
@@ -258,26 +270,26 @@ void GenericTilePolygonEditor::_advanced_menu_item_pressed(int p_item_pressed) {
 				polygon.write[i] = polygon[i] * tile_set->get_tile_size();
 			}
 			undo_redo->add_do_method(this, "add_polygon", polygon);
-			undo_redo->add_do_method(base_control, "update");
+			undo_redo->add_do_method(base_control, "queue_redraw");
 			undo_redo->add_do_method(this, "emit_signal", "polygons_changed");
 			undo_redo->add_undo_method(this, "clear_polygons");
 			for (unsigned int i = 0; i < polygons.size(); i++) {
 				undo_redo->add_undo_method(this, "add_polygon", polygons[i]);
 			}
-			undo_redo->add_undo_method(base_control, "update");
+			undo_redo->add_undo_method(base_control, "queue_redraw");
 			undo_redo->add_undo_method(this, "emit_signal", "polygons_changed");
 			undo_redo->commit_action(true);
 		} break;
 		case CLEAR_TILE: {
 			undo_redo->create_action(TTR("Clear Polygons"));
 			undo_redo->add_do_method(this, "clear_polygons");
-			undo_redo->add_do_method(base_control, "update");
+			undo_redo->add_do_method(base_control, "queue_redraw");
 			undo_redo->add_do_method(this, "emit_signal", "polygons_changed");
 			undo_redo->add_undo_method(this, "clear_polygons");
 			for (unsigned int i = 0; i < polygons.size(); i++) {
 				undo_redo->add_undo_method(this, "add_polygon", polygons[i]);
 			}
-			undo_redo->add_undo_method(base_control, "update");
+			undo_redo->add_undo_method(base_control, "queue_redraw");
 			undo_redo->add_undo_method(this, "emit_signal", "polygons_changed");
 			undo_redo->commit_action(true);
 		} break;
@@ -310,20 +322,17 @@ void GenericTilePolygonEditor::_advanced_menu_item_pressed(int p_item_pressed) {
 				}
 				undo_redo->add_do_method(this, "set_polygon", i, new_polygon);
 			}
-			undo_redo->add_do_method(base_control, "update");
+			undo_redo->add_do_method(base_control, "queue_redraw");
 			undo_redo->add_do_method(this, "emit_signal", "polygons_changed");
 			for (unsigned int i = 0; i < polygons.size(); i++) {
 				undo_redo->add_undo_method(this, "set_polygon", polygons[i]);
 			}
-			undo_redo->add_undo_method(base_control, "update");
+			undo_redo->add_undo_method(base_control, "queue_redraw");
 			undo_redo->add_undo_method(this, "emit_signal", "polygons_changed");
 			undo_redo->commit_action(true);
 		} break;
 		default:
 			break;
-	}
-	if (!use_undo_redo) {
-		memdelete(undo_redo);
 	}
 }
 
@@ -409,7 +418,14 @@ void GenericTilePolygonEditor::_snap_to_half_pixel(Point2 &r_point) {
 }
 
 void GenericTilePolygonEditor::_base_control_gui_input(Ref<InputEvent> p_event) {
-	UndoRedo *undo_redo = use_undo_redo ? editor_undo_redo : memnew(UndoRedo);
+	Ref<EditorUndoRedoManager> undo_redo;
+	if (use_undo_redo) {
+		undo_redo = editor_undo_redo;
+	} else {
+		// This nice hack allows for discarding undo actions without making code too complex.
+		undo_redo.instantiate();
+	}
+
 	real_t grab_threshold = EDITOR_GET("editors/polygon_editor/point_grab_radius");
 
 	hovered_polygon_index = -1;
@@ -436,7 +452,7 @@ void GenericTilePolygonEditor::_base_control_gui_input(Ref<InputEvent> p_event) 
 		} else if (drag_type == DRAG_TYPE_PAN) {
 			panning += mm->get_position() - drag_last_pos;
 			drag_last_pos = mm->get_position();
-			button_center_view->set_disabled(panning.is_equal_approx(Vector2()));
+			button_center_view->set_disabled(panning.is_zero_approx());
 		} else {
 			// Update hovered point.
 			_grab_polygon_point(mm->get_position(), xform, hovered_polygon_index, hovered_point_index);
@@ -479,9 +495,9 @@ void GenericTilePolygonEditor::_base_control_gui_input(Ref<InputEvent> p_event) 
 							undo_redo->add_do_method(this, "clear_polygons");
 						}
 						undo_redo->add_do_method(this, "add_polygon", in_creation_polygon);
-						undo_redo->add_do_method(base_control, "update");
+						undo_redo->add_do_method(base_control, "queue_redraw");
 						undo_redo->add_undo_method(this, "remove_polygon", added);
-						undo_redo->add_undo_method(base_control, "update");
+						undo_redo->add_undo_method(base_control, "queue_redraw");
 						undo_redo->commit_action(false);
 						emit_signal(SNAME("polygons_changed"));
 					} else {
@@ -527,8 +543,8 @@ void GenericTilePolygonEditor::_base_control_gui_input(Ref<InputEvent> p_event) 
 							undo_redo->add_do_method(this, "set_polygon", closest_polygon, polygons[closest_polygon]);
 							undo_redo->add_undo_method(this, "set_polygon", closest_polygon, old_polygon);
 						}
-						undo_redo->add_do_method(base_control, "update");
-						undo_redo->add_undo_method(base_control, "update");
+						undo_redo->add_do_method(base_control, "queue_redraw");
+						undo_redo->add_undo_method(base_control, "queue_redraw");
 						undo_redo->commit_action(false);
 						emit_signal(SNAME("polygons_changed"));
 					}
@@ -537,9 +553,9 @@ void GenericTilePolygonEditor::_base_control_gui_input(Ref<InputEvent> p_event) 
 				if (drag_type == DRAG_TYPE_DRAG_POINT) {
 					undo_redo->create_action(TTR("Edit Polygons"));
 					undo_redo->add_do_method(this, "set_polygon", drag_polygon_index, polygons[drag_polygon_index]);
-					undo_redo->add_do_method(base_control, "update");
+					undo_redo->add_do_method(base_control, "queue_redraw");
 					undo_redo->add_undo_method(this, "set_polygon", drag_polygon_index, drag_old_polygon);
-					undo_redo->add_undo_method(base_control, "update");
+					undo_redo->add_undo_method(base_control, "queue_redraw");
 					undo_redo->commit_action(false);
 					emit_signal(SNAME("polygons_changed"));
 				} else if (drag_type == DRAG_TYPE_CREATE_POINT) {
@@ -574,8 +590,8 @@ void GenericTilePolygonEditor::_base_control_gui_input(Ref<InputEvent> p_event) 
 							undo_redo->add_do_method(this, "set_polygon", closest_polygon, polygons[closest_polygon]);
 							undo_redo->add_undo_method(this, "set_polygon", closest_polygon, old_polygon);
 						}
-						undo_redo->add_do_method(base_control, "update");
-						undo_redo->add_undo_method(base_control, "update");
+						undo_redo->add_do_method(base_control, "queue_redraw");
+						undo_redo->add_undo_method(base_control, "queue_redraw");
 						undo_redo->commit_action(false);
 						emit_signal(SNAME("polygons_changed"));
 					} else {
@@ -599,11 +615,7 @@ void GenericTilePolygonEditor::_base_control_gui_input(Ref<InputEvent> p_event) 
 		}
 	}
 
-	base_control->update();
-
-	if (!use_undo_redo) {
-		memdelete(undo_redo);
-	}
+	base_control->queue_redraw();
 }
 
 void GenericTilePolygonEditor::set_use_undo_redo(bool p_use_undo_redo) {
@@ -651,7 +663,7 @@ void GenericTilePolygonEditor::set_background(Ref<Texture2D> p_texture, Rect2 p_
 	background_v_flip = p_flip_v;
 	background_transpose = p_transpose;
 	background_modulate = p_modulate;
-	base_control->update();
+	base_control->queue_redraw();
 }
 
 int GenericTilePolygonEditor::get_polygon_count() {
@@ -664,13 +676,13 @@ int GenericTilePolygonEditor::add_polygon(Vector<Point2> p_polygon, int p_index)
 
 	if (p_index < 0) {
 		polygons.push_back(p_polygon);
-		base_control->update();
+		base_control->queue_redraw();
 		button_edit->set_pressed(true);
 		return polygons.size() - 1;
 	} else {
 		polygons.insert(p_index, p_polygon);
 		button_edit->set_pressed(true);
-		base_control->update();
+		base_control->queue_redraw();
 		return p_index;
 	}
 }
@@ -682,12 +694,12 @@ void GenericTilePolygonEditor::remove_polygon(int p_index) {
 	if (polygons.size() == 0) {
 		button_create->set_pressed(true);
 	}
-	base_control->update();
+	base_control->queue_redraw();
 }
 
 void GenericTilePolygonEditor::clear_polygons() {
 	polygons.clear();
-	base_control->update();
+	base_control->queue_redraw();
 }
 
 void GenericTilePolygonEditor::set_polygon(int p_polygon_index, Vector<Point2> p_polygon) {
@@ -695,7 +707,7 @@ void GenericTilePolygonEditor::set_polygon(int p_polygon_index, Vector<Point2> p
 	ERR_FAIL_COND(p_polygon.size() < 3);
 	polygons[p_polygon_index] = p_polygon;
 	button_edit->set_pressed(true);
-	base_control->update();
+	base_control->queue_redraw();
 }
 
 Vector<Point2> GenericTilePolygonEditor::get_polygon(int p_polygon_index) {
@@ -705,7 +717,7 @@ Vector<Point2> GenericTilePolygonEditor::get_polygon(int p_polygon_index) {
 
 void GenericTilePolygonEditor::set_polygons_color(Color p_color) {
 	polygon_color = p_color;
-	base_control->update();
+	base_control->queue_redraw();
 }
 
 void GenericTilePolygonEditor::set_multiple_polygon_mode(bool p_multiple_polygon_mode) {
@@ -756,21 +768,21 @@ GenericTilePolygonEditor::GenericTilePolygonEditor() {
 	button_create->set_toggle_mode(true);
 	button_create->set_button_group(tools_button_group);
 	button_create->set_pressed(true);
-	button_create->set_tooltip(TTR("Add polygon tool"));
+	button_create->set_tooltip_text(TTR("Add polygon tool"));
 	toolbar->add_child(button_create);
 
 	button_edit = memnew(Button);
 	button_edit->set_flat(true);
 	button_edit->set_toggle_mode(true);
 	button_edit->set_button_group(tools_button_group);
-	button_edit->set_tooltip(TTR("Edit points tool"));
+	button_edit->set_tooltip_text(TTR("Edit points tool"));
 	toolbar->add_child(button_edit);
 
 	button_delete = memnew(Button);
 	button_delete->set_flat(true);
 	button_delete->set_toggle_mode(true);
 	button_delete->set_button_group(tools_button_group);
-	button_delete->set_tooltip(TTR("Delete points tool"));
+	button_delete->set_tooltip_text(TTR("Delete points tool"));
 	toolbar->add_child(button_delete);
 
 	button_advanced_menu = memnew(MenuButton);
@@ -793,7 +805,7 @@ GenericTilePolygonEditor::GenericTilePolygonEditor() {
 	button_pixel_snap->set_flat(true);
 	button_pixel_snap->set_toggle_mode(true);
 	button_pixel_snap->set_pressed(true);
-	button_pixel_snap->set_tooltip(TTR("Snap to half-pixel"));
+	button_pixel_snap->set_tooltip_text(TTR("Snap to half-pixel"));
 	toolbar->add_child(button_pixel_snap);
 
 	Control *root = memnew(Control);
@@ -1153,7 +1165,7 @@ void TileDataDefaultEditor::setup_property_editor(Variant::Type p_type, String p
 		property_editor->set_label(p_label);
 	}
 	property_editor->connect("property_changed", callable_mp(this, &TileDataDefaultEditor::_property_value_changed).unbind(1));
-	property_editor->set_tooltip(p_property);
+	property_editor->set_tooltip_text(p_property);
 	property_editor->update_property();
 	add_child(property_editor);
 }
@@ -1363,7 +1375,7 @@ void TileDataCollisionEditor::_polygons_changed() {
 			one_way_property_editor->set_label(one_way_property);
 			one_way_property_editor->connect("property_changed", callable_mp(this, &TileDataCollisionEditor::_property_value_changed).unbind(1));
 			one_way_property_editor->connect("selected", callable_mp(this, &TileDataCollisionEditor::_property_selected));
-			one_way_property_editor->set_tooltip(one_way_property_editor->get_edited_property());
+			one_way_property_editor->set_tooltip_text(one_way_property_editor->get_edited_property());
 			one_way_property_editor->update_property();
 			add_child(one_way_property_editor);
 			property_editors[one_way_property] = one_way_property_editor;
@@ -1375,7 +1387,7 @@ void TileDataCollisionEditor::_polygons_changed() {
 			one_way_margin_property_editor->set_label(one_way_margin_property);
 			one_way_margin_property_editor->connect("property_changed", callable_mp(this, &TileDataCollisionEditor::_property_value_changed).unbind(1));
 			one_way_margin_property_editor->connect("selected", callable_mp(this, &TileDataCollisionEditor::_property_selected));
-			one_way_margin_property_editor->set_tooltip(one_way_margin_property_editor->get_edited_property());
+			one_way_margin_property_editor->set_tooltip_text(one_way_margin_property_editor->get_edited_property());
 			one_way_margin_property_editor->update_property();
 			add_child(one_way_margin_property_editor);
 			property_editors[one_way_margin_property] = one_way_margin_property_editor;
@@ -1536,7 +1548,7 @@ TileDataCollisionEditor::TileDataCollisionEditor() {
 	linear_velocity_editor->set_label("linear_velocity");
 	linear_velocity_editor->connect("property_changed", callable_mp(this, &TileDataCollisionEditor::_property_value_changed).unbind(1));
 	linear_velocity_editor->connect("selected", callable_mp(this, &TileDataCollisionEditor::_property_selected));
-	linear_velocity_editor->set_tooltip(linear_velocity_editor->get_edited_property());
+	linear_velocity_editor->set_tooltip_text(linear_velocity_editor->get_edited_property());
 	linear_velocity_editor->update_property();
 	add_child(linear_velocity_editor);
 	property_editors["linear_velocity"] = linear_velocity_editor;
@@ -1546,7 +1558,7 @@ TileDataCollisionEditor::TileDataCollisionEditor() {
 	angular_velocity_editor->set_label("angular_velocity");
 	angular_velocity_editor->connect("property_changed", callable_mp(this, &TileDataCollisionEditor::_property_value_changed).unbind(1));
 	angular_velocity_editor->connect("selected", callable_mp(this, &TileDataCollisionEditor::_property_selected));
-	angular_velocity_editor->set_tooltip(angular_velocity_editor->get_edited_property());
+	angular_velocity_editor->set_tooltip_text(angular_velocity_editor->get_edited_property());
 	angular_velocity_editor->update_property();
 	add_child(angular_velocity_editor);
 	property_editors["angular_velocity"] = angular_velocity_editor;
@@ -2594,7 +2606,7 @@ TileDataTerrainsEditor::TileDataTerrainsEditor() {
 	terrain_set_property_editor->set_object_and_property(dummy_object, "terrain_set");
 	terrain_set_property_editor->set_label("Terrain Set");
 	terrain_set_property_editor->connect("property_changed", callable_mp(this, &TileDataTerrainsEditor::_property_value_changed).unbind(1));
-	terrain_set_property_editor->set_tooltip(terrain_set_property_editor->get_edited_property());
+	terrain_set_property_editor->set_tooltip_text(terrain_set_property_editor->get_edited_property());
 	add_child(terrain_set_property_editor);
 
 	terrain_property_editor = memnew(EditorPropertyEnum);
@@ -2666,7 +2678,9 @@ void TileDataNavigationEditor::_tile_set_changed() {
 void TileDataNavigationEditor::_notification(int p_what) {
 	switch (p_what) {
 		case NOTIFICATION_ENTER_TREE: {
-			polygon_editor->set_polygons_color(get_tree()->get_debug_navigation_color());
+#ifdef DEBUG_ENABLED
+			polygon_editor->set_polygons_color(NavigationServer3D::get_singleton()->get_debug_navigation_geometry_face_color());
+#endif // DEBUG_ENABLED
 		} break;
 	}
 }
@@ -2693,7 +2707,10 @@ void TileDataNavigationEditor::draw_over_tile(CanvasItem *p_canvas_item, Transfo
 			return;
 		}
 
-		Color color = p_canvas_item->get_tree()->get_debug_navigation_color();
+		Color color = Color(0.5, 1.0, 1.0, 1.0);
+#ifdef DEBUG_ENABLED
+		color = NavigationServer3D::get_singleton()->get_debug_navigation_geometry_face_color();
+#endif // DEBUG_ENABLED
 		if (p_selected) {
 			Color grid_color = EditorSettings::get_singleton()->get("editors/tiles_editor/grid_color");
 			Color selection_color = Color().from_hsv(Math::fposmod(grid_color.get_h() + 0.5, 1.0), grid_color.get_s(), grid_color.get_v(), 1.0);

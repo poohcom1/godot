@@ -195,6 +195,9 @@ private:
 
 		void set(int p_line, const String &p_text, const Array &p_bidi_override);
 		void set_hidden(int p_line, bool p_hidden) {
+			if (text[p_line].hidden == p_hidden) {
+				return;
+			}
 			text.write[p_line].hidden = p_hidden;
 			if (!p_hidden && text[p_line].width > max_width) {
 				max_width = text[p_line].width;
@@ -759,8 +762,8 @@ public:
 	void set_caret_blink_enabled(const bool p_enabled);
 	bool is_caret_blink_enabled() const;
 
-	void set_caret_blink_speed(const float p_speed);
-	float get_caret_blink_speed() const;
+	void set_caret_blink_interval(const float p_interval);
+	float get_caret_blink_interval() const;
 
 	void set_move_caret_on_right_click_enabled(const bool p_enabled);
 	bool is_move_caret_on_right_click_enabled() const;

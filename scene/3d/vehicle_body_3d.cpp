@@ -105,8 +105,8 @@ void VehicleWheel3D::_notification(int p_what) {
 	}
 }
 
-TypedArray<String> VehicleWheel3D::get_configuration_warnings() const {
-	TypedArray<String> warnings = Node::get_configuration_warnings();
+PackedStringArray VehicleWheel3D::get_configuration_warnings() const {
+	PackedStringArray warnings = Node::get_configuration_warnings();
 
 	if (!Object::cast_to<VehicleBody3D>(get_parent())) {
 		warnings.push_back(RTR("VehicleWheel3D serves to provide a wheel system to a VehicleBody3D. Please use it as a child of a VehicleBody3D."));
@@ -807,7 +807,7 @@ void VehicleBody3D::_update_friction(PhysicsDirectBodyState3D *s) {
 }
 
 void VehicleBody3D::_body_state_changed(PhysicsDirectBodyState3D *p_state) {
-	RigidDynamicBody3D::_body_state_changed(p_state);
+	RigidBody3D::_body_state_changed(p_state);
 
 	real_t step = p_state->get_step();
 

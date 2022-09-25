@@ -37,6 +37,7 @@
 
 #ifdef TOOLS_ENABLED
 #include "editor/editor_node.h"
+#include "editor/editor_undo_redo_manager.h"
 #include "scene/2d/skeleton_2d.h"
 
 void AnimatedValuesBackup::update_skeletons() {
@@ -174,8 +175,8 @@ bool AnimationPlayer::_get(const StringName &p_name, Variant &r_ret) const {
 	return true;
 }
 
-void AnimationPlayer::_validate_property(PropertyInfo &property) const {
-	if (property.name == "current_animation") {
+void AnimationPlayer::_validate_property(PropertyInfo &p_property) const {
+	if (p_property.name == "current_animation") {
 		List<String> names;
 
 		for (const KeyValue<StringName, AnimationData> &E : animation_set) {
@@ -191,10 +192,8 @@ void AnimationPlayer::_validate_property(PropertyInfo &property) const {
 			hint += E->get();
 		}
 
-		property.hint_string = hint;
+		p_property.hint_string = hint;
 	}
-
-	Node::_validate_property(property);
 }
 
 void AnimationPlayer::_get_property_list(List<PropertyInfo> *p_list) const {
@@ -323,10 +322,8 @@ void AnimationPlayer::_ensure_node_caches(AnimationData *p_anim, Node *p_root_ov
 
 #endif // _3D_DISABLED
 
-		{
-			if (!child->is_connected("tree_exiting", callable_mp(this, &AnimationPlayer::_node_removed))) {
-				child->connect("tree_exiting", callable_mp(this, &AnimationPlayer::_node_removed).bind(child), CONNECT_ONESHOT);
-			}
+		if (!child->is_connected("tree_exiting", callable_mp(this, &AnimationPlayer::_node_removed))) {
+			child->connect("tree_exiting", callable_mp(this, &AnimationPlayer::_node_removed).bind(child), CONNECT_ONE_SHOT);
 		}
 
 		TrackNodeCacheKey key;
@@ -375,7 +372,7 @@ void AnimationPlayer::_ensure_node_caches(AnimationData *p_anim, Node *p_root_ov
 					node_cache->init_rot = rest.basis.get_rotation_quaternion();
 					node_cache->init_scale = rest.basis.get_scale();
 				} else {
-					// no property, just use spatialnode
+					// Not a skeleton, the node can be accessed with the node_3d member.
 					node_cache->skeleton = nullptr;
 				}
 			}
@@ -653,15 +650,14 @@ void AnimationPlayer::_animation_process_animation(AnimationData *p_anim, double
 						double c = Math::ease(p_time / first_key_time, transition);
 						Variant first_value = a->track_get_key_value(i, first_key);
 						first_value = _post_process_key_value(a, i, first_value, nc->node);
-						Variant interp_value;
-						Variant::interpolate(pa->capture, first_value, c, interp_value);
+						Variant interp_value = Animation::interpolate_variant(pa->capture, first_value, c);
 						if (pa->accum_pass != accum_pass) {
 							ERR_CONTINUE(cache_update_prop_size >= NODE_CACHE_UPDATE_MAX);
 							cache_update_prop[cache_update_prop_size++] = pa;
 							pa->value_accum = interp_value;
 							pa->accum_pass = accum_pass;
 						} else {
-							Variant::interpolate(pa->value_accum, interp_value, p_interp, pa->value_accum);
+							pa->value_accum = Animation::interpolate_variant(pa->value_accum, interp_value, p_interp);
 						}
 
 						continue; //handled
@@ -682,7 +678,7 @@ void AnimationPlayer::_animation_process_animation(AnimationData *p_anim, double
 						pa->value_accum = value;
 						pa->accum_pass = accum_pass;
 					} else {
-						Variant::interpolate(pa->value_accum, value, p_interp, pa->value_accum);
+						pa->value_accum = Animation::interpolate_variant(pa->value_accum, value, p_interp);
 					}
 
 				} else if (p_is_current && p_delta != 0) {
@@ -1154,7 +1150,7 @@ void AnimationPlayer::_animation_update_transforms() {
 				}
 #endif
 
-				static_cast<Node2D *>(pa->object)->set_rotation(Math::deg2rad((double)pa->value_accum));
+				static_cast<Node2D *>(pa->object)->set_rotation(Math::deg_to_rad((double)pa->value_accum));
 			} break;
 			case SP_NODE2D_SCALE: {
 #ifdef DEBUG_ENABLED
@@ -1273,6 +1269,8 @@ void AnimationPlayer::_animation_set_cache_update() {
 		// If something was modified or removed, caches need to be cleared
 		clear_caches();
 	}
+
+	emit_signal(SNAME("animation_list_changed"));
 }
 
 void AnimationPlayer::_animation_added(const StringName &p_name, const StringName &p_library) {
@@ -1504,7 +1502,7 @@ bool AnimationPlayer::has_animation(const StringName &p_name) const {
 }
 
 Ref<Animation> AnimationPlayer::get_animation(const StringName &p_name) const {
-	ERR_FAIL_COND_V_MSG(!animation_set.has(p_name), Ref<Animation>(), vformat("Animation not found: %s.", p_name));
+	ERR_FAIL_COND_V_MSG(!animation_set.has(p_name), Ref<Animation>(), vformat("Animation not found: \"%s\".", p_name));
 
 	const AnimationData &data = animation_set[p_name];
 
@@ -2048,7 +2046,7 @@ Ref<AnimatedValuesBackup> AnimationPlayer::apply_reset(bool p_user_initiated) {
 		Ref<AnimatedValuesBackup> new_values = aux_player->backup_animated_values();
 		old_values->restore();
 
-		UndoRedo *ur = EditorNode::get_singleton()->get_undo_redo();
+		Ref<EditorUndoRedoManager> &ur = EditorNode::get_undo_redo();
 		ur->create_action(TTR("Anim Apply Reset"));
 		ur->add_do_method(new_values.ptr(), "restore");
 		ur->add_undo_method(old_values.ptr(), "restore");
@@ -2153,6 +2151,7 @@ void AnimationPlayer::_bind_methods() {
 	ADD_SIGNAL(MethodInfo("animation_finished", PropertyInfo(Variant::STRING_NAME, "anim_name")));
 	ADD_SIGNAL(MethodInfo("animation_changed", PropertyInfo(Variant::STRING_NAME, "old_name"), PropertyInfo(Variant::STRING_NAME, "new_name")));
 	ADD_SIGNAL(MethodInfo("animation_started", PropertyInfo(Variant::STRING_NAME, "anim_name")));
+	ADD_SIGNAL(MethodInfo("animation_list_changed"));
 	ADD_SIGNAL(MethodInfo("caches_cleared"));
 
 	BIND_ENUM_CONSTANT(ANIMATION_PROCESS_PHYSICS);

@@ -45,16 +45,20 @@ class SubViewportContainer;
 class MaterialEditor : public Control {
 	GDCLASS(MaterialEditor, Control);
 
+	Vector2 rot = Vector2();
+
 	HBoxContainer *layout_2d = nullptr;
 	ColorRect *rect_instance = nullptr;
 
 	SubViewportContainer *vc = nullptr;
 	SubViewport *viewport = nullptr;
+	Node3D *rotation = nullptr;
 	MeshInstance3D *sphere_instance = nullptr;
 	MeshInstance3D *box_instance = nullptr;
 	DirectionalLight3D *light1 = nullptr;
 	DirectionalLight3D *light2 = nullptr;
 	Camera3D *camera = nullptr;
+	Ref<CameraAttributesPractical> camera_attributes;
 
 	Ref<SphereMesh> sphere_mesh;
 	Ref<BoxMesh> box_mesh;
@@ -69,13 +73,25 @@ class MaterialEditor : public Control {
 
 	Ref<Material> material;
 
+	struct ThemeCache {
+		Ref<Texture2D> light_1_on;
+		Ref<Texture2D> light_1_off;
+		Ref<Texture2D> light_2_on;
+		Ref<Texture2D> light_2_off;
+		Ref<Texture2D> sphere_on;
+		Ref<Texture2D> sphere_off;
+		Ref<Texture2D> box_on;
+		Ref<Texture2D> box_off;
+		Ref<Texture2D> checkerboard;
+	} theme_cache;
+
 	void _button_pressed(Node *p_button);
-	bool first_enter;
 
 protected:
+	virtual void _update_theme_item_cache() override;
 	void _notification(int p_what);
-
-	static void _bind_methods();
+	void gui_input(const Ref<InputEvent> &p_event) override;
+	void _update_rotation();
 
 public:
 	void edit(Ref<Material> p_material, const Ref<Environment> &p_env);
@@ -122,8 +138,8 @@ public:
 	virtual Ref<Resource> convert(const Ref<Resource> &p_resource) const override;
 };
 
-class ParticlesMaterialConversionPlugin : public EditorResourceConversionPlugin {
-	GDCLASS(ParticlesMaterialConversionPlugin, EditorResourceConversionPlugin);
+class ParticleProcessMaterialConversionPlugin : public EditorResourceConversionPlugin {
+	GDCLASS(ParticleProcessMaterialConversionPlugin, EditorResourceConversionPlugin);
 
 public:
 	virtual String converts_to() const override;

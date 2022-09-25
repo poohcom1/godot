@@ -121,26 +121,26 @@ bool SkeletonProfile::_get(const StringName &p_path, Variant &r_ret) const {
 	return true;
 }
 
-void SkeletonProfile::_validate_property(PropertyInfo &property) const {
+void SkeletonProfile::_validate_property(PropertyInfo &p_property) const {
 	if (is_read_only) {
-		if (property.name == ("group_size") || property.name == ("bone_size") || property.name == ("root_bone") || property.name == ("scale_base_bone")) {
-			property.usage = PROPERTY_USAGE_NO_EDITOR;
+		if (p_property.name == ("group_size") || p_property.name == ("bone_size") || p_property.name == ("root_bone") || p_property.name == ("scale_base_bone")) {
+			p_property.usage = PROPERTY_USAGE_NO_EDITOR;
 			return;
 		}
 	}
 
-	if (property.name == ("root_bone") || property.name == ("scale_base_bone")) {
+	if (p_property.name == ("root_bone") || p_property.name == ("scale_base_bone")) {
 		String hint = "";
 		for (int i = 0; i < bones.size(); i++) {
 			hint += i == 0 ? String(bones[i].bone_name) : "," + String(bones[i].bone_name);
 		}
-		property.hint_string = hint;
+		p_property.hint_string = hint;
 	}
 
-	PackedStringArray split = property.name.split("/");
+	PackedStringArray split = p_property.name.split("/");
 	if (split.size() == 3 && split[0] == "bones") {
 		if (split[2] == "bone_tail" && get_tail_direction(split[1].to_int()) != TAIL_DIRECTION_SPECIFIC_CHILD) {
-			property.usage = PROPERTY_USAGE_NONE;
+			p_property.usage = PROPERTY_USAGE_NONE;
 		}
 	}
 }
@@ -506,7 +506,7 @@ SkeletonProfileHumanoid::SkeletonProfileHumanoid() {
 	bones.write[5].reference_pose = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1, 0);
 	bones.write[5].handle_offset = Vector2(0.5, 0.23);
 	bones.write[5].group = "Body";
-	bones.write[5].require = true;
+	bones.write[5].require = false;
 
 	bones.write[6].bone_name = "Head";
 	bones.write[6].bone_parent = "Neck";
@@ -566,7 +566,7 @@ SkeletonProfileHumanoid::SkeletonProfileHumanoid() {
 
 	bones.write[14].bone_name = "LeftThumbMetacarpal";
 	bones.write[14].bone_parent = "LeftHand";
-	bones.write[14].reference_pose = Transform3D(0, -0.577, 0.816, 0.707, 0.577, 0.408, -0.707, 0.577, 0.408, -0.025, 0, 0);
+	bones.write[14].reference_pose = Transform3D(0, -0.577, 0.816, 0, 0.816, 0.577, -1, 0, 0, -0.025, 0.025, 0);
 	bones.write[14].handle_offset = Vector2(0.4, 0.8);
 	bones.write[14].group = "LeftHand";
 
@@ -686,7 +686,7 @@ SkeletonProfileHumanoid::SkeletonProfileHumanoid() {
 
 	bones.write[33].bone_name = "RightThumbMetacarpal";
 	bones.write[33].bone_parent = "RightHand";
-	bones.write[33].reference_pose = Transform3D(0, 0.577, -0.816, -0.707, 0.577, 0.408, 0.707, 0.577, 0.408, 0.025, 0, 0);
+	bones.write[33].reference_pose = Transform3D(0, 0.577, -0.816, 0, 0.816, 0.577, 1, 0, 0, 0.025, 0.025, 0);
 	bones.write[33].handle_offset = Vector2(0.6, 0.8);
 	bones.write[33].group = "RightHand";
 

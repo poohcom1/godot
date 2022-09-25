@@ -237,7 +237,7 @@ Error OS_Windows::open_dynamic_library(const String p_path, void *&p_library_han
 
 	if (!FileAccess::exists(path)) {
 		//this code exists so gdnative can load .dll files from within the executable path
-		path = get_executable_path().get_base_dir().plus_file(p_path.get_file());
+		path = get_executable_path().get_base_dir().path_join(p_path.get_file());
 	}
 
 	typedef DLL_DIRECTORY_COOKIE(WINAPI * PAddDllDirectory)(PCWSTR);
@@ -290,7 +290,25 @@ String OS_Windows::get_name() const {
 	return "Windows";
 }
 
-OS::Date OS_Windows::get_date(bool p_utc) const {
+String OS_Windows::get_distribution_name() const {
+	return get_name();
+}
+
+String OS_Windows::get_version() const {
+	typedef LONG NTSTATUS, *PNTSTATUS;
+	typedef NTSTATUS(WINAPI * RtlGetVersionPtr)(PRTL_OSVERSIONINFOW);
+	RtlGetVersionPtr version_ptr = (RtlGetVersionPtr)GetProcAddress(GetModuleHandle("ntdll.dll"), "RtlGetVersion");
+	if (version_ptr != nullptr) {
+		RTL_OSVERSIONINFOW fow = { 0 };
+		fow.dwOSVersionInfoSize = sizeof(fow);
+		if (version_ptr(&fow) == 0x00000000) {
+			return vformat("%d.%d.%d", (int64_t)fow.dwMajorVersion, (int64_t)fow.dwMinorVersion, (int64_t)fow.dwBuildNumber);
+		}
+	}
+	return "";
+}
+
+OS::DateTime OS_Windows::get_datetime(bool p_utc) const {
 	SYSTEMTIME systemtime;
 	if (p_utc) {
 		GetSystemTime(&systemtime);
@@ -305,28 +323,16 @@ OS::Date OS_Windows::get_date(bool p_utc) const {
 		daylight = true;
 	}
 
-	Date date;
-	date.day = systemtime.wDay;
-	date.month = Month(systemtime.wMonth);
-	date.weekday = Weekday(systemtime.wDayOfWeek);
-	date.year = systemtime.wYear;
-	date.dst = daylight;
-	return date;
-}
-
-OS::Time OS_Windows::get_time(bool p_utc) const {
-	SYSTEMTIME systemtime;
-	if (p_utc) {
-		GetSystemTime(&systemtime);
-	} else {
-		GetLocalTime(&systemtime);
-	}
-
-	Time time;
-	time.hour = systemtime.wHour;
-	time.minute = systemtime.wMinute;
-	time.second = systemtime.wSecond;
-	return time;
+	DateTime dt;
+	dt.year = systemtime.wYear;
+	dt.month = Month(systemtime.wMonth);
+	dt.day = systemtime.wDay;
+	dt.weekday = Weekday(systemtime.wDayOfWeek);
+	dt.hour = systemtime.wHour;
+	dt.minute = systemtime.wMinute;
+	dt.second = systemtime.wSecond;
+	dt.dst = daylight;
+	return dt;
 }
 
 OS::TimeZoneInfo OS_Windows::get_time_zone_info() const {
@@ -902,7 +908,7 @@ void OS_Windows::run() {
 
 	main_loop->initialize();
 
-	while (!force_quit) {
+	while (true) {
 		DisplayServer::get_singleton()->process_events(); // get rid of pending events
 		if (Main::iteration()) {
 			break;
@@ -1071,13 +1077,13 @@ String OS_Windows::get_user_data_dir() const {
 			if (custom_dir.is_empty()) {
 				custom_dir = appname;
 			}
-			return get_data_path().plus_file(custom_dir).replace("\\", "/");
+			return get_data_path().path_join(custom_dir).replace("\\", "/");
 		} else {
-			return get_data_path().plus_file(get_godot_dir_name()).plus_file("app_userdata").plus_file(appname).replace("\\", "/");
+			return get_data_path().path_join(get_godot_dir_name()).path_join("app_userdata").path_join(appname).replace("\\", "/");
 		}
 	}
 
-	return get_data_path().plus_file(get_godot_dir_name()).plus_file("app_userdata").plus_file("[unnamed project]");
+	return get_data_path().path_join(get_godot_dir_name()).path_join("app_userdata").path_join("[unnamed project]");
 }
 
 String OS_Windows::get_unique_id() const {
@@ -1132,8 +1138,6 @@ OS_Windows::OS_Windows(HINSTANCE _hInstance) {
 	main_loop = nullptr;
 	process_map = nullptr;
 
-	force_quit = false;
-
 	hInstance = _hInstance;
 #ifdef STDOUT_FILE
 	stdo = fopen("stdout.txt", "wb");
@@ -1147,6 +1151,21 @@ OS_Windows::OS_Windows(HINSTANCE _hInstance) {
 #endif
 
 	DisplayServerWindows::register_windows_driver();
+
+	// Enable ANSI escape code support on Windows 10 v1607 (Anniversary Update) and later.
+	// This lets the engine and projects use ANSI escape codes to color text just like on macOS and Linux.
+	//
+	// NOTE: The engine does not use ANSI escape codes to color error/warning messages; it uses Windows API calls instead.
+	// Therefore, error/warning messages are still colored on Windows versions older than 10.
+	HANDLE stdoutHandle;
+	stdoutHandle = GetStdHandle(STD_OUTPUT_HANDLE);
+	DWORD outMode = 0;
+	outMode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+
+	if (!SetConsoleMode(stdoutHandle, outMode)) {
+		// Windows 8.1 or below, or Windows 10 prior to Anniversary Update.
+		print_verbose("Can't set the ENABLE_VIRTUAL_TERMINAL_PROCESSING Windows console mode. `print_rich()` will not work as expected.");
+	}
 
 	Vector<Logger *> loggers;
 	loggers.push_back(memnew(WindowsTerminalLogger));

@@ -85,6 +85,7 @@ class RendererCanvasRenderRD : public RendererCanvasRender {
 		FLAGS_DEFAULT_SPECULAR_MAP_USED = (1 << 27),
 
 		FLAGS_USE_MSDF = (1 << 28),
+		FLAGS_USE_LCD = (1 << 29),
 	};
 
 	enum {
@@ -122,6 +123,7 @@ class RendererCanvasRenderRD : public RendererCanvasRender {
 		PIPELINE_VARIANT_ATTRIBUTE_LINES,
 		PIPELINE_VARIANT_ATTRIBUTE_LINES_STRIP,
 		PIPELINE_VARIANT_ATTRIBUTE_POINTS,
+		PIPELINE_VARIANT_QUAD_LCD_BLEND,
 		PIPELINE_VARIANT_MAX
 	};
 	enum PipelineLightMode {
@@ -174,16 +176,17 @@ class RendererCanvasRenderRD : public RendererCanvasRender {
 		HashMap<StringName, HashMap<int, RID>> default_texture_params;
 
 		bool uses_screen_texture = false;
+		bool uses_screen_texture_mipmaps = false;
 		bool uses_sdf = false;
 		bool uses_time = false;
 
 		virtual void set_code(const String &p_Code);
 		virtual void set_path_hint(const String &p_path);
-		virtual void set_default_texture_param(const StringName &p_name, RID p_texture, int p_index);
+		virtual void set_default_texture_parameter(const StringName &p_name, RID p_texture, int p_index);
 		virtual void get_shader_uniform_list(List<PropertyInfo> *p_param_list) const;
 		virtual void get_instance_param_list(List<RendererMaterialStorage::InstanceShaderParam> *p_param_list) const;
 
-		virtual bool is_param_texture(const StringName &p_param) const;
+		virtual bool is_parameter_texture(const StringName &p_param) const;
 		virtual bool is_animated() const;
 		virtual bool casts_shadows() const;
 		virtual Variant get_default_parameter(const StringName &p_parameter) const;

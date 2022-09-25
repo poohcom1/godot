@@ -49,7 +49,7 @@ class FogVolume : public VisualInstance3D {
 protected:
 	_FORCE_INLINE_ RID _get_volume() { return volume; }
 	static void _bind_methods();
-	virtual void _validate_property(PropertyInfo &property) const override;
+	void _validate_property(PropertyInfo &p_property) const;
 
 public:
 	void set_extents(const Vector3 &p_extents);
@@ -62,7 +62,7 @@ public:
 	Ref<Material> get_material() const;
 
 	virtual AABB get_aabb() const override;
-	TypedArray<String> get_configuration_warnings() const override;
+	PackedStringArray get_configuration_warnings() const override;
 
 	FogVolume();
 	~FogVolume();

@@ -683,7 +683,7 @@ bool GDScript::_update_exports(bool *r_err, bool p_recursive_call, PlaceHolderSc
 						if (base.is_empty() || base.is_relative_path()) {
 							ERR_PRINT(("Could not resolve relative path for parent class: " + path).utf8().get_data());
 						} else {
-							path = base.get_base_dir().plus_file(path);
+							path = base.get_base_dir().path_join(path);
 						}
 					}
 				} else if (c->extends.size() != 0) {
@@ -1077,10 +1077,12 @@ Error GDScript::load_source_code(const String &p_path) {
 	}
 
 	source = s;
+	path = p_path;
 #ifdef TOOLS_ENABLED
 	source_changed_cache = true;
-#endif
-	path = p_path;
+	set_edited(false);
+	set_last_modified_time(FileAccess::get_modified_time(path));
+#endif // TOOLS_ENABLED
 	return OK;
 }
 
@@ -1536,6 +1538,47 @@ void GDScriptInstance::get_property_list(List<PropertyInfo> *p_properties) const
 
 		sptr = sptr->_base;
 	}
+}
+
+bool GDScriptInstance::property_can_revert(const StringName &p_name) const {
+	Variant name = p_name;
+	const Variant *args[1] = { &name };
+
+	const GDScript *sptr = script.ptr();
+	while (sptr) {
+		HashMap<StringName, GDScriptFunction *>::ConstIterator E = sptr->member_functions.find(GDScriptLanguage::get_singleton()->strings._property_can_revert);
+		if (E) {
+			Callable::CallError err;
+			Variant ret = E->value->call(const_cast<GDScriptInstance *>(this), args, 1, err);
+			if (err.error == Callable::CallError::CALL_OK && ret.get_type() == Variant::BOOL && ret.operator bool()) {
+				return true;
+			}
+		}
+		sptr = sptr->_base;
+	}
+
+	return false;
+}
+
+bool GDScriptInstance::property_get_revert(const StringName &p_name, Variant &r_ret) const {
+	Variant name = p_name;
+	const Variant *args[1] = { &name };
+
+	const GDScript *sptr = script.ptr();
+	while (sptr) {
+		HashMap<StringName, GDScriptFunction *>::ConstIterator E = sptr->member_functions.find(GDScriptLanguage::get_singleton()->strings._property_get_revert);
+		if (E) {
+			Callable::CallError err;
+			Variant ret = E->value->call(const_cast<GDScriptInstance *>(this), args, 1, err);
+			if (err.error == Callable::CallError::CALL_OK && ret.get_type() != Variant::NIL) {
+				r_ret = ret;
+				return true;
+			}
+		}
+		sptr = sptr->_base;
+	}
+
+	return false;
 }
 
 void GDScriptInstance::get_method_list(List<MethodInfo> *p_list) const {
@@ -2163,7 +2206,7 @@ String GDScriptLanguage::get_global_class_name(const String &p_path, String *r_b
 			if (c->icon_path.is_empty() || c->icon_path.is_absolute_path()) {
 				*r_icon_path = c->icon_path;
 			} else if (c->icon_path.is_relative_path()) {
-				*r_icon_path = p_path.get_base_dir().plus_file(c->icon_path).simplify_path();
+				*r_icon_path = p_path.get_base_dir().path_join(c->icon_path).simplify_path();
 			}
 		}
 		if (r_base_type) {
@@ -2191,7 +2234,7 @@ String GDScriptLanguage::get_global_class_name(const String &p_path, String *r_b
 							}
 							String subpath = subclass->extends_path;
 							if (subpath.is_relative_path()) {
-								subpath = path.get_base_dir().plus_file(subpath).simplify_path();
+								subpath = path.get_base_dir().path_join(subpath).simplify_path();
 							}
 
 							if (OK != subparser.parse(subsource, subpath, false)) {
@@ -2248,6 +2291,8 @@ GDScriptLanguage::GDScriptLanguage() {
 	strings._set = StaticCString::create("_set");
 	strings._get = StaticCString::create("_get");
 	strings._get_property_list = StaticCString::create("_get_property_list");
+	strings._property_can_revert = StaticCString::create("_property_can_revert");
+	strings._property_get_revert = StaticCString::create("_property_get_revert");
 	strings._script_source = StaticCString::create("script/source");
 	_debug_parse_err_line = -1;
 	_debug_parse_err_file = "";
@@ -2345,7 +2390,7 @@ Ref<Resource> ResourceFormatLoaderGDScript::load(const String &p_path, const Str
 	}
 
 	Error err;
-	Ref<GDScript> script = GDScriptCache::get_full_script(p_path, err);
+	Ref<GDScript> script = GDScriptCache::get_full_script(p_path, err, "", p_cache_mode == CACHE_MODE_IGNORE);
 
 	// TODO: Reintroduce binary and encrypted scripts.
 

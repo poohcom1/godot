@@ -34,6 +34,7 @@
 #include "core/input/input.h"
 #include "core/os/keyboard.h"
 #include "core/os/os.h"
+#include "core/variant/typed_array.h"
 
 InputMap *InputMap::singleton = nullptr;
 
@@ -99,8 +100,8 @@ void InputMap::erase_action(const StringName &p_action) {
 	input_map.erase(p_action);
 }
 
-Array InputMap::_get_actions() {
-	Array ret;
+TypedArray<StringName> InputMap::_get_actions() {
+	TypedArray<StringName> ret;
 	List<StringName> actions = get_actions();
 	if (actions.is_empty()) {
 		return ret;
@@ -190,8 +191,8 @@ void InputMap::action_erase_events(const StringName &p_action) {
 	input_map[p_action].inputs.clear();
 }
 
-Array InputMap::_action_get_events(const StringName &p_action) {
-	Array ret;
+TypedArray<InputEvent> InputMap::_action_get_events(const StringName &p_action) {
+	TypedArray<InputEvent> ret;
 	const List<Ref<InputEvent>> *al = action_get_events(p_action);
 	if (al) {
 		for (const List<Ref<InputEvent>>::Element *E = al->front(); E; E = E->next()) {
@@ -428,27 +429,27 @@ const HashMap<String, List<Ref<InputEvent>>> &InputMap::get_builtins() {
 	// ///// UI basic Shortcuts /////
 
 	inputs = List<Ref<InputEvent>>();
-	inputs.push_back(InputEventKey::create_reference(Key::X | KeyModifierMask::CMD));
+	inputs.push_back(InputEventKey::create_reference(Key::X | KeyModifierMask::CMD_OR_CTRL));
 	inputs.push_back(InputEventKey::create_reference(Key::KEY_DELETE | KeyModifierMask::SHIFT));
 	default_builtin_cache.insert("ui_cut", inputs);
 
 	inputs = List<Ref<InputEvent>>();
-	inputs.push_back(InputEventKey::create_reference(Key::C | KeyModifierMask::CMD));
-	inputs.push_back(InputEventKey::create_reference(Key::INSERT | KeyModifierMask::CMD));
+	inputs.push_back(InputEventKey::create_reference(Key::C | KeyModifierMask::CMD_OR_CTRL));
+	inputs.push_back(InputEventKey::create_reference(Key::INSERT | KeyModifierMask::CMD_OR_CTRL));
 	default_builtin_cache.insert("ui_copy", inputs);
 
 	inputs = List<Ref<InputEvent>>();
-	inputs.push_back(InputEventKey::create_reference(Key::V | KeyModifierMask::CMD));
+	inputs.push_back(InputEventKey::create_reference(Key::V | KeyModifierMask::CMD_OR_CTRL));
 	inputs.push_back(InputEventKey::create_reference(Key::INSERT | KeyModifierMask::SHIFT));
 	default_builtin_cache.insert("ui_paste", inputs);
 
 	inputs = List<Ref<InputEvent>>();
-	inputs.push_back(InputEventKey::create_reference(Key::Z | KeyModifierMask::CMD));
+	inputs.push_back(InputEventKey::create_reference(Key::Z | KeyModifierMask::CMD_OR_CTRL));
 	default_builtin_cache.insert("ui_undo", inputs);
 
 	inputs = List<Ref<InputEvent>>();
-	inputs.push_back(InputEventKey::create_reference(Key::Z | KeyModifierMask::CMD | KeyModifierMask::SHIFT));
-	inputs.push_back(InputEventKey::create_reference(Key::Y | KeyModifierMask::CMD));
+	inputs.push_back(InputEventKey::create_reference(Key::Z | KeyModifierMask::CMD_OR_CTRL | KeyModifierMask::SHIFT));
+	inputs.push_back(InputEventKey::create_reference(Key::Y | KeyModifierMask::CMD_OR_CTRL));
 	default_builtin_cache.insert("ui_redo", inputs);
 
 	// ///// UI Text Input Shortcuts /////
@@ -473,13 +474,13 @@ const HashMap<String, List<Ref<InputEvent>>> &InputMap::get_builtins() {
 
 	inputs = List<Ref<InputEvent>>();
 
-	inputs.push_back(InputEventKey::create_reference(Key::ENTER | KeyModifierMask::CMD));
-	inputs.push_back(InputEventKey::create_reference(Key::KP_ENTER | KeyModifierMask::CMD));
+	inputs.push_back(InputEventKey::create_reference(Key::ENTER | KeyModifierMask::CMD_OR_CTRL));
+	inputs.push_back(InputEventKey::create_reference(Key::KP_ENTER | KeyModifierMask::CMD_OR_CTRL));
 	default_builtin_cache.insert("ui_text_newline_blank", inputs);
 
 	inputs = List<Ref<InputEvent>>();
-	inputs.push_back(InputEventKey::create_reference(Key::ENTER | KeyModifierMask::SHIFT | KeyModifierMask::CMD));
-	inputs.push_back(InputEventKey::create_reference(Key::KP_ENTER | KeyModifierMask::SHIFT | KeyModifierMask::CMD));
+	inputs.push_back(InputEventKey::create_reference(Key::ENTER | KeyModifierMask::SHIFT | KeyModifierMask::CMD_OR_CTRL));
+	inputs.push_back(InputEventKey::create_reference(Key::KP_ENTER | KeyModifierMask::SHIFT | KeyModifierMask::CMD_OR_CTRL));
 	default_builtin_cache.insert("ui_text_newline_above", inputs);
 
 	// Indentation
@@ -498,7 +499,7 @@ const HashMap<String, List<Ref<InputEvent>>> &InputMap::get_builtins() {
 	default_builtin_cache.insert("ui_text_backspace", inputs);
 
 	inputs = List<Ref<InputEvent>>();
-	inputs.push_back(InputEventKey::create_reference(Key::BACKSPACE | KeyModifierMask::CMD));
+	inputs.push_back(InputEventKey::create_reference(Key::BACKSPACE | KeyModifierMask::CMD_OR_CTRL));
 	default_builtin_cache.insert("ui_text_backspace_word", inputs);
 
 	inputs = List<Ref<InputEvent>>();
@@ -509,7 +510,7 @@ const HashMap<String, List<Ref<InputEvent>>> &InputMap::get_builtins() {
 	default_builtin_cache.insert("ui_text_backspace_all_to_left", inputs);
 
 	inputs = List<Ref<InputEvent>>();
-	inputs.push_back(InputEventKey::create_reference(Key::BACKSPACE | KeyModifierMask::CMD));
+	inputs.push_back(InputEventKey::create_reference(Key::BACKSPACE | KeyModifierMask::CMD_OR_CTRL));
 	default_builtin_cache.insert("ui_text_backspace_all_to_left.macos", inputs);
 
 	inputs = List<Ref<InputEvent>>();
@@ -517,7 +518,7 @@ const HashMap<String, List<Ref<InputEvent>>> &InputMap::get_builtins() {
 	default_builtin_cache.insert("ui_text_delete", inputs);
 
 	inputs = List<Ref<InputEvent>>();
-	inputs.push_back(InputEventKey::create_reference(Key::KEY_DELETE | KeyModifierMask::CMD));
+	inputs.push_back(InputEventKey::create_reference(Key::KEY_DELETE | KeyModifierMask::CMD_OR_CTRL));
 	default_builtin_cache.insert("ui_text_delete_word", inputs);
 
 	inputs = List<Ref<InputEvent>>();
@@ -528,7 +529,7 @@ const HashMap<String, List<Ref<InputEvent>>> &InputMap::get_builtins() {
 	default_builtin_cache.insert("ui_text_delete_all_to_right", inputs);
 
 	inputs = List<Ref<InputEvent>>();
-	inputs.push_back(InputEventKey::create_reference(Key::KEY_DELETE | KeyModifierMask::CMD));
+	inputs.push_back(InputEventKey::create_reference(Key::KEY_DELETE | KeyModifierMask::CMD_OR_CTRL));
 	default_builtin_cache.insert("ui_text_delete_all_to_right.macos", inputs);
 
 	// Text Caret Movement Left/Right
@@ -538,7 +539,7 @@ const HashMap<String, List<Ref<InputEvent>>> &InputMap::get_builtins() {
 	default_builtin_cache.insert("ui_text_caret_left", inputs);
 
 	inputs = List<Ref<InputEvent>>();
-	inputs.push_back(InputEventKey::create_reference(Key::LEFT | KeyModifierMask::CMD));
+	inputs.push_back(InputEventKey::create_reference(Key::LEFT | KeyModifierMask::CMD_OR_CTRL));
 	default_builtin_cache.insert("ui_text_caret_word_left", inputs);
 
 	inputs = List<Ref<InputEvent>>();
@@ -550,7 +551,7 @@ const HashMap<String, List<Ref<InputEvent>>> &InputMap::get_builtins() {
 	default_builtin_cache.insert("ui_text_caret_right", inputs);
 
 	inputs = List<Ref<InputEvent>>();
-	inputs.push_back(InputEventKey::create_reference(Key::RIGHT | KeyModifierMask::CMD));
+	inputs.push_back(InputEventKey::create_reference(Key::RIGHT | KeyModifierMask::CMD_OR_CTRL));
 	default_builtin_cache.insert("ui_text_caret_word_right", inputs);
 
 	inputs = List<Ref<InputEvent>>();
@@ -575,7 +576,7 @@ const HashMap<String, List<Ref<InputEvent>>> &InputMap::get_builtins() {
 
 	inputs = List<Ref<InputEvent>>();
 	inputs.push_back(InputEventKey::create_reference(Key::A | KeyModifierMask::CTRL));
-	inputs.push_back(InputEventKey::create_reference(Key::LEFT | KeyModifierMask::CMD));
+	inputs.push_back(InputEventKey::create_reference(Key::LEFT | KeyModifierMask::CMD_OR_CTRL));
 	default_builtin_cache.insert("ui_text_caret_line_start.macos", inputs);
 
 	inputs = List<Ref<InputEvent>>();
@@ -584,7 +585,7 @@ const HashMap<String, List<Ref<InputEvent>>> &InputMap::get_builtins() {
 
 	inputs = List<Ref<InputEvent>>();
 	inputs.push_back(InputEventKey::create_reference(Key::E | KeyModifierMask::CTRL));
-	inputs.push_back(InputEventKey::create_reference(Key::RIGHT | KeyModifierMask::CMD));
+	inputs.push_back(InputEventKey::create_reference(Key::RIGHT | KeyModifierMask::CMD_OR_CTRL));
 	default_builtin_cache.insert("ui_text_caret_line_end.macos", inputs);
 
 	// Text Caret Movement Page Up/Down
@@ -600,47 +601,47 @@ const HashMap<String, List<Ref<InputEvent>>> &InputMap::get_builtins() {
 	// Text Caret Movement Document Start/End
 
 	inputs = List<Ref<InputEvent>>();
-	inputs.push_back(InputEventKey::create_reference(Key::HOME | KeyModifierMask::CMD));
+	inputs.push_back(InputEventKey::create_reference(Key::HOME | KeyModifierMask::CMD_OR_CTRL));
 	default_builtin_cache.insert("ui_text_caret_document_start", inputs);
 
 	inputs = List<Ref<InputEvent>>();
-	inputs.push_back(InputEventKey::create_reference(Key::UP | KeyModifierMask::CMD));
+	inputs.push_back(InputEventKey::create_reference(Key::UP | KeyModifierMask::CMD_OR_CTRL));
 	default_builtin_cache.insert("ui_text_caret_document_start.macos", inputs);
 
 	inputs = List<Ref<InputEvent>>();
-	inputs.push_back(InputEventKey::create_reference(Key::END | KeyModifierMask::CMD));
+	inputs.push_back(InputEventKey::create_reference(Key::END | KeyModifierMask::CMD_OR_CTRL));
 	default_builtin_cache.insert("ui_text_caret_document_end", inputs);
 
 	inputs = List<Ref<InputEvent>>();
-	inputs.push_back(InputEventKey::create_reference(Key::DOWN | KeyModifierMask::CMD));
+	inputs.push_back(InputEventKey::create_reference(Key::DOWN | KeyModifierMask::CMD_OR_CTRL));
 	default_builtin_cache.insert("ui_text_caret_document_end.macos", inputs);
 
 	// Text Scrolling
 
 	inputs = List<Ref<InputEvent>>();
-	inputs.push_back(InputEventKey::create_reference(Key::UP | KeyModifierMask::CMD));
+	inputs.push_back(InputEventKey::create_reference(Key::UP | KeyModifierMask::CMD_OR_CTRL));
 	default_builtin_cache.insert("ui_text_scroll_up", inputs);
 
 	inputs = List<Ref<InputEvent>>();
-	inputs.push_back(InputEventKey::create_reference(Key::UP | KeyModifierMask::CMD | KeyModifierMask::ALT));
+	inputs.push_back(InputEventKey::create_reference(Key::UP | KeyModifierMask::CMD_OR_CTRL | KeyModifierMask::ALT));
 	default_builtin_cache.insert("ui_text_scroll_up.macos", inputs);
 
 	inputs = List<Ref<InputEvent>>();
-	inputs.push_back(InputEventKey::create_reference(Key::DOWN | KeyModifierMask::CMD));
+	inputs.push_back(InputEventKey::create_reference(Key::DOWN | KeyModifierMask::CMD_OR_CTRL));
 	default_builtin_cache.insert("ui_text_scroll_down", inputs);
 
 	inputs = List<Ref<InputEvent>>();
-	inputs.push_back(InputEventKey::create_reference(Key::DOWN | KeyModifierMask::CMD | KeyModifierMask::ALT));
+	inputs.push_back(InputEventKey::create_reference(Key::DOWN | KeyModifierMask::CMD_OR_CTRL | KeyModifierMask::ALT));
 	default_builtin_cache.insert("ui_text_scroll_down.macos", inputs);
 
 	// Text Misc
 
 	inputs = List<Ref<InputEvent>>();
-	inputs.push_back(InputEventKey::create_reference(Key::A | KeyModifierMask::CMD));
+	inputs.push_back(InputEventKey::create_reference(Key::A | KeyModifierMask::CMD_OR_CTRL));
 	default_builtin_cache.insert("ui_text_select_all", inputs);
 
 	inputs = List<Ref<InputEvent>>();
-	inputs.push_back(InputEventKey::create_reference(Key::D | KeyModifierMask::CMD));
+	inputs.push_back(InputEventKey::create_reference(Key::D | KeyModifierMask::CMD_OR_CTRL));
 	default_builtin_cache.insert("ui_text_select_word_under_caret", inputs);
 
 	inputs = List<Ref<InputEvent>>();
@@ -659,7 +660,7 @@ const HashMap<String, List<Ref<InputEvent>>> &InputMap::get_builtins() {
 	// ///// UI Graph Shortcuts /////
 
 	inputs = List<Ref<InputEvent>>();
-	inputs.push_back(InputEventKey::create_reference(Key::D | KeyModifierMask::CMD));
+	inputs.push_back(InputEventKey::create_reference(Key::D | KeyModifierMask::CMD_OR_CTRL));
 	default_builtin_cache.insert("ui_graph_duplicate", inputs);
 
 	inputs = List<Ref<InputEvent>>();
@@ -680,7 +681,7 @@ const HashMap<String, List<Ref<InputEvent>>> &InputMap::get_builtins() {
 	default_builtin_cache.insert("ui_filedialog_show_hidden", inputs);
 
 	inputs = List<Ref<InputEvent>>();
-	inputs.push_back(InputEventKey::create_reference(Key::QUOTELEFT | KeyModifierMask::CMD));
+	inputs.push_back(InputEventKey::create_reference(Key::QUOTELEFT | KeyModifierMask::CMD_OR_CTRL));
 	default_builtin_cache.insert("ui_swap_input_direction", inputs);
 
 	return default_builtin_cache;

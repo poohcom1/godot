@@ -473,20 +473,25 @@ bool Area3D::is_monitoring() const {
 }
 
 TypedArray<Node3D> Area3D::get_overlapping_bodies() const {
-	ERR_FAIL_COND_V(!monitoring, Array());
-	Array ret;
+	TypedArray<Node3D> ret;
+	ERR_FAIL_COND_V_MSG(!monitoring, ret, "Can't find overlapping bodies when monitoring is off.");
 	ret.resize(body_map.size());
 	int idx = 0;
 	for (const KeyValue<ObjectID, BodyState> &E : body_map) {
 		Object *obj = ObjectDB::get_instance(E.key);
-		if (!obj) {
-			ret.resize(ret.size() - 1); //ops
-		} else {
-			ret[idx++] = obj;
+		if (obj) {
+			ret[idx] = obj;
+			idx++;
 		}
 	}
 
+	ret.resize(idx);
 	return ret;
+}
+
+bool Area3D::has_overlapping_bodies() const {
+	ERR_FAIL_COND_V_MSG(!monitoring, false, "Can't find overlapping bodies when monitoring is off.");
+	return !body_map.is_empty();
 }
 
 void Area3D::set_monitorable(bool p_enable) {
@@ -506,20 +511,24 @@ bool Area3D::is_monitorable() const {
 }
 
 TypedArray<Area3D> Area3D::get_overlapping_areas() const {
-	ERR_FAIL_COND_V(!monitoring, Array());
-	Array ret;
+	TypedArray<Area3D> ret;
+	ERR_FAIL_COND_V_MSG(!monitoring, ret, "Can't find overlapping areas when monitoring is off.");
 	ret.resize(area_map.size());
 	int idx = 0;
 	for (const KeyValue<ObjectID, AreaState> &E : area_map) {
 		Object *obj = ObjectDB::get_instance(E.key);
-		if (!obj) {
-			ret.resize(ret.size() - 1); //ops
-		} else {
-			ret[idx++] = obj;
+		if (obj) {
+			ret[idx] = obj;
+			idx++;
 		}
 	}
-
+	ret.resize(idx);
 	return ret;
+}
+
+bool Area3D::has_overlapping_areas() const {
+	ERR_FAIL_COND_V_MSG(!monitoring, false, "Can't find overlapping areas when monitoring is off.");
+	return !area_map.is_empty();
 }
 
 bool Area3D::overlaps_area(Node *p_area) const {
@@ -598,8 +607,8 @@ float Area3D::get_reverb_uniformity() const {
 	return reverb_uniformity;
 }
 
-void Area3D::_validate_property(PropertyInfo &property) const {
-	if (property.name == "audio_bus_name" || property.name == "reverb_bus_name") {
+void Area3D::_validate_property(PropertyInfo &p_property) const {
+	if (p_property.name == "audio_bus_name" || p_property.name == "reverb_bus_name") {
 		String options;
 		for (int i = 0; i < AudioServer::get_singleton()->get_bus_count(); i++) {
 			if (i > 0) {
@@ -609,32 +618,30 @@ void Area3D::_validate_property(PropertyInfo &property) const {
 			options += name;
 		}
 
-		property.hint_string = options;
-	} else if (property.name.begins_with("gravity") && property.name != "gravity_space_override") {
+		p_property.hint_string = options;
+	} else if (p_property.name.begins_with("gravity") && p_property.name != "gravity_space_override") {
 		if (gravity_space_override == SPACE_OVERRIDE_DISABLED) {
-			property.usage = PROPERTY_USAGE_NO_EDITOR | PROPERTY_USAGE_INTERNAL;
+			p_property.usage = PROPERTY_USAGE_NO_EDITOR;
 		} else {
 			if (gravity_is_point) {
-				if (property.name == "gravity_direction") {
-					property.usage = PROPERTY_USAGE_NO_EDITOR | PROPERTY_USAGE_INTERNAL;
+				if (p_property.name == "gravity_direction") {
+					p_property.usage = PROPERTY_USAGE_NO_EDITOR;
 				}
 			} else {
-				if (property.name.begins_with("gravity_point_")) {
-					property.usage = PROPERTY_USAGE_NO_EDITOR | PROPERTY_USAGE_INTERNAL;
+				if (p_property.name.begins_with("gravity_point_")) {
+					p_property.usage = PROPERTY_USAGE_NO_EDITOR;
 				}
 			}
 		}
-	} else if (property.name.begins_with("linear_damp") && property.name != "linear_damp_space_override") {
+	} else if (p_property.name.begins_with("linear_damp") && p_property.name != "linear_damp_space_override") {
 		if (linear_damp_space_override == SPACE_OVERRIDE_DISABLED) {
-			property.usage = PROPERTY_USAGE_NO_EDITOR | PROPERTY_USAGE_INTERNAL;
+			p_property.usage = PROPERTY_USAGE_NO_EDITOR;
 		}
-	} else if (property.name.begins_with("angular_damp") && property.name != "angular_damp_space_override") {
+	} else if (p_property.name.begins_with("angular_damp") && p_property.name != "angular_damp_space_override") {
 		if (angular_damp_space_override == SPACE_OVERRIDE_DISABLED) {
-			property.usage = PROPERTY_USAGE_NO_EDITOR | PROPERTY_USAGE_INTERNAL;
+			p_property.usage = PROPERTY_USAGE_NO_EDITOR;
 		}
 	}
-
-	CollisionObject3D::_validate_property(property);
 }
 
 void Area3D::_bind_methods() {
@@ -689,6 +696,9 @@ void Area3D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_overlapping_bodies"), &Area3D::get_overlapping_bodies);
 	ClassDB::bind_method(D_METHOD("get_overlapping_areas"), &Area3D::get_overlapping_areas);
 
+	ClassDB::bind_method(D_METHOD("has_overlapping_bodies"), &Area3D::has_overlapping_bodies);
+	ClassDB::bind_method(D_METHOD("has_overlapping_areas"), &Area3D::has_overlapping_areas);
+
 	ClassDB::bind_method(D_METHOD("overlaps_body", "body"), &Area3D::overlaps_body);
 	ClassDB::bind_method(D_METHOD("overlaps_area", "area"), &Area3D::overlaps_area);
 
@@ -730,7 +740,7 @@ void Area3D::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "gravity_point_distance_scale", PROPERTY_HINT_RANGE, "0,1024,0.001,or_greater,exp"), "set_gravity_point_distance_scale", "get_gravity_point_distance_scale");
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR3, "gravity_point_center", PROPERTY_HINT_NONE, "suffix:m"), "set_gravity_point_center", "get_gravity_point_center");
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR3, "gravity_direction"), "set_gravity_direction", "get_gravity_direction");
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "gravity", PROPERTY_HINT_RANGE, U"-32,32,0.001,or_lesser,or_greater,suffix:m/s\u00B2"), "set_gravity", "get_gravity");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "gravity", PROPERTY_HINT_RANGE, U"-32,32,0.001,or_less,or_greater,suffix:m/s\u00B2"), "set_gravity", "get_gravity");
 
 	ADD_GROUP("Linear Damp", "linear_damp_");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "linear_damp_space_override", PROPERTY_HINT_ENUM, "Disabled,Combine,Combine-Replace,Replace,Replace-Combine", PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_UPDATE_ALL_IF_MODIFIED), "set_linear_damp_space_override_mode", "get_linear_damp_space_override_mode");

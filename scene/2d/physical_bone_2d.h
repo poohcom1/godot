@@ -36,8 +36,8 @@
 
 class Joint2D;
 
-class PhysicalBone2D : public RigidDynamicBody2D {
-	GDCLASS(PhysicalBone2D, RigidDynamicBody2D);
+class PhysicalBone2D : public RigidBody2D {
+	GDCLASS(PhysicalBone2D, RigidBody2D);
 
 protected:
 	void _notification(int p_what);
@@ -79,7 +79,7 @@ public:
 	void set_follow_bone_when_simulating(bool p_follow);
 	bool get_follow_bone_when_simulating() const;
 
-	TypedArray<String> get_configuration_warnings() const override;
+	PackedStringArray get_configuration_warnings() const override;
 
 	PhysicalBone2D();
 	~PhysicalBone2D();

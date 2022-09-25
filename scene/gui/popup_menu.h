@@ -68,7 +68,7 @@ class PopupMenu : public Popup {
 		Key accel = Key::NONE;
 		int _ofs_cache = 0;
 		int _height_cache = 0;
-		int h_ofs = 0;
+		int indent = 0;
 		Ref<Shortcut> shortcut;
 		bool shortcut_is_global = false;
 		bool shortcut_is_disabled = false;
@@ -129,13 +129,61 @@ class PopupMenu : public Popup {
 	ScrollContainer *scroll_container = nullptr;
 	Control *control = nullptr;
 
+	struct ThemeCache {
+		Ref<StyleBox> panel_style;
+		Ref<StyleBox> hover_style;
+
+		Ref<StyleBox> separator_style;
+		Ref<StyleBox> labeled_separator_left;
+		Ref<StyleBox> labeled_separator_right;
+
+		int v_separation = 0;
+		int h_separation = 0;
+		int indent = 0;
+		int item_start_padding = 0;
+		int item_end_padding = 0;
+
+		Ref<Texture2D> checked;
+		Ref<Texture2D> checked_disabled;
+		Ref<Texture2D> unchecked;
+		Ref<Texture2D> unchecked_disabled;
+		Ref<Texture2D> radio_checked;
+		Ref<Texture2D> radio_checked_disabled;
+		Ref<Texture2D> radio_unchecked;
+		Ref<Texture2D> radio_unchecked_disabled;
+
+		Ref<Texture2D> submenu;
+		Ref<Texture2D> submenu_mirrored;
+
+		Ref<Font> font;
+		int font_size = 0;
+		Ref<Font> font_separator;
+		int font_separator_size = 0;
+
+		Color font_color;
+		Color font_hover_color;
+		Color font_disabled_color;
+		Color font_accelerator_color;
+		int font_outline_size = 0;
+		Color font_outline_color;
+
+		Color font_separator_color;
+		int font_separator_outline_size = 0;
+		Color font_separator_outline_color;
+	} theme_cache;
+
 	void _draw_items();
 	void _draw_background();
 
 	void _minimum_lifetime_timeout();
 	void _close_pressed();
+	void _menu_changed();
 
 protected:
+	virtual void _update_theme_item_cache() override;
+
+	virtual void add_child_notify(Node *p_child) override;
+	virtual void remove_child_notify(Node *p_child) override;
 	void _notification(int p_what);
 	bool _set(const StringName &p_name, const Variant &p_value);
 	bool _get(const StringName &p_name, Variant &r_ret) const;
@@ -183,7 +231,7 @@ public:
 	void set_item_as_radio_checkable(int p_idx, bool p_radio_checkable);
 	void set_item_tooltip(int p_idx, const String &p_tooltip);
 	void set_item_shortcut(int p_idx, const Ref<Shortcut> &p_shortcut, bool p_global = false);
-	void set_item_horizontal_offset(int p_idx, int p_offset);
+	void set_item_indent(int p_idx, int p_indent);
 	void set_item_multistate(int p_idx, int p_state);
 	void toggle_item_multistate(int p_idx);
 	void set_item_shortcut_disabled(int p_idx, bool p_disabled);
@@ -206,13 +254,15 @@ public:
 	bool is_item_checkable(int p_idx) const;
 	bool is_item_radio_checkable(int p_idx) const;
 	bool is_item_shortcut_disabled(int p_idx) const;
+	bool is_item_shortcut_global(int p_idx) const;
 	String get_item_tooltip(int p_idx) const;
 	Ref<Shortcut> get_item_shortcut(int p_idx) const;
-	int get_item_horizontal_offset(int p_idx) const;
+	int get_item_indent(int p_idx) const;
+	int get_item_max_states(int p_idx) const;
 	int get_item_state(int p_idx) const;
 
-	void set_current_index(int p_idx);
-	int get_current_index() const;
+	void set_focused_item(int p_idx);
+	int get_focused_item() const;
 
 	void set_item_count(int p_count);
 	int get_item_count() const;

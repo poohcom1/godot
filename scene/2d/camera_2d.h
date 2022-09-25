@@ -63,7 +63,7 @@ protected:
 	Vector2 zoom = Vector2(1, 1);
 	Vector2 zoom_scale = Vector2(1, 1);
 	AnchorMode anchor_mode = ANCHOR_MODE_DRAG_CENTER;
-	bool rotating = false;
+	bool ignore_rotation = true;
 	bool current = false;
 	real_t smoothing = 5.0;
 	bool smoothing_enabled = false;
@@ -100,7 +100,7 @@ protected:
 
 	void _notification(int p_what);
 	static void _bind_methods();
-	void _validate_property(PropertyInfo &property) const override;
+	void _validate_property(PropertyInfo &p_property) const;
 
 public:
 	void set_offset(const Vector2 &p_offset);
@@ -109,8 +109,8 @@ public:
 	void set_anchor_mode(AnchorMode p_anchor_mode);
 	AnchorMode get_anchor_mode() const;
 
-	void set_rotating(bool p_rotating);
-	bool is_rotating() const;
+	void set_ignore_rotation(bool p_ignore);
+	bool is_ignoring_rotation() const;
 
 	void set_limit(Side p_side, int p_limit);
 	int get_limit(Side p_side) const;

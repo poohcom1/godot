@@ -9,7 +9,7 @@
 		Below is an example EditorImportPlugin that imports a [Mesh] from a file with the extension ".special" or ".spec":
 		[codeblocks]
 		[gdscript]
-		tool
+		@tool
 		extends EditorImportPlugin
 
 		func _get_importer_name():
@@ -44,7 +44,7 @@
 		    # Fill the Mesh with data read in "file", left as an exercise to the reader.
 
 		    var filename = save_path + "." + _get_save_extension()
-		    return ResourceSaver.save(filename, mesh)
+		    return ResourceSaver.save(mesh, filename)
 		[/gdscript]
 		[csharp]
 		using Godot;
@@ -103,7 +103,7 @@
 		        var mesh = new ArrayMesh();
 		        // Fill the Mesh with data read in "file", left as an exercise to the reader.
 		        String filename = savePath + "." + GetSaveExtension();
-		        return (int)ResourceSaver.Save(filename, mesh);
+		        return (int)ResourceSaver.Save(mesh, filename);
 		    }
 		}
 		[/csharp]
@@ -115,7 +115,7 @@
 	</tutorials>
 	<methods>
 		<method name="_get_import_options" qualifiers="virtual const">
-			<return type="Array" />
+			<return type="Dictionary[]" />
 			<param index="0" name="path" type="String" />
 			<param index="1" name="preset_index" type="int" />
 			<description>
@@ -214,8 +214,8 @@
 			<param index="0" name="source_file" type="String" />
 			<param index="1" name="save_path" type="String" />
 			<param index="2" name="options" type="Dictionary" />
-			<param index="3" name="platform_variants" type="Array" />
-			<param index="4" name="gen_files" type="Array" />
+			<param index="3" name="platform_variants" type="String[]" />
+			<param index="4" name="gen_files" type="String[]" />
 			<description>
 				Imports [param source_file] into [param save_path] with the import [param options] specified. The [param platform_variants] and [param gen_files] arrays will be modified by this function.
 				This method must be overridden to do the actual importing work. See this class' description for an example of overriding this method.

@@ -141,7 +141,7 @@ private:
 	float reverb_amount = 0.0;
 	float reverb_uniformity = 0.0;
 
-	void _validate_property(PropertyInfo &property) const override;
+	void _validate_property(PropertyInfo &p_property) const;
 
 	void _initialize_wind();
 
@@ -200,6 +200,9 @@ public:
 
 	TypedArray<Node3D> get_overlapping_bodies() const;
 	TypedArray<Area3D> get_overlapping_areas() const; //function for script
+
+	bool has_overlapping_bodies() const;
+	bool has_overlapping_areas() const;
 
 	bool overlaps_area(Node *p_area) const;
 	bool overlaps_body(Node *p_body) const;

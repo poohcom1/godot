@@ -60,11 +60,10 @@
 				Returns the edited (current) scene's root [Node].
 			</description>
 		</method>
-		<method name="get_editor_main_control">
-			<return type="Control" />
+		<method name="get_editor_main_screen">
+			<return type="VBoxContainer" />
 			<description>
-				Returns the main editor control. Use this as a parent for main screens.
-				[b]Note:[/b] This returns the main editor control containing the whole editor, not the 2D or 3D viewports specifically.
+				Returns the editor control responsible for main screen plugins and tools. Use it with plugins that implement [method EditorPlugin._has_main_screen].
 				[b]Warning:[/b] Removing and freeing this node will render a part of the editor useless and may cause a crash.
 			</description>
 		</method>
@@ -101,7 +100,7 @@
 			</description>
 		</method>
 		<method name="get_open_scenes" qualifiers="const">
-			<return type="Array" />
+			<return type="PackedStringArray" />
 			<description>
 				Returns an [Array] with the file paths of the currently opened scenes.
 			</description>
@@ -166,8 +165,8 @@
 			</description>
 		</method>
 		<method name="make_mesh_previews">
-			<return type="Array" />
-			<param index="0" name="meshes" type="Array" />
+			<return type="Texture2D[]" />
+			<param index="0" name="meshes" type="Mesh[]" />
 			<param index="1" name="preview_size" type="int" />
 			<description>
 				Returns mesh previews rendered at the given size as an [Array] of [Texture2D]s.
@@ -204,6 +203,13 @@
 			<param index="0" name="scene_filepath" type="String" />
 			<description>
 				Reloads the scene at the given path.
+			</description>
+		</method>
+		<method name="restart_editor">
+			<return type="void" />
+			<param index="0" name="save" type="bool" default="true" />
+			<description>
+				Restarts the editor. This closes the editor and then opens the same project. If [param save] is [code]true[/code], the project will be saved before restarting.
 			</description>
 		</method>
 		<method name="save_scene">

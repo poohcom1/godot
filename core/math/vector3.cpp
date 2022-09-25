@@ -117,16 +117,36 @@ Vector3 Vector3::octahedron_decode(const Vector2 &p_oct) {
 	return n.normalized();
 }
 
-Basis Vector3::outer(const Vector3 &p_with) const {
-	Vector3 row0(x * p_with.x, x * p_with.y, x * p_with.z);
-	Vector3 row1(y * p_with.x, y * p_with.y, y * p_with.z);
-	Vector3 row2(z * p_with.x, z * p_with.y, z * p_with.z);
+Vector2 Vector3::octahedron_tangent_encode(const float sign) const {
+	Vector2 res = this->octahedron_encode();
+	res.y = res.y * 0.5f + 0.5f;
+	res.y = sign >= 0.0f ? res.y : 1 - res.y;
+	return res;
+}
 
-	return Basis(row0, row1, row2);
+Vector3 Vector3::octahedron_tangent_decode(const Vector2 &p_oct, float *sign) {
+	Vector2 oct_compressed = p_oct;
+	oct_compressed.y = oct_compressed.y * 2 - 1;
+	*sign = oct_compressed.y >= 0.0f ? 1.0f : -1.0f;
+	oct_compressed.y = Math::abs(oct_compressed.y);
+	Vector3 res = Vector3::octahedron_decode(oct_compressed);
+	return res;
+}
+
+Basis Vector3::outer(const Vector3 &p_with) const {
+	Basis basis;
+	basis.rows[0] = Vector3(x * p_with.x, x * p_with.y, x * p_with.z);
+	basis.rows[1] = Vector3(y * p_with.x, y * p_with.y, y * p_with.z);
+	basis.rows[2] = Vector3(z * p_with.x, z * p_with.y, z * p_with.z);
+	return basis;
 }
 
 bool Vector3::is_equal_approx(const Vector3 &p_v) const {
 	return Math::is_equal_approx(x, p_v.x) && Math::is_equal_approx(y, p_v.y) && Math::is_equal_approx(z, p_v.z);
+}
+
+bool Vector3::is_zero_approx() const {
+	return Math::is_zero_approx(x) && Math::is_zero_approx(y) && Math::is_zero_approx(z);
 }
 
 Vector3::operator String() const {

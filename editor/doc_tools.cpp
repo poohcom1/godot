@@ -41,6 +41,7 @@
 #include "core/version.h"
 #include "editor/editor_settings.h"
 #include "scene/resources/theme.h"
+#include "scene/theme/theme_db.h"
 
 // Used for a hack preserving Mono properties on non-Mono builds.
 #include "modules/modules_enabled.gen.h" // For mono.
@@ -83,6 +84,9 @@ void DocTools::merge_from(const DocTools &p_data) {
 		}
 
 		const DocData::ClassDoc &cf = p_data.class_list[c.name];
+
+		c.is_deprecated = cf.is_deprecated;
+		c.is_experimental = cf.is_experimental;
 
 		c.description = cf.description;
 		c.brief_description = cf.brief_description;
@@ -132,6 +136,8 @@ void DocTools::merge_from(const DocTools &p_data) {
 				const DocData::MethodDoc &mf = cf.constructors[j];
 
 				m.description = mf.description;
+				m.is_deprecated = mf.is_deprecated;
+				m.is_experimental = mf.is_experimental;
 				break;
 			}
 		}
@@ -147,6 +153,8 @@ void DocTools::merge_from(const DocTools &p_data) {
 				const DocData::MethodDoc &mf = cf.methods[j];
 
 				m.description = mf.description;
+				m.is_deprecated = mf.is_deprecated;
+				m.is_experimental = mf.is_experimental;
 				break;
 			}
 		}
@@ -161,6 +169,8 @@ void DocTools::merge_from(const DocTools &p_data) {
 				const DocData::MethodDoc &mf = cf.signals[j];
 
 				m.description = mf.description;
+				m.is_deprecated = mf.is_deprecated;
+				m.is_experimental = mf.is_experimental;
 				break;
 			}
 		}
@@ -175,6 +185,8 @@ void DocTools::merge_from(const DocTools &p_data) {
 				const DocData::ConstantDoc &mf = cf.constants[j];
 
 				m.description = mf.description;
+				m.is_deprecated = mf.is_deprecated;
+				m.is_experimental = mf.is_experimental;
 				break;
 			}
 		}
@@ -189,6 +201,8 @@ void DocTools::merge_from(const DocTools &p_data) {
 				const DocData::MethodDoc &mf = cf.annotations[j];
 
 				m.description = mf.description;
+				m.is_deprecated = mf.is_deprecated;
+				m.is_experimental = mf.is_experimental;
 				break;
 			}
 		}
@@ -203,6 +217,8 @@ void DocTools::merge_from(const DocTools &p_data) {
 				const DocData::PropertyDoc &pf = cf.properties[j];
 
 				p.description = pf.description;
+				p.is_deprecated = pf.is_deprecated;
+				p.is_experimental = pf.is_experimental;
 				break;
 			}
 		}
@@ -265,6 +281,8 @@ void DocTools::merge_from(const DocTools &p_data) {
 				const DocData::MethodDoc &mf = cf.operators[j];
 
 				m.description = mf.description;
+				m.is_deprecated = mf.is_deprecated;
+				m.is_experimental = mf.is_experimental;
 				break;
 			}
 		}
@@ -567,29 +585,29 @@ void DocTools::generate(bool p_basic_types) {
 			{
 				List<StringName> l;
 
-				Theme::get_default()->get_color_list(cname, &l);
+				ThemeDB::get_singleton()->get_default_theme()->get_color_list(cname, &l);
 				for (const StringName &E : l) {
 					DocData::ThemeItemDoc tid;
 					tid.name = E;
 					tid.type = "Color";
 					tid.data_type = "color";
-					tid.default_value = Variant(Theme::get_default()->get_color(E, cname)).get_construct_string().replace("\n", " ");
+					tid.default_value = Variant(ThemeDB::get_singleton()->get_default_theme()->get_color(E, cname)).get_construct_string().replace("\n", " ");
 					c.theme_properties.push_back(tid);
 				}
 
 				l.clear();
-				Theme::get_default()->get_constant_list(cname, &l);
+				ThemeDB::get_singleton()->get_default_theme()->get_constant_list(cname, &l);
 				for (const StringName &E : l) {
 					DocData::ThemeItemDoc tid;
 					tid.name = E;
 					tid.type = "int";
 					tid.data_type = "constant";
-					tid.default_value = itos(Theme::get_default()->get_constant(E, cname));
+					tid.default_value = itos(ThemeDB::get_singleton()->get_default_theme()->get_constant(E, cname));
 					c.theme_properties.push_back(tid);
 				}
 
 				l.clear();
-				Theme::get_default()->get_font_list(cname, &l);
+				ThemeDB::get_singleton()->get_default_theme()->get_font_list(cname, &l);
 				for (const StringName &E : l) {
 					DocData::ThemeItemDoc tid;
 					tid.name = E;
@@ -599,7 +617,7 @@ void DocTools::generate(bool p_basic_types) {
 				}
 
 				l.clear();
-				Theme::get_default()->get_font_size_list(cname, &l);
+				ThemeDB::get_singleton()->get_default_theme()->get_font_size_list(cname, &l);
 				for (const StringName &E : l) {
 					DocData::ThemeItemDoc tid;
 					tid.name = E;
@@ -609,7 +627,7 @@ void DocTools::generate(bool p_basic_types) {
 				}
 
 				l.clear();
-				Theme::get_default()->get_icon_list(cname, &l);
+				ThemeDB::get_singleton()->get_default_theme()->get_icon_list(cname, &l);
 				for (const StringName &E : l) {
 					DocData::ThemeItemDoc tid;
 					tid.name = E;
@@ -619,7 +637,7 @@ void DocTools::generate(bool p_basic_types) {
 				}
 
 				l.clear();
-				Theme::get_default()->get_stylebox_list(cname, &l);
+				ThemeDB::get_singleton()->get_default_theme()->get_stylebox_list(cname, &l);
 				for (const StringName &E : l) {
 					DocData::ThemeItemDoc tid;
 					tid.name = E;
@@ -1006,6 +1024,12 @@ static Error _parse_methods(Ref<XMLParser> &parser, Vector<DocData::MethodDoc> &
 				if (parser->has_attribute("qualifiers")) {
 					method.qualifiers = parser->get_attribute_value("qualifiers");
 				}
+				if (parser->has_attribute("is_deprecated")) {
+					method.is_deprecated = parser->get_attribute_value("is_deprecated").to_lower() == "true";
+				}
+				if (parser->has_attribute("is_experimental")) {
+					method.is_experimental = parser->get_attribute_value("is_experimental").to_lower() == "true";
+				}
 
 				while (parser->read() == OK) {
 					if (parser->get_node_type() == XMLParser::NODE_ELEMENT) {
@@ -1070,7 +1094,7 @@ Error DocTools::load_classes(const String &p_dir) {
 	while (!path.is_empty()) {
 		if (!da->current_is_dir() && path.ends_with("xml")) {
 			Ref<XMLParser> parser = memnew(XMLParser);
-			Error err2 = parser->open(p_dir.plus_file(path));
+			Error err2 = parser->open(p_dir.path_join(path));
 			if (err2) {
 				return err2;
 			}
@@ -1135,6 +1159,14 @@ Error DocTools::_load(Ref<XMLParser> parser) {
 		c.name = name;
 		if (parser->has_attribute("inherits")) {
 			c.inherits = parser->get_attribute_value("inherits");
+		}
+
+		if (parser->has_attribute("is_deprecated")) {
+			c.is_deprecated = parser->get_attribute_value("is_deprecated").to_lower() == "true";
+		}
+
+		if (parser->has_attribute("is_experimental")) {
+			c.is_experimental = parser->get_attribute_value("is_experimental").to_lower() == "true";
 		}
 
 		while (parser->read() == OK) {
@@ -1210,6 +1242,12 @@ Error DocTools::_load(Ref<XMLParser> parser) {
 								if (parser->has_attribute("enum")) {
 									prop2.enumeration = parser->get_attribute_value("enum");
 								}
+								if (parser->has_attribute("is_deprecated")) {
+									prop2.is_deprecated = parser->get_attribute_value("is_deprecated").to_lower() == "true";
+								}
+								if (parser->has_attribute("is_experimental")) {
+									prop2.is_experimental = parser->get_attribute_value("is_experimental").to_lower() == "true";
+								}
 								if (!parser->is_empty()) {
 									parser->read();
 									if (parser->get_node_type() == XMLParser::NODE_TEXT) {
@@ -1274,6 +1312,12 @@ Error DocTools::_load(Ref<XMLParser> parser) {
 								if (parser->has_attribute("is_bitfield")) {
 									constant2.is_bitfield = parser->get_attribute_value("is_bitfield").to_lower() == "true";
 								}
+								if (parser->has_attribute("is_deprecated")) {
+									constant2.is_deprecated = parser->get_attribute_value("is_deprecated").to_lower() == "true";
+								}
+								if (parser->has_attribute("is_experimental")) {
+									constant2.is_experimental = parser->get_attribute_value("is_experimental").to_lower() == "true";
+								}
 								if (!parser->is_empty()) {
 									parser->read();
 									if (parser->get_node_type() == XMLParser::NODE_TEXT) {
@@ -1326,7 +1370,15 @@ static void _write_method_doc(Ref<FileAccess> f, const String &p_name, Vector<Do
 				qualifiers += " qualifiers=\"" + m.qualifiers.xml_escape() + "\"";
 			}
 
-			_write_string(f, 2, "<" + p_name + " name=\"" + m.name.xml_escape() + "\"" + qualifiers + ">");
+			String additional_attributes;
+			if (m.is_deprecated) {
+				additional_attributes += " is_deprecated=\"true\"";
+			}
+			if (m.is_experimental) {
+				additional_attributes += " is_experimental=\"true\"";
+			}
+
+			_write_string(f, 2, "<" + p_name + " name=\"" + m.name.xml_escape() + "\"" + qualifiers + additional_attributes + ">");
 
 			if (!m.return_type.is_empty()) {
 				String enum_text;
@@ -1379,7 +1431,7 @@ Error DocTools::save_classes(const String &p_default_path, const HashMap<String,
 		}
 
 		Error err;
-		String save_file = save_path.plus_file(c.name + ".xml");
+		String save_file = save_path.path_join(c.name + ".xml");
 		Ref<FileAccess> f = FileAccess::open(save_file, FileAccess::WRITE, &err);
 
 		ERR_CONTINUE_MSG(err != OK, "Can't write doc file: " + save_file + ".");
@@ -1389,6 +1441,12 @@ Error DocTools::save_classes(const String &p_default_path, const HashMap<String,
 		String header = "<class name=\"" + c.name + "\"";
 		if (!c.inherits.is_empty()) {
 			header += " inherits=\"" + c.inherits + "\"";
+			if (c.is_deprecated) {
+				header += " is_deprecated=\"true\"";
+			}
+			if (c.is_experimental) {
+				header += " is_experimental=\"true\"";
+			}
 		}
 		header += String(" version=\"") + VERSION_BRANCH + "\"";
 		// Reference the XML schema so editors can provide error checking.
@@ -1432,6 +1490,12 @@ Error DocTools::save_classes(const String &p_default_path, const HashMap<String,
 				if (!c.properties[i].default_value.is_empty()) {
 					additional_attributes += " default=\"" + c.properties[i].default_value.xml_escape(true) + "\"";
 				}
+				if (c.properties[i].is_deprecated) {
+					additional_attributes += " is_deprecated=\"true\"";
+				}
+				if (c.properties[i].is_experimental) {
+					additional_attributes += " is_experimental=\"true\"";
+				}
 
 				const DocData::PropertyDoc &p = c.properties[i];
 
@@ -1452,21 +1516,30 @@ Error DocTools::save_classes(const String &p_default_path, const HashMap<String,
 			_write_string(f, 1, "<constants>");
 			for (int i = 0; i < c.constants.size(); i++) {
 				const DocData::ConstantDoc &k = c.constants[i];
+
+				String additional_attributes;
+				if (c.constants[i].is_deprecated) {
+					additional_attributes += " is_deprecated=\"true\"";
+				}
+				if (c.constants[i].is_experimental) {
+					additional_attributes += " is_experimental=\"true\"";
+				}
+
 				if (k.is_value_valid) {
 					if (!k.enumeration.is_empty()) {
 						if (k.is_bitfield) {
-							_write_string(f, 2, "<constant name=\"" + k.name + "\" value=\"" + k.value + "\" enum=\"" + k.enumeration + "\" is_bitfield=\"true\">");
+							_write_string(f, 2, "<constant name=\"" + k.name + "\" value=\"" + k.value + "\" enum=\"" + k.enumeration + "\" is_bitfield=\"true\"" + additional_attributes + ">");
 						} else {
-							_write_string(f, 2, "<constant name=\"" + k.name + "\" value=\"" + k.value + "\" enum=\"" + k.enumeration + "\">");
+							_write_string(f, 2, "<constant name=\"" + k.name + "\" value=\"" + k.value + "\" enum=\"" + k.enumeration + "\"" + additional_attributes + ">");
 						}
 					} else {
-						_write_string(f, 2, "<constant name=\"" + k.name + "\" value=\"" + k.value + "\">");
+						_write_string(f, 2, "<constant name=\"" + k.name + "\" value=\"" + k.value + "\"" + additional_attributes + ">");
 					}
 				} else {
 					if (!k.enumeration.is_empty()) {
-						_write_string(f, 2, "<constant name=\"" + k.name + "\" value=\"platform-dependent\" enum=\"" + k.enumeration + "\">");
+						_write_string(f, 2, "<constant name=\"" + k.name + "\" value=\"platform-dependent\" enum=\"" + k.enumeration + "\"" + additional_attributes + ">");
 					} else {
-						_write_string(f, 2, "<constant name=\"" + k.name + "\" value=\"platform-dependent\">");
+						_write_string(f, 2, "<constant name=\"" + k.name + "\" value=\"platform-dependent\"" + additional_attributes + ">");
 					}
 				}
 				_write_string(f, 3, _translate_doc_string(k.description).strip_edges().xml_escape());

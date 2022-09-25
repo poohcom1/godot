@@ -53,7 +53,7 @@ void SceneCreateDialog::_notification(int p_what) {
 			node_type_3d->set_icon(get_theme_icon(SNAME("Node3D"), SNAME("EditorIcons")));
 			node_type_gui->set_icon(get_theme_icon(SNAME("Control"), SNAME("EditorIcons")));
 			node_type_other->add_theme_icon_override(SNAME("icon"), get_theme_icon(SNAME("Node"), SNAME("EditorIcons")));
-			status_panel->add_theme_style_override("panel", get_theme_stylebox(SNAME("bg"), SNAME("Tree")));
+			status_panel->add_theme_style_override("panel", get_theme_stylebox(SNAME("panel"), SNAME("Tree")));
 		} break;
 	}
 }
@@ -111,7 +111,7 @@ void SceneCreateDialog::update_dialog() {
 	}
 
 	if (is_valid) {
-		scene_name = directory.plus_file(scene_name);
+		scene_name = directory.path_join(scene_name);
 		Ref<DirAccess> da = DirAccess::create(DirAccess::ACCESS_RESOURCES);
 		if (da->file_exists(scene_name)) {
 			update_error(file_error_label, MSG_ERROR, TTR("File already exists."));
@@ -133,7 +133,7 @@ void SceneCreateDialog::update_dialog() {
 		root_name = scene_name.get_file().get_basename();
 	}
 
-	if (!root_name.is_valid_identifier()) {
+	if (root_name.is_empty() || root_name.validate_node_name().size() != root_name.size()) {
 		update_error(node_error_label, MSG_ERROR, TTR("Invalid root node name."));
 		is_valid = false;
 	}

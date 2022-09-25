@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       # Azure repositories are not reliable, we need to prevent Azure giving us packages.
       - name: Make apt sources.list use the default Ubuntu repositories
@@ -24,18 +24,14 @@ jobs:
 
       - name: Install dependencies
         run: |
-          sudo apt-get install -qq dos2unix recode clang-format-13 libxml2-utils
-          sudo update-alternatives --remove-all clang-format
+          sudo apt-get install -qq dos2unix recode clang-format-13 libxml2-utils python3-pip moreutils
+          sudo update-alternatives --remove-all clang-format || true
           sudo update-alternatives --install /usr/bin/clang-format clang-format /usr/bin/clang-format-13 100
-          sudo pip3 install black==22.3.0 pygments
+          sudo pip3 install black==22.3.0 pygments pytest
 
       - name: File formatting checks (file_format.sh)
         run: |
           bash ./misc/scripts/file_format.sh
-
-      - name: Style checks via clang-format (clang_format.sh)
-        run: |
-          bash ./misc/scripts/clang_format.sh
 
       - name: Header guards formatting checks (header_guards.sh)
         run: |
@@ -45,9 +41,13 @@ jobs:
         run: |
           bash ./misc/scripts/black_format.sh
 
+      - name: Python builders checks via pytest (pytest_builders.sh)
+        run: |
+          bash ./misc/scripts/pytest_builders.sh
+
       - name: JavaScript style and documentation checks via ESLint and JSDoc
         run: |
-          cd platform/javascript
+          cd platform/web
           npm ci
           npm run lint
           npm run docs -- -d dry-run
@@ -59,3 +59,11 @@ jobs:
       - name: Documentation checks
         run: |
           doc/tools/make_rst.py --dry-run --color doc/classes modules
+
+      - name: Style checks via clang-format (clang_format.sh)
+        run: |
+          bash ./misc/scripts/clang_format.sh
+
+      - name: Style checks via dotnet format (dotnet_format.sh)
+        run: |
+          bash ./misc/scripts/dotnet_format.sh

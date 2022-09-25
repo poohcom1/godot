@@ -38,6 +38,8 @@
 #include "core/variant/native_ptr.h"
 
 class PhysicsDirectSpaceState3D;
+template <typename T>
+class TypedArray;
 
 class PhysicsDirectBodyState3D : public Object {
 	GDCLASS(PhysicsDirectBodyState3D, Object);
@@ -120,10 +122,10 @@ class PhysicsDirectSpaceState3D : public Object {
 
 private:
 	Dictionary _intersect_ray(const Ref<PhysicsRayQueryParameters3D> &p_ray_query);
-	Array _intersect_point(const Ref<PhysicsPointQueryParameters3D> &p_point_query, int p_max_results = 32);
-	Array _intersect_shape(const Ref<PhysicsShapeQueryParameters3D> &p_shape_query, int p_max_results = 32);
-	Array _cast_motion(const Ref<PhysicsShapeQueryParameters3D> &p_shape_query);
-	Array _collide_shape(const Ref<PhysicsShapeQueryParameters3D> &p_shape_query, int p_max_results = 32);
+	TypedArray<Dictionary> _intersect_point(const Ref<PhysicsPointQueryParameters3D> &p_point_query, int p_max_results = 32);
+	TypedArray<Dictionary> _intersect_shape(const Ref<PhysicsShapeQueryParameters3D> &p_shape_query, int p_max_results = 32);
+	Vector<real_t> _cast_motion(const Ref<PhysicsShapeQueryParameters3D> &p_shape_query);
+	TypedArray<PackedVector2Array> _collide_shape(const Ref<PhysicsShapeQueryParameters3D> &p_shape_query, int p_max_results = 32);
 	Dictionary _get_rest_info(const Ref<PhysicsShapeQueryParameters3D> &p_shape_query);
 
 protected:
@@ -362,8 +364,11 @@ public:
 	virtual Variant area_get_param(RID p_parea, AreaParameter p_param) const = 0;
 	virtual Transform3D area_get_transform(RID p_area) const = 0;
 
-	virtual void area_set_collision_mask(RID p_area, uint32_t p_mask) = 0;
 	virtual void area_set_collision_layer(RID p_area, uint32_t p_layer) = 0;
+	virtual uint32_t area_get_collision_layer(RID p_area) const = 0;
+
+	virtual void area_set_collision_mask(RID p_area, uint32_t p_mask) = 0;
+	virtual uint32_t area_get_collision_mask(RID p_area) const = 0;
 
 	virtual void area_set_monitorable(RID p_area, bool p_monitorable) = 0;
 
@@ -379,8 +384,8 @@ public:
 	enum BodyMode {
 		BODY_MODE_STATIC,
 		BODY_MODE_KINEMATIC,
-		BODY_MODE_DYNAMIC,
-		BODY_MODE_DYNAMIC_LINEAR,
+		BODY_MODE_RIGID,
+		BODY_MODE_RIGID_LINEAR,
 	};
 
 	enum BodyDampMode {
@@ -420,6 +425,9 @@ public:
 
 	virtual void body_set_collision_mask(RID p_body, uint32_t p_mask) = 0;
 	virtual uint32_t body_get_collision_mask(RID p_body) const = 0;
+
+	virtual void body_set_collision_priority(RID p_body, real_t p_priority) = 0;
+	virtual real_t body_get_collision_priority(RID p_body) const = 0;
 
 	virtual void body_set_user_flags(RID p_body, uint32_t p_flags) = 0;
 	virtual uint32_t body_get_user_flags(RID p_body) const = 0;
@@ -503,10 +511,7 @@ public:
 	virtual void body_set_omit_force_integration(RID p_body, bool p_omit) = 0;
 	virtual bool body_is_omitting_force_integration(RID p_body) const = 0;
 
-	// Callback for C++ use only.
-	typedef void (*BodyStateCallback)(void *p_instance, PhysicsDirectBodyState3D *p_state);
-	virtual void body_set_state_sync_callback(RID p_body, void *p_instance, BodyStateCallback p_callback) = 0;
-
+	virtual void body_set_state_sync_callback(RID p_body, const Callable &p_callable) = 0;
 	virtual void body_set_force_integration_callback(RID p_body, const Callable &p_callable, const Variant &p_udata = Variant()) = 0;
 
 	virtual void body_set_ray_pickable(RID p_body, bool p_enable) = 0;
@@ -522,7 +527,7 @@ public:
 		bool collide_separation_ray = false;
 		HashSet<RID> exclude_bodies;
 		HashSet<ObjectID> exclude_objects;
-		bool recovery_as_collision = false;
+		bool recovery_as_collision = false; // Don't report margin recovery as collision by default, only used for floor snapping.
 
 		MotionParameters() {}
 
@@ -978,16 +983,18 @@ public:
 	real_t get_collision_depth(int p_collision_index = 0) const;
 };
 
-typedef PhysicsServer3D *(*CreatePhysicsServer3DCallback)();
+class PhysicsServer3DManager : public Object {
+	GDCLASS(PhysicsServer3DManager, Object);
 
-class PhysicsServer3DManager {
+	static PhysicsServer3DManager *singleton;
+
 	struct ClassInfo {
 		String name;
-		CreatePhysicsServer3DCallback create_callback = nullptr;
+		Callable create_callback;
 
 		ClassInfo() {}
 
-		ClassInfo(String p_name, CreatePhysicsServer3DCallback p_create_callback) :
+		ClassInfo(String p_name, Callable p_create_callback) :
 				name(p_name),
 				create_callback(p_create_callback) {}
 
@@ -1001,24 +1008,30 @@ class PhysicsServer3DManager {
 		}
 	};
 
-	static Vector<ClassInfo> physics_servers;
-	static int default_server_id;
-	static int default_server_priority;
+	Vector<ClassInfo> physics_servers;
+	int default_server_id = -1;
+	int default_server_priority = -1;
+
+	void on_servers_changed();
+
+protected:
+	static void _bind_methods();
 
 public:
 	static const String setting_property_name;
 
-private:
-	static void on_servers_changed();
+	static PhysicsServer3DManager *get_singleton();
 
-public:
-	static void register_server(const String &p_name, CreatePhysicsServer3DCallback p_creat_callback);
-	static void set_default_server(const String &p_name, int p_priority = 0);
-	static int find_server_id(const String &p_name);
-	static int get_servers_count();
-	static String get_server_name(int p_id);
-	static PhysicsServer3D *new_default_server();
-	static PhysicsServer3D *new_server(const String &p_name);
+	void register_server(const String &p_name, const Callable &p_create_callback);
+	void set_default_server(const String &p_name, int p_priority = 0);
+	int find_server_id(const String &p_name);
+	int get_servers_count();
+	String get_server_name(int p_id);
+	PhysicsServer3D *new_default_server();
+	PhysicsServer3D *new_server(const String &p_name);
+
+	PhysicsServer3DManager();
+	~PhysicsServer3DManager();
 };
 
 VARIANT_ENUM_CAST(PhysicsServer3D::ShapeType);

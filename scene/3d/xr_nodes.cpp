@@ -88,8 +88,8 @@ void XRCamera3D::_pose_changed(const Ref<XRPose> &p_pose) {
 	}
 }
 
-TypedArray<String> XRCamera3D::get_configuration_warnings() const {
-	TypedArray<String> warnings = Node::get_configuration_warnings();
+PackedStringArray XRCamera3D::get_configuration_warnings() const {
+	PackedStringArray warnings = Node::get_configuration_warnings();
 
 	if (is_visible() && is_inside_tree()) {
 		// must be child node of XROrigin3D!
@@ -244,27 +244,25 @@ void XRNode3D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("trigger_haptic_pulse", "action_name", "frequency", "amplitude", "duration_sec", "delay_sec"), &XRNode3D::trigger_haptic_pulse);
 };
 
-void XRNode3D::_validate_property(PropertyInfo &property) const {
+void XRNode3D::_validate_property(PropertyInfo &p_property) const {
 	XRServer *xr_server = XRServer::get_singleton();
 	ERR_FAIL_NULL(xr_server);
 
-	if (property.name == "tracker") {
+	if (p_property.name == "tracker") {
 		PackedStringArray names = xr_server->get_suggested_tracker_names();
 		String hint_string;
 		for (const String &name : names) {
 			hint_string += name + ",";
 		}
-		property.hint_string = hint_string;
-	} else if (property.name == "pose") {
+		p_property.hint_string = hint_string;
+	} else if (p_property.name == "pose") {
 		PackedStringArray names = xr_server->get_suggested_pose_names(tracker_name);
 		String hint_string;
 		for (const String &name : names) {
 			hint_string += name + ",";
 		}
-		property.hint_string = hint_string;
+		p_property.hint_string = hint_string;
 	}
-
-	Node3D::_validate_property(property);
 }
 
 void XRNode3D::set_tracker(const StringName p_tracker_name) {
@@ -416,8 +414,8 @@ XRNode3D::~XRNode3D() {
 	xr_server->disconnect("tracker_removed", callable_mp(this, &XRNode3D::_removed_tracker));
 }
 
-TypedArray<String> XRNode3D::get_configuration_warnings() const {
-	TypedArray<String> warnings = Node::get_configuration_warnings();
+PackedStringArray XRNode3D::get_configuration_warnings() const {
+	PackedStringArray warnings = Node::get_configuration_warnings();
 
 	if (is_visible() && is_inside_tree()) {
 		// must be child node of XROrigin!
@@ -584,8 +582,8 @@ Plane XRAnchor3D::get_plane() const {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-TypedArray<String> XROrigin3D::get_configuration_warnings() const {
-	TypedArray<String> warnings = Node::get_configuration_warnings();
+PackedStringArray XROrigin3D::get_configuration_warnings() const {
+	PackedStringArray warnings = Node::get_configuration_warnings();
 
 	if (is_visible() && is_inside_tree()) {
 		if (tracked_camera == nullptr) {

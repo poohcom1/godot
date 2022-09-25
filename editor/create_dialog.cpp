@@ -38,7 +38,7 @@
 #include "editor/editor_scale.h"
 #include "editor/editor_settings.h"
 
-void CreateDialog::popup_create(bool p_dont_clear, bool p_replace_mode, const String &p_select_type) {
+void CreateDialog::popup_create(bool p_dont_clear, bool p_replace_mode, const String &p_current_type, const String &p_current_name) {
 	_fill_type_list();
 
 	icon_fallback = search_options->has_theme_icon(base_type, SNAME("EditorIcons")) ? base_type : "Object";
@@ -50,14 +50,14 @@ void CreateDialog::popup_create(bool p_dont_clear, bool p_replace_mode, const St
 	}
 
 	if (p_replace_mode) {
-		search_box->set_text(p_select_type);
+		search_box->set_text(p_current_type);
 	}
 
 	search_box->grab_focus();
 	_update_search();
 
 	if (p_replace_mode) {
-		set_title(vformat(TTR("Change %s Type"), base_type));
+		set_title(vformat(TTR("Change Type of \"%s\""), p_current_name));
 		set_ok_button_text(TTR("Change"));
 	} else {
 		set_title(vformat(TTR("Create New %s"), base_type));
@@ -296,6 +296,15 @@ void CreateDialog::_configure_search_option_item(TreeItem *r_item, const String 
 		r_item->set_icon(0, EditorNode::get_singleton()->get_class_icon(p_type, icon_fallback));
 	}
 
+	bool is_deprecated = EditorHelp::get_doc_data()->class_list[p_type].is_deprecated;
+	bool is_experimental = EditorHelp::get_doc_data()->class_list[p_type].is_experimental;
+
+	if (is_deprecated) {
+		r_item->add_button(0, get_theme_icon("StatusError", SNAME("EditorIcons")), 0, false, TTR("This class is marked as deprecated."));
+	} else if (is_experimental) {
+		r_item->add_button(0, get_theme_icon("NodeWarning", SNAME("EditorIcons")), 0, false, TTR("This class is marked as experimental."));
+	}
+
 	if (!search_box->get_text().is_empty()) {
 		r_item->set_collapsed(false);
 	} else {
@@ -309,7 +318,7 @@ void CreateDialog::_configure_search_option_item(TreeItem *r_item, const String 
 	}
 
 	const String &description = DTR(EditorHelp::get_doc_data()->class_list[p_type].brief_description);
-	r_item->set_tooltip(0, description);
+	r_item->set_tooltip_text(0, description);
 
 	if (p_type_category == TypeCategory::OTHER_TYPE && !script_type) {
 		Ref<Texture2D> icon = EditorNode::get_editor_data().get_custom_types()[custom_type_parents[p_type]][custom_type_indices[p_type]].icon;
@@ -379,7 +388,7 @@ void CreateDialog::_confirmed() {
 	}
 
 	{
-		Ref<FileAccess> f = FileAccess::open(EditorPaths::get_singleton()->get_project_settings_dir().plus_file("create_recent." + base_type), FileAccess::WRITE);
+		Ref<FileAccess> f = FileAccess::open(EditorPaths::get_singleton()->get_project_settings_dir().path_join("create_recent." + base_type), FileAccess::WRITE);
 		if (f.is_valid()) {
 			f->store_line(selected_item);
 
@@ -656,12 +665,12 @@ void CreateDialog::_save_and_update_favorite_list() {
 	TreeItem *root = favorites->create_item();
 
 	{
-		Ref<FileAccess> f = FileAccess::open(EditorPaths::get_singleton()->get_project_settings_dir().plus_file("favorites." + base_type), FileAccess::WRITE);
+		Ref<FileAccess> f = FileAccess::open(EditorPaths::get_singleton()->get_project_settings_dir().path_join("favorites." + base_type), FileAccess::WRITE);
 		if (f.is_valid()) {
 			for (int i = 0; i < favorite_list.size(); i++) {
 				String l = favorite_list[i];
 				String name = l.get_slicec(' ', 0);
-				if (!(ClassDB::class_exists(name) || ScriptServer::is_global_class(name))) {
+				if (!EditorNode::get_editor_data().is_type_recognized(name)) {
 					continue;
 				}
 				f->store_line(l);
@@ -682,19 +691,19 @@ void CreateDialog::_save_and_update_favorite_list() {
 
 void CreateDialog::_load_favorites_and_history() {
 	String dir = EditorPaths::get_singleton()->get_project_settings_dir();
-	Ref<FileAccess> f = FileAccess::open(dir.plus_file("create_recent." + base_type), FileAccess::READ);
+	Ref<FileAccess> f = FileAccess::open(dir.path_join("create_recent." + base_type), FileAccess::READ);
 	if (f.is_valid()) {
 		while (!f->eof_reached()) {
 			String l = f->get_line().strip_edges();
 			String name = l.get_slicec(' ', 0);
 
-			if ((ClassDB::class_exists(name) || ScriptServer::is_global_class(name)) && !_is_class_disabled_by_feature_profile(name)) {
+			if (EditorNode::get_editor_data().is_type_recognized(name) && !_is_class_disabled_by_feature_profile(name)) {
 				recent->add_item(l, EditorNode::get_singleton()->get_class_icon(name, icon_fallback));
 			}
 		}
 	}
 
-	f = FileAccess::open(dir.plus_file("favorites." + base_type), FileAccess::READ);
+	f = FileAccess::open(dir.path_join("favorites." + base_type), FileAccess::READ);
 	if (f.is_valid()) {
 		while (!f->eof_reached()) {
 			String l = f->get_line().strip_edges();
@@ -776,7 +785,7 @@ CreateDialog::CreateDialog() {
 
 	favorite = memnew(Button);
 	favorite->set_toggle_mode(true);
-	favorite->set_tooltip(TTR("(Un)favorite selected item."));
+	favorite->set_tooltip_text(TTR("(Un)favorite selected item."));
 	favorite->connect("pressed", callable_mp(this, &CreateDialog::_favorite_toggled));
 	search_hb->add_child(favorite);
 	vbc->add_margin_child(TTR("Search:"), search_hb);

@@ -32,6 +32,7 @@
 #define EDITOR_IMPORT_PLUGIN_H
 
 #include "core/io/resource_importer.h"
+#include "core/variant/typed_array.h"
 
 class EditorImportPlugin : public ResourceImporter {
 	GDCLASS(EditorImportPlugin, ResourceImporter);
@@ -44,13 +45,13 @@ protected:
 	GDVIRTUAL0RC(int, _get_preset_count)
 	GDVIRTUAL1RC(String, _get_preset_name, int)
 	GDVIRTUAL0RC(Vector<String>, _get_recognized_extensions)
-	GDVIRTUAL2RC(Array, _get_import_options, String, int)
+	GDVIRTUAL2RC(TypedArray<Dictionary>, _get_import_options, String, int)
 	GDVIRTUAL0RC(String, _get_save_extension)
 	GDVIRTUAL0RC(String, _get_resource_type)
 	GDVIRTUAL0RC(float, _get_priority)
 	GDVIRTUAL0RC(int, _get_import_order)
 	GDVIRTUAL3RC(bool, _get_option_visibility, String, StringName, Dictionary)
-	GDVIRTUAL5RC(int, _import, String, String, Dictionary, Array, Array)
+	GDVIRTUAL5RC(int, _import, String, String, Dictionary, TypedArray<String>, TypedArray<String>)
 
 public:
 	EditorImportPlugin();

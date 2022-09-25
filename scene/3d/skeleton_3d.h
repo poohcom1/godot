@@ -51,12 +51,14 @@ class SkinReference : public RefCounted {
 	uint64_t skeleton_version = 0;
 	Vector<uint32_t> skin_bone_indices;
 	uint32_t *skin_bone_indices_ptrs = nullptr;
-	void _skin_changed();
 
 protected:
 	static void _bind_methods();
 
 public:
+	// Public for use with callable_mp.
+	void _skin_changed();
+
 	RID get_skeleton() const;
 	Ref<Skin> get_skin() const;
 	~SkinReference();
@@ -156,7 +158,7 @@ protected:
 	bool _get(const StringName &p_path, Variant &r_ret) const;
 	bool _set(const StringName &p_path, const Variant &p_value);
 	void _get_property_list(List<PropertyInfo> *p_list) const;
-	virtual void _validate_property(PropertyInfo &property) const override;
+	void _validate_property(PropertyInfo &p_property) const;
 	void _notification(int p_what);
 	static void _bind_methods();
 
@@ -191,11 +193,8 @@ public:
 
 	void unparent_bone_and_rest(int p_bone);
 
-	Vector<int> get_bone_children(int p_bone);
-	void set_bone_children(int p_bone, Vector<int> p_children);
-	void add_bone_child(int p_bone, int p_child);
-	void remove_bone_child(int p_bone, int p_child);
-	Vector<int> get_parentless_bones();
+	Vector<int> get_bone_children(int p_bone) const;
+	Vector<int> get_parentless_bones() const;
 
 	int get_bone_count() const;
 
@@ -226,6 +225,9 @@ public:
 	Vector3 get_bone_pose_position(int p_bone) const;
 	Quaternion get_bone_pose_rotation(int p_bone) const;
 	Vector3 get_bone_pose_scale(int p_bone) const;
+
+	void reset_bone_pose(int p_bone);
+	void reset_bone_poses();
 
 	void clear_bones_global_pose_override();
 	Transform3D get_bone_global_pose_override(int p_bone) const;

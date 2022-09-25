@@ -33,6 +33,7 @@
 #include "editor/editor_data.h"
 #include "editor/editor_node.h"
 #include "editor/editor_scale.h"
+#include "editor/multi_node_edit.h"
 
 void EditorPath::_add_children_to_popup(Object *p_obj, int p_depth) {
 	if (p_depth > 8) {
@@ -72,7 +73,7 @@ void EditorPath::_add_children_to_popup(Object *p_obj, int p_depth) {
 
 		int index = sub_objects_menu->get_item_count();
 		sub_objects_menu->add_icon_item(icon, proper_name, objects.size());
-		sub_objects_menu->set_item_horizontal_offset(index, p_depth * 10 * EDSCALE);
+		sub_objects_menu->set_item_indent(index, p_depth);
 		objects.push_back(obj->get_instance_id());
 
 		_add_children_to_popup(obj, p_depth + 1);
@@ -80,6 +81,11 @@ void EditorPath::_add_children_to_popup(Object *p_obj, int p_depth) {
 }
 
 void EditorPath::_show_popup() {
+	if (sub_objects_menu->is_visible()) {
+		sub_objects_menu->hide();
+		return;
+	}
+
 	sub_objects_menu->clear();
 
 	Size2 size = get_size();
@@ -116,14 +122,22 @@ void EditorPath::update_path() {
 			continue;
 		}
 
-		Ref<Texture2D> icon = EditorNode::get_singleton()->get_object_icon(obj);
+		Ref<Texture2D> icon;
+		if (Object::cast_to<MultiNodeEdit>(obj)) {
+			icon = EditorNode::get_singleton()->get_class_icon(Object::cast_to<MultiNodeEdit>(obj)->get_edited_class_name());
+		} else {
+			icon = EditorNode::get_singleton()->get_object_icon(obj);
+		}
+
 		if (icon.is_valid()) {
 			current_object_icon->set_texture(icon);
 		}
 
 		if (i == history->get_path_size() - 1) {
 			String name;
-			if (Object::cast_to<Resource>(obj)) {
+			if (obj->has_method("_get_editor_name")) {
+				name = obj->call("_get_editor_name");
+			} else if (Object::cast_to<Resource>(obj)) {
 				Resource *r = Object::cast_to<Resource>(obj);
 				if (r->get_path().is_resource_file()) {
 					name = r->get_path().get_file();
@@ -144,24 +158,24 @@ void EditorPath::update_path() {
 				name = obj->get_class();
 			}
 
-			current_object_label->set_text(" " + name); // An extra space so the text is not too close of the icon.
-			set_tooltip(obj->get_class());
+			current_object_label->set_text(name);
+			set_tooltip_text(obj->get_class());
 		}
 	}
 }
 
 void EditorPath::clear_path() {
 	set_disabled(true);
-	set_tooltip("");
+	set_tooltip_text("");
 
 	current_object_label->set_text("");
 	current_object_icon->set_texture(nullptr);
-	sub_objects_icon->set_visible(false);
+	sub_objects_icon->hide();
 }
 
 void EditorPath::enable_path() {
 	set_disabled(false);
-	sub_objects_icon->set_visible(true);
+	sub_objects_icon->show();
 }
 
 void EditorPath::_id_pressed(int p_idx) {
@@ -181,7 +195,7 @@ void EditorPath::_notification(int p_what) {
 		case NOTIFICATION_THEME_CHANGED: {
 			update_path();
 
-			sub_objects_icon->set_texture(get_theme_icon(SNAME("select_arrow"), SNAME("Tree")));
+			sub_objects_icon->set_texture(get_theme_icon(SNAME("arrow"), SNAME("OptionButton")));
 			current_object_label->add_theme_font_override("font", get_theme_font(SNAME("main"), SNAME("EditorFonts")));
 		} break;
 
@@ -211,13 +225,12 @@ EditorPath::EditorPath(EditorSelectionHistory *p_history) {
 	main_hb->add_child(current_object_icon);
 
 	current_object_label = memnew(Label);
-	current_object_label->set_clip_text(true);
-	current_object_label->set_horizontal_alignment(HORIZONTAL_ALIGNMENT_LEFT);
+	current_object_label->set_text_overrun_behavior(TextServer::OVERRUN_TRIM_ELLIPSIS);
 	current_object_label->set_h_size_flags(SIZE_EXPAND_FILL);
 	main_hb->add_child(current_object_label);
 
 	sub_objects_icon = memnew(TextureRect);
-	sub_objects_icon->set_visible(false);
+	sub_objects_icon->hide();
 	sub_objects_icon->set_stretch_mode(TextureRect::STRETCH_KEEP_CENTERED);
 	main_hb->add_child(sub_objects_icon);
 
@@ -226,5 +239,5 @@ EditorPath::EditorPath(EditorSelectionHistory *p_history) {
 	sub_objects_menu->connect("about_to_popup", callable_mp(this, &EditorPath::_about_to_show));
 	sub_objects_menu->connect("id_pressed", callable_mp(this, &EditorPath::_id_pressed));
 
-	set_tooltip(TTR("Open a list of sub-resources."));
+	set_tooltip_text(TTR("Open a list of sub-resources."));
 }

@@ -33,6 +33,7 @@
 #include "editor/audio_stream_preview.h"
 #include "editor/editor_resource_preview.h"
 #include "editor/editor_scale.h"
+#include "editor/editor_undo_redo_manager.h"
 #include "scene/2d/animated_sprite_2d.h"
 #include "scene/2d/sprite_2d.h"
 #include "scene/3d/sprite_3d.h"
@@ -196,7 +197,7 @@ void AnimationTrackEditAudio::_preview_changed(ObjectID p_which) {
 	Ref<AudioStream> stream = object->call("get_stream");
 
 	if (stream.is_valid() && stream->get_instance_id() == p_which) {
-		update();
+		queue_redraw();
 	}
 }
 
@@ -798,7 +799,7 @@ void AnimationTrackEditTypeAudio::_preview_changed(ObjectID p_which) {
 	for (int i = 0; i < get_animation()->track_get_key_count(get_track()); i++) {
 		Ref<AudioStream> stream = get_animation()->audio_track_get_key_stream(get_track(), i);
 		if (stream.is_valid() && stream->get_instance_id() == p_which) {
-			update();
+			queue_redraw();
 			return;
 		}
 	}
@@ -1025,7 +1026,7 @@ void AnimationTrackEditTypeAudio::drop_data(const Point2 &p_point, const Variant
 			get_undo_redo()->add_undo_method(get_animation().ptr(), "track_remove_key_at_time", get_track(), ofs);
 			get_undo_redo()->commit_action();
 
-			update();
+			queue_redraw();
 			return;
 		}
 	}
@@ -1085,7 +1086,7 @@ void AnimationTrackEditTypeAudio::gui_input(const Ref<InputEvent> &p_event) {
 	if (len_resizing && mm.is_valid()) {
 		len_resizing_rel += mm->get_relative().x;
 		len_resizing_start = mm->is_shift_pressed();
-		update();
+		queue_redraw();
 		accept_event();
 		return;
 	}
@@ -1096,7 +1097,7 @@ void AnimationTrackEditTypeAudio::gui_input(const Ref<InputEvent> &p_event) {
 		len_resizing_start = mb->is_shift_pressed();
 		len_resizing_from_px = mb->get_position().x;
 		len_resizing_rel = 0;
-		update();
+		queue_redraw();
 		accept_event();
 		return;
 	}
@@ -1119,7 +1120,7 @@ void AnimationTrackEditTypeAudio::gui_input(const Ref<InputEvent> &p_event) {
 		}
 
 		len_resizing_index = -1;
-		update();
+		queue_redraw();
 		accept_event();
 		return;
 	}

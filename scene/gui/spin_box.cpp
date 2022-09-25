@@ -41,12 +41,16 @@ Size2 SpinBox::get_minimum_size() const {
 
 void SpinBox::_value_changed(double p_value) {
 	String value = TS->format_number(String::num(get_value(), Math::range_step_decimals(get_step())));
-	if (!prefix.is_empty()) {
-		value = prefix + " " + value;
+
+	if (!line_edit->has_focus()) {
+		if (!prefix.is_empty()) {
+			value = prefix + " " + value;
+		}
+		if (!suffix.is_empty()) {
+			value += " " + suffix;
+		}
 	}
-	if (!suffix.is_empty()) {
-		value += " " + suffix;
-	}
+
 	line_edit->set_text(value);
 	Range::_value_changed(p_value);
 }
@@ -105,8 +109,9 @@ void SpinBox::_range_click_timeout() {
 void SpinBox::_release_mouse() {
 	if (drag.enabled) {
 		drag.enabled = false;
-		Input::get_singleton()->set_mouse_mode(Input::MOUSE_MODE_VISIBLE);
+		Input::get_singleton()->set_mouse_mode(Input::MOUSE_MODE_HIDDEN);
 		warp_mouse(drag.capture_pos);
+		Input::get_singleton()->set_mouse_mode(Input::MOUSE_MODE_VISIBLE);
 	}
 }
 
@@ -181,8 +186,14 @@ void SpinBox::gui_input(const Ref<InputEvent> &p_event) {
 	}
 }
 
+void SpinBox::_line_edit_focus_enter() {
+	int col = line_edit->get_caret_column();
+	_value_changed(0); // Update the LineEdit's text.
+	line_edit->set_caret_column(col);
+}
+
 void SpinBox::_line_edit_focus_exit() {
-	// discontinue because the focus_exit was caused by right-click context menu
+	// Discontinue because the focus_exit was caused by right-click context menu.
 	if (line_edit->is_menu_visible()) {
 		return;
 	}
@@ -199,25 +210,29 @@ inline void SpinBox::_adjust_width_for_icon(const Ref<Texture2D> &icon) {
 	}
 }
 
+void SpinBox::_update_theme_item_cache() {
+	Range::_update_theme_item_cache();
+
+	theme_cache.updown_icon = get_theme_icon(SNAME("updown"));
+}
+
 void SpinBox::_notification(int p_what) {
 	switch (p_what) {
 		case NOTIFICATION_DRAW: {
-			Ref<Texture2D> updown = get_theme_icon(SNAME("updown"));
-
-			_adjust_width_for_icon(updown);
+			_adjust_width_for_icon(theme_cache.updown_icon);
 
 			RID ci = get_canvas_item();
 			Size2i size = get_size();
 
 			if (is_layout_rtl()) {
-				updown->draw(ci, Point2i(0, (size.height - updown->get_height()) / 2));
+				theme_cache.updown_icon->draw(ci, Point2i(0, (size.height - theme_cache.updown_icon->get_height()) / 2));
 			} else {
-				updown->draw(ci, Point2i(size.width - updown->get_width(), (size.height - updown->get_height()) / 2));
+				theme_cache.updown_icon->draw(ci, Point2i(size.width - theme_cache.updown_icon->get_width(), (size.height - theme_cache.updown_icon->get_height()) / 2));
 			}
 		} break;
 
 		case NOTIFICATION_ENTER_TREE: {
-			_adjust_width_for_icon(get_theme_icon(SNAME("updown")));
+			_adjust_width_for_icon(theme_cache.updown_icon);
 			_value_changed(0);
 		} break;
 
@@ -227,7 +242,7 @@ void SpinBox::_notification(int p_what) {
 
 		case NOTIFICATION_TRANSLATION_CHANGED: {
 			_value_changed(0);
-			update();
+			queue_redraw();
 		} break;
 
 		case NOTIFICATION_THEME_CHANGED: {
@@ -236,7 +251,7 @@ void SpinBox::_notification(int p_what) {
 		} break;
 
 		case NOTIFICATION_LAYOUT_DIRECTION_CHANGED: {
-			update();
+			queue_redraw();
 		} break;
 	}
 }
@@ -250,6 +265,10 @@ HorizontalAlignment SpinBox::get_horizontal_alignment() const {
 }
 
 void SpinBox::set_suffix(const String &p_suffix) {
+	if (suffix == p_suffix) {
+		return;
+	}
+
 	suffix = p_suffix;
 	_value_changed(0);
 }
@@ -259,6 +278,10 @@ String SpinBox::get_suffix() const {
 }
 
 void SpinBox::set_prefix(const String &p_prefix) {
+	if (prefix == p_prefix) {
+		return;
+	}
+
 	prefix = p_prefix;
 	_value_changed(0);
 }
@@ -338,6 +361,7 @@ SpinBox::SpinBox() {
 	line_edit->set_horizontal_alignment(HORIZONTAL_ALIGNMENT_LEFT);
 
 	line_edit->connect("text_submitted", callable_mp(this, &SpinBox::_text_submitted), CONNECT_DEFERRED);
+	line_edit->connect("focus_entered", callable_mp(this, &SpinBox::_line_edit_focus_enter), CONNECT_DEFERRED);
 	line_edit->connect("focus_exited", callable_mp(this, &SpinBox::_line_edit_focus_exit), CONNECT_DEFERRED);
 	line_edit->connect("gui_input", callable_mp(this, &SpinBox::_line_edit_input));
 

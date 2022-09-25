@@ -53,6 +53,15 @@
 		</constructor>
 		<constructor name="Array">
 			<return type="Array" />
+			<param index="0" name="base" type="Array" />
+			<param index="1" name="type" type="int" />
+			<param index="2" name="class_name" type="StringName" />
+			<param index="3" name="script" type="Variant" />
+			<description>
+			</description>
+		</constructor>
+		<constructor name="Array">
+			<return type="Array" />
 			<param index="0" name="from" type="Array" />
 			<description>
 				Constructs an [Array] as a copy of the given [Array].
@@ -303,6 +312,21 @@
 				[b]Note:[/b] Calling this function is not the same as writing [code]array[0][/code]. If the array is empty, accessing by index will pause project execution when running from the editor.
 			</description>
 		</method>
+		<method name="get_typed_builtin" qualifiers="const">
+			<return type="int" />
+			<description>
+			</description>
+		</method>
+		<method name="get_typed_class_name" qualifiers="const">
+			<return type="StringName" />
+			<description>
+			</description>
+		</method>
+		<method name="get_typed_script" qualifiers="const">
+			<return type="Variant" />
+			<description>
+			</description>
+		</method>
 		<method name="has" qualifiers="const">
 			<return type="bool" />
 			<param index="0" name="value" type="Variant" />
@@ -364,6 +388,16 @@
 			<return type="bool" />
 			<description>
 				Returns [code]true[/code] if the array is empty.
+			</description>
+		</method>
+		<method name="is_read_only" qualifiers="const">
+			<return type="bool" />
+			<description>
+			</description>
+		</method>
+		<method name="is_typed" qualifiers="const">
+			<return type="bool" />
+			<description>
 			</description>
 		</method>
 		<method name="map" qualifiers="const">
@@ -479,6 +513,20 @@
 				Searches the array in reverse order. Optionally, a start search index can be passed. If negative, the start index is considered relative to the end of the array.
 			</description>
 		</method>
+		<method name="set_read_only">
+			<return type="void" />
+			<param index="0" name="enable" type="bool" />
+			<description>
+			</description>
+		</method>
+		<method name="set_typed">
+			<return type="void" />
+			<param index="0" name="type" type="int" />
+			<param index="1" name="class_name" type="StringName" />
+			<param index="2" name="script" type="Variant" />
+			<description>
+			</description>
+		</method>
 		<method name="shuffle">
 			<return type="void" />
 			<description>
@@ -556,6 +604,12 @@
 				[/codeblocks]
 			</description>
 		</method>
+		<method name="typed_assign">
+			<return type="bool" />
+			<param index="0" name="array" type="Array" />
+			<description>
+			</description>
+		</method>
 	</methods>
 	<operators>
 		<operator name="operator !=">
@@ -576,14 +630,14 @@
 			<return type="bool" />
 			<param index="0" name="right" type="Array" />
 			<description>
-				Performs a comparison for each index between the left operand [Array] and the [param right] [Array], considering the highest common index of both arrays for this comparison: Returns [code]true[/code] on the first occurrence of an element that is less, or [code]false[/code] if the element is greater. Note that depending on the type of data stored, this function may be recursive. If all elements are equal, it compares the length of both arrays and returns [code]false[/code] if the left operand [Array] has less elements, otherwise it returns [code]true[/code].
+				Performs a comparison for each index between the left operand [Array] and the [param right] [Array], considering the highest common index of both arrays for this comparison: Returns [code]true[/code] on the first occurrence of an element that is less, or [code]false[/code] if the element is greater. Note that depending on the type of data stored, this function may be recursive. If all elements are equal, it compares the length of both arrays and returns [code]false[/code] if the left operand [Array] has fewer elements, otherwise it returns [code]true[/code].
 			</description>
 		</operator>
 		<operator name="operator &lt;=">
 			<return type="bool" />
 			<param index="0" name="right" type="Array" />
 			<description>
-				Performs a comparison for each index between the left operand [Array] and the [param right] [Array], considering the highest common index of both arrays for this comparison: Returns [code]true[/code] on the first occurrence of an element that is less, or [code]false[/code] if the element is greater. Note that depending on the type of data stored, this function may be recursive. If all elements are equal, it compares the length of both arrays and returns [code]true[/code] if the left operand [Array] has less or the same number of elements, otherwise it returns [code]false[/code].
+				Performs a comparison for each index between the left operand [Array] and the [param right] [Array], considering the highest common index of both arrays for this comparison: Returns [code]true[/code] on the first occurrence of an element that is less, or [code]false[/code] if the element is greater. Note that depending on the type of data stored, this function may be recursive. If all elements are equal, it compares the length of both arrays and returns [code]true[/code] if the left operand [Array] has the same number of elements or fewer, otherwise it returns [code]false[/code].
 			</description>
 		</operator>
 		<operator name="operator ==">

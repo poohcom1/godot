@@ -569,16 +569,15 @@ bool EditorExportPlatformAndroid::_should_compress_asset(const String &p_path, c
 }
 
 zip_fileinfo EditorExportPlatformAndroid::get_zip_fileinfo() {
-	OS::Time time = OS::get_singleton()->get_time();
-	OS::Date date = OS::get_singleton()->get_date();
+	OS::DateTime dt = OS::get_singleton()->get_datetime();
 
 	zip_fileinfo zipfi;
-	zipfi.tmz_date.tm_hour = time.hour;
-	zipfi.tmz_date.tm_mday = date.day;
-	zipfi.tmz_date.tm_min = time.minute;
-	zipfi.tmz_date.tm_mon = date.month - 1; // tm_mon is zero indexed
-	zipfi.tmz_date.tm_sec = time.second;
-	zipfi.tmz_date.tm_year = date.year;
+	zipfi.tmz_date.tm_year = dt.year;
+	zipfi.tmz_date.tm_mon = dt.month - 1; // tm_mon is zero indexed
+	zipfi.tmz_date.tm_mday = dt.day;
+	zipfi.tmz_date.tm_hour = dt.hour;
+	zipfi.tmz_date.tm_min = dt.minute;
+	zipfi.tmz_date.tm_sec = dt.second;
 	zipfi.dosDate = 0;
 	zipfi.external_fa = 0;
 	zipfi.internal_fa = 0;
@@ -624,7 +623,7 @@ Vector<String> EditorExportPlatformAndroid::list_gdap_files(const String &p_path
 Vector<PluginConfigAndroid> EditorExportPlatformAndroid::get_plugins() {
 	Vector<PluginConfigAndroid> loaded_plugins;
 
-	String plugins_dir = ProjectSettings::get_singleton()->get_resource_path().plus_file("android/plugins");
+	String plugins_dir = ProjectSettings::get_singleton()->get_resource_path().path_join("android/plugins");
 
 	// Add the prebuilt plugins
 	loaded_plugins.append_array(PluginConfigAndroid::get_prebuilt_plugins(plugins_dir));
@@ -635,7 +634,7 @@ Vector<PluginConfigAndroid> EditorExportPlatformAndroid::get_plugins() {
 		if (!plugins_filenames.is_empty()) {
 			Ref<ConfigFile> config_file = memnew(ConfigFile);
 			for (int i = 0; i < plugins_filenames.size(); i++) {
-				PluginConfigAndroid config = PluginConfigAndroid::load_plugin_config(config_file, plugins_dir.plus_file(plugins_filenames[i]));
+				PluginConfigAndroid config = PluginConfigAndroid::load_plugin_config(config_file, plugins_dir.path_join(plugins_filenames[i]));
 				if (config.valid_config) {
 					loaded_plugins.push_back(config);
 				} else {
@@ -696,7 +695,7 @@ Error EditorExportPlatformAndroid::save_apk_so(void *p_userdata, const SharedObj
 		if (abi_index != -1) {
 			exported = true;
 			String abi = abis[abi_index];
-			String dst_path = String("lib").plus_file(abi).plus_file(p_so.path.get_file());
+			String dst_path = String("lib").path_join(abi).path_join(p_so.path.get_file());
 			Vector<uint8_t> array = FileAccess::get_file_as_array(p_so.path);
 			Error store_err = store_in_apk(ed, dst_path, array);
 			ERR_FAIL_COND_V_MSG(store_err, store_err, "Cannot store in apk file '" + dst_path + "'.");
@@ -737,7 +736,7 @@ Error EditorExportPlatformAndroid::copy_gradle_so(void *p_userdata, const Shared
 			String type = export_data->debug ? "debug" : "release";
 			String abi = abis[abi_index];
 			String filename = p_so.path.get_file();
-			String dst_path = base.plus_file(type).plus_file(abi).plus_file(filename);
+			String dst_path = base.path_join(type).path_join(abi).path_join(filename);
 			Vector<uint8_t> data = FileAccess::get_file_as_array(p_so.path);
 			print_verbose("Copying .so file from " + p_so.path + " to " + dst_path);
 			Error err = store_file_at_path(dst_path, data);
@@ -1670,14 +1669,7 @@ Vector<String> EditorExportPlatformAndroid::get_enabled_abis(const Ref<EditorExp
 }
 
 void EditorExportPlatformAndroid::get_preset_features(const Ref<EditorExportPreset> &p_preset, List<String> *r_features) const {
-	String driver = ProjectSettings::get_singleton()->get("rendering/driver/driver_name");
-	if (driver == "opengl3") {
-		r_features->push_back("etc");
-	}
-	// FIXME: Review what texture formats are used for Vulkan.
-	if (driver == "vulkan") {
-		r_features->push_back("etc2");
-	}
+	r_features->push_back("etc2");
 
 	Vector<String> abis = get_enabled_abis(p_preset);
 	for (int i = 0; i < abis.size(); ++i) {
@@ -1851,7 +1843,7 @@ Error EditorExportPlatformAndroid::run(const Ref<EditorExportPreset> &p_preset, 
 		p_debug_flags |= DEBUG_FLAG_REMOTE_DEBUG_LOCALHOST;
 	}
 
-	String tmp_export_path = EditorPaths::get_singleton()->get_cache_dir().plus_file("tmpexport." + uitos(OS::get_singleton()->get_unix_time()) + ".apk");
+	String tmp_export_path = EditorPaths::get_singleton()->get_cache_dir().path_join("tmpexport." + uitos(OS::get_singleton()->get_unix_time()) + ".apk");
 
 #define CLEANUP_AND_RETURN(m_err)                         \
 	{                                                     \
@@ -2004,7 +1996,7 @@ String EditorExportPlatformAndroid::get_adb_path() {
 		exe_ext = ".exe";
 	}
 	String sdk_path = EditorSettings::get_singleton()->get("export/android/android_sdk_path");
-	return sdk_path.plus_file("platform-tools/adb" + exe_ext);
+	return sdk_path.path_join("platform-tools/adb" + exe_ext);
 }
 
 String EditorExportPlatformAndroid::get_apksigner_path() {
@@ -2017,7 +2009,7 @@ String EditorExportPlatformAndroid::get_apksigner_path() {
 	String apksigner_path = "";
 
 	Error errn;
-	String build_tools_dir = sdk_path.plus_file("build-tools");
+	String build_tools_dir = sdk_path.path_join("build-tools");
 	Ref<DirAccess> da = DirAccess::open(build_tools_dir, &errn);
 	if (errn != OK) {
 		print_error("Unable to open Android 'build-tools' directory.");
@@ -2030,7 +2022,7 @@ String EditorExportPlatformAndroid::get_apksigner_path() {
 	while (!sub_dir.is_empty()) {
 		if (!sub_dir.begins_with(".") && da->current_is_dir()) {
 			// Check if the tool is here.
-			String tool_path = build_tools_dir.plus_file(sub_dir).plus_file(apksigner_command_name);
+			String tool_path = build_tools_dir.path_join(sub_dir).path_join(apksigner_command_name);
 			if (FileAccess::exists(tool_path)) {
 				apksigner_path = tool_path;
 				break;
@@ -2135,7 +2127,7 @@ bool EditorExportPlatformAndroid::has_valid_export_configuration(const Ref<Edito
 	} else {
 		Error errn;
 		// Check for the platform-tools directory.
-		Ref<DirAccess> da = DirAccess::open(sdk_path.plus_file("platform-tools"), &errn);
+		Ref<DirAccess> da = DirAccess::open(sdk_path.path_join("platform-tools"), &errn);
 		if (errn != OK) {
 			err += TTR("Invalid Android SDK path in Editor Settings.");
 			err += TTR("Missing 'platform-tools' directory!");
@@ -2153,7 +2145,7 @@ bool EditorExportPlatformAndroid::has_valid_export_configuration(const Ref<Edito
 		}
 
 		// Check for the build-tools directory.
-		Ref<DirAccess> build_tools_da = DirAccess::open(sdk_path.plus_file("build-tools"), &errn);
+		Ref<DirAccess> build_tools_da = DirAccess::open(sdk_path.path_join("build-tools"), &errn);
 		if (errn != OK) {
 			err += TTR("Invalid Android SDK path in Editor Settings.");
 			err += TTR("Missing 'build-tools' directory!");
@@ -2310,7 +2302,7 @@ String EditorExportPlatformAndroid::get_apk_expansion_fullpath(const Ref<EditorE
 	int version_code = p_preset->get("version/code");
 	String package_name = p_preset->get("package/unique_name");
 	String apk_file_name = "main." + itos(version_code) + "." + get_package_name(package_name) + ".obb";
-	String fullpath = p_path.get_base_dir().plus_file(apk_file_name);
+	String fullpath = p_path.get_base_dir().path_join(apk_file_name);
 	return fullpath;
 }
 
@@ -2671,8 +2663,8 @@ Error EditorExportPlatformAndroid::export_project_helper(const Ref<EditorExportP
 		build_command = "gradlew";
 #endif
 
-		String build_path = ProjectSettings::get_singleton()->get_resource_path().plus_file("android/build");
-		build_command = build_path.plus_file(build_command);
+		String build_path = ProjectSettings::get_singleton()->get_resource_path().path_join("android/build");
+		build_command = build_path.path_join(build_command);
 
 		String package_name = get_package_name(p_preset->get("package/unique_name"));
 		String version_code = itos(p_preset->get("version/code"));
@@ -2742,7 +2734,7 @@ Error EditorExportPlatformAndroid::export_project_helper(const Ref<EditorExportP
 					debug_user = EditorSettings::get_singleton()->get("export/android/debug_keystore_user");
 				}
 				if (debug_keystore.is_relative_path()) {
-					debug_keystore = OS::get_singleton()->get_resource_dir().plus_file(debug_keystore).simplify_path();
+					debug_keystore = OS::get_singleton()->get_resource_dir().path_join(debug_keystore).simplify_path();
 				}
 				if (!FileAccess::exists(debug_keystore)) {
 					add_message(EXPORT_MESSAGE_ERROR, TTR("Code Signing"), TTR("Could not find keystore, unable to export."));
@@ -2758,7 +2750,7 @@ Error EditorExportPlatformAndroid::export_project_helper(const Ref<EditorExportP
 				String release_username = p_preset->get("keystore/release_user");
 				String release_password = p_preset->get("keystore/release_password");
 				if (release_keystore.is_relative_path()) {
-					release_keystore = OS::get_singleton()->get_resource_dir().plus_file(release_keystore).simplify_path();
+					release_keystore = OS::get_singleton()->get_resource_dir().path_join(release_keystore).simplify_path();
 				}
 				if (!FileAccess::exists(release_keystore)) {
 					add_message(EXPORT_MESSAGE_ERROR, TTR("Code Signing"), TTR("Could not find keystore, unable to export."));
@@ -2793,7 +2785,7 @@ Error EditorExportPlatformAndroid::export_project_helper(const Ref<EditorExportP
 		String export_filename = p_path.get_file();
 		String export_path = p_path.get_base_dir();
 		if (export_path.is_relative_path()) {
-			export_path = OS::get_singleton()->get_resource_dir().plus_file(export_path);
+			export_path = OS::get_singleton()->get_resource_dir().path_join(export_path);
 		}
 		export_path = ProjectSettings::get_singleton()->globalize_path(export_path).simplify_path();
 
@@ -2852,7 +2844,7 @@ Error EditorExportPlatformAndroid::export_project_helper(const Ref<EditorExportP
 	Ref<FileAccess> io2_fa;
 	zlib_filefunc_def io2 = zipio_create_io(&io2_fa);
 
-	String tmp_unaligned_path = EditorPaths::get_singleton()->get_cache_dir().plus_file("tmpexport-unaligned." + uitos(OS::get_singleton()->get_unix_time()) + ".apk");
+	String tmp_unaligned_path = EditorPaths::get_singleton()->get_cache_dir().path_join("tmpexport-unaligned." + uitos(OS::get_singleton()->get_unix_time()) + ".apk");
 
 #define CLEANUP_AND_RETURN(m_err)                            \
 	{                                                        \

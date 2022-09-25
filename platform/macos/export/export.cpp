@@ -33,8 +33,14 @@
 #include "export_plugin.h"
 
 void register_macos_exporter() {
-	EDITOR_DEF("export/macos/force_builtin_codesign", false);
-	EditorSettings::get_singleton()->add_property_hint(PropertyInfo(Variant::BOOL, "export/macos/force_builtin_codesign", PROPERTY_HINT_NONE));
+#ifndef ANDROID_ENABLED
+	EDITOR_DEF("export/macos/rcodesign", "");
+#ifdef WINDOWS_ENABLED
+	EditorSettings::get_singleton()->add_property_hint(PropertyInfo(Variant::STRING, "export/macos/rcodesign", PROPERTY_HINT_GLOBAL_FILE, "*.exe"));
+#else
+	EditorSettings::get_singleton()->add_property_hint(PropertyInfo(Variant::STRING, "export/macos/rcodesign", PROPERTY_HINT_GLOBAL_FILE));
+#endif
+#endif
 
 	Ref<EditorExportPlatformMacOS> platform;
 	platform.instantiate();

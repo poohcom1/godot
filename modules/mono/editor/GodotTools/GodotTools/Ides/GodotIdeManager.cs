@@ -8,7 +8,7 @@ using GodotTools.Internals;
 
 namespace GodotTools.Ides
 {
-    public sealed class GodotIdeManager : Node, ISerializationListener
+    public sealed partial class GodotIdeManager : Node, ISerializationListener
     {
         private MessagingServer _messagingServer;
 
@@ -76,7 +76,7 @@ namespace GodotTools.Ides
 
         public async Task<EditorPick?> LaunchIdeAsync(int millisecondsTimeout = 10000)
         {
-            var editorId = (ExternalEditorId)GodotSharpEditor.Instance.GetEditorInterface()
+            var editorId = (ExternalEditorId)(int)GodotSharpEditor.Instance.GetEditorInterface()
                 .GetEditorSettings().GetSetting("mono/editor/external_editor");
             string editorIdentity = GetExternalEditorIdentity(editorId);
 
@@ -153,7 +153,7 @@ namespace GodotTools.Ides
                 }
 
                 default:
-                    throw new ArgumentOutOfRangeException();
+                    throw new ArgumentOutOfRangeException(nameof(editorId));
             }
         }
 
@@ -180,17 +180,17 @@ namespace GodotTools.Ides
 
             public void SendOpenFile(string file)
             {
-                SendRequest<OpenFileResponse>(new OpenFileRequest {File = file});
+                SendRequest<OpenFileResponse>(new OpenFileRequest { File = file });
             }
 
             public void SendOpenFile(string file, int line)
             {
-                SendRequest<OpenFileResponse>(new OpenFileRequest {File = file, Line = line});
+                SendRequest<OpenFileResponse>(new OpenFileRequest { File = file, Line = line });
             }
 
             public void SendOpenFile(string file, int line, int column)
             {
-                SendRequest<OpenFileResponse>(new OpenFileRequest {File = file, Line = line, Column = column});
+                SendRequest<OpenFileResponse>(new OpenFileRequest { File = file, Line = line, Column = column });
             }
         }
 

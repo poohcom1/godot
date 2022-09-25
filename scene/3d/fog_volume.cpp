@@ -29,6 +29,7 @@
 /*************************************************************************/
 
 #include "fog_volume.h"
+#include "scene/resources/environment.h"
 
 ///////////////////////////
 
@@ -45,12 +46,11 @@ void FogVolume::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "material", PROPERTY_HINT_RESOURCE_TYPE, "FogMaterial,ShaderMaterial"), "set_material", "get_material");
 }
 
-void FogVolume::_validate_property(PropertyInfo &property) const {
-	if (property.name == "extents" && shape == RS::FOG_VOLUME_SHAPE_WORLD) {
-		property.usage = PROPERTY_USAGE_NONE;
+void FogVolume::_validate_property(PropertyInfo &p_property) const {
+	if (p_property.name == "extents" && shape == RS::FOG_VOLUME_SHAPE_WORLD) {
+		p_property.usage = PROPERTY_USAGE_NONE;
 		return;
 	}
-	VisualInstance3D::_validate_property(property);
 }
 
 void FogVolume::set_extents(const Vector3 &p_extents) {
@@ -99,8 +99,8 @@ AABB FogVolume::get_aabb() const {
 	return AABB();
 }
 
-TypedArray<String> FogVolume::get_configuration_warnings() const {
-	TypedArray<String> warnings = Node::get_configuration_warnings();
+PackedStringArray FogVolume::get_configuration_warnings() const {
+	PackedStringArray warnings = Node::get_configuration_warnings();
 
 	Ref<Environment> environment = get_viewport()->find_world_3d()->get_environment();
 

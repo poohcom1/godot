@@ -485,6 +485,20 @@ void GodotPhysicsServer2D::area_set_monitorable(RID p_area, bool p_monitorable) 
 	area->set_monitorable(p_monitorable);
 }
 
+void GodotPhysicsServer2D::area_set_collision_layer(RID p_area, uint32_t p_layer) {
+	GodotArea2D *area = area_owner.get_or_null(p_area);
+	ERR_FAIL_COND(!area);
+
+	area->set_collision_layer(p_layer);
+}
+
+uint32_t GodotPhysicsServer2D::area_get_collision_layer(RID p_area) const {
+	GodotArea2D *area = area_owner.get_or_null(p_area);
+	ERR_FAIL_COND_V(!area, 0);
+
+	return area->get_collision_layer();
+}
+
 void GodotPhysicsServer2D::area_set_collision_mask(RID p_area, uint32_t p_mask) {
 	GodotArea2D *area = area_owner.get_or_null(p_area);
 	ERR_FAIL_COND(!area);
@@ -492,11 +506,11 @@ void GodotPhysicsServer2D::area_set_collision_mask(RID p_area, uint32_t p_mask) 
 	area->set_collision_mask(p_mask);
 }
 
-void GodotPhysicsServer2D::area_set_collision_layer(RID p_area, uint32_t p_layer) {
+uint32_t GodotPhysicsServer2D::area_get_collision_mask(RID p_area) const {
 	GodotArea2D *area = area_owner.get_or_null(p_area);
-	ERR_FAIL_COND(!area);
+	ERR_FAIL_COND_V(!area, 0);
 
-	area->set_collision_layer(p_layer);
+	return area->get_collision_mask();
 }
 
 void GodotPhysicsServer2D::area_set_monitor_callback(RID p_area, const Callable &p_callback) {
@@ -718,6 +732,20 @@ uint32_t GodotPhysicsServer2D::body_get_collision_mask(RID p_body) const {
 	return body->get_collision_mask();
 }
 
+void GodotPhysicsServer2D::body_set_collision_priority(RID p_body, real_t p_priority) {
+	GodotBody2D *body = body_owner.get_or_null(p_body);
+	ERR_FAIL_COND(!body);
+
+	body->set_collision_priority(p_priority);
+}
+
+real_t GodotPhysicsServer2D::body_get_collision_priority(RID p_body) const {
+	const GodotBody2D *body = body_owner.get_or_null(p_body);
+	ERR_FAIL_COND_V(!body, 0);
+
+	return body->get_collision_priority();
+}
+
 void GodotPhysicsServer2D::body_set_param(RID p_body, BodyParameter p_param, const Variant &p_value) {
 	GodotBody2D *body = body_owner.get_or_null(p_body);
 	ERR_FAIL_COND(!body);
@@ -834,7 +862,7 @@ void GodotPhysicsServer2D::body_set_constant_force(RID p_body, const Vector2 &p_
 	ERR_FAIL_COND(!body);
 
 	body->set_constant_force(p_force);
-	if (!p_force.is_equal_approx(Vector2())) {
+	if (!p_force.is_zero_approx()) {
 		body->wakeup();
 	}
 }
@@ -937,10 +965,10 @@ int GodotPhysicsServer2D::body_get_max_contacts_reported(RID p_body) const {
 	return body->get_max_contacts_reported();
 }
 
-void GodotPhysicsServer2D::body_set_state_sync_callback(RID p_body, void *p_instance, BodyStateCallback p_callback) {
+void GodotPhysicsServer2D::body_set_state_sync_callback(RID p_body, const Callable &p_callable) {
 	GodotBody2D *body = body_owner.get_or_null(p_body);
 	ERR_FAIL_COND(!body);
-	body->set_state_sync_callback(p_instance, p_callback);
+	body->set_state_sync_callback(p_callable);
 }
 
 void GodotPhysicsServer2D::body_set_force_integration_callback(RID p_body, const Callable &p_callable, const Variant &p_udata) {

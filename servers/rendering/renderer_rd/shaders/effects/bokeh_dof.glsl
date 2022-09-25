@@ -30,7 +30,7 @@ layout(set = 1, binding = 0) uniform sampler2D source_bokeh;
 #ifdef MODE_GEN_BLUR_SIZE
 
 float get_depth_at_pos(vec2 uv) {
-	float depth = textureLod(source_depth, uv, 0.0).x;
+	float depth = textureLod(source_depth, uv, 0.0).x * 2.0 - 1.0;
 	if (params.orthogonal) {
 		depth = ((depth + (params.z_far + params.z_near) / (params.z_far - params.z_near)) * (params.z_far - params.z_near)) / 2.0;
 	} else {
@@ -41,11 +41,25 @@ float get_depth_at_pos(vec2 uv) {
 
 float get_blur_size(float depth) {
 	if (params.blur_near_active && depth < params.blur_near_begin) {
-		return -(1.0 - smoothstep(params.blur_near_end, params.blur_near_begin, depth)) * params.blur_size - DEPTH_GAP; //near blur is negative
+		if (params.use_physical_near) {
+			// Physically-based.
+			float d = abs(params.blur_near_begin - depth);
+			return -(d / (params.blur_near_begin - d)) * params.blur_size_near - DEPTH_GAP; // Near blur is negative.
+		} else {
+			// Non-physically-based.
+			return -(1.0 - smoothstep(params.blur_near_end, params.blur_near_begin, depth)) * params.blur_size - DEPTH_GAP; // Near blur is negative.
+		}
 	}
 
 	if (params.blur_far_active && depth > params.blur_far_begin) {
-		return smoothstep(params.blur_far_begin, params.blur_far_end, depth) * params.blur_size + DEPTH_GAP;
+		if (params.use_physical_far) {
+			// Physically-based.
+			float d = abs(params.blur_far_begin - depth);
+			return (d / (params.blur_far_begin + d)) * params.blur_size_far + DEPTH_GAP;
+		} else {
+			// Non-physically-based.
+			return smoothstep(params.blur_far_begin, params.blur_far_end, depth) * params.blur_size + DEPTH_GAP;
+		}
 	}
 
 	return 0.0;
@@ -172,6 +186,7 @@ void main() {
 	uv += pixel_size * 0.5; //half pixel to read centers
 
 	vec4 color = texture(color_texture, uv);
+	float initial_blur = color.a;
 	float accum = 1.0;
 	float radius = params.blur_scale;
 
@@ -179,8 +194,8 @@ void main() {
 		vec2 suv = uv + vec2(cos(ang), sin(ang)) * pixel_size * radius;
 		vec4 sample_color = texture(color_texture, suv);
 		float sample_size = abs(sample_color.a);
-		if (sample_color.a > color.a) {
-			sample_size = clamp(sample_size, 0.0, abs(color.a) * 2.0);
+		if (sample_color.a > initial_blur) {
+			sample_size = clamp(sample_size, 0.0, abs(initial_blur) * 2.0);
 		}
 
 		float m = smoothstep(radius - 0.5, radius + 0.5, sample_size);

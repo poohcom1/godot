@@ -69,9 +69,14 @@ private:
 	int deadzone = 0;
 	bool follow_focus = false;
 
+	struct ThemeCache {
+		Ref<StyleBox> panel_style;
+	} theme_cache;
+
 	void _cancel_drag();
 
 protected:
+	virtual void _update_theme_item_cache() override;
 	Size2 get_minimum_size() const override;
 
 	void _gui_focus_changed(Control *p_control);
@@ -109,7 +114,7 @@ public:
 	VScrollBar *get_v_scroll_bar();
 	void ensure_control_visible(Control *p_control);
 
-	TypedArray<String> get_configuration_warnings() const override;
+	PackedStringArray get_configuration_warnings() const override;
 
 	ScrollContainer();
 };

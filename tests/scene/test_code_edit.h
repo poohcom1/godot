@@ -74,7 +74,7 @@ TEST_CASE("[SceneTree][CodeEdit] line gutters") {
 
 			code_edit->set_line_as_breakpoint(0, true);
 			CHECK(code_edit->is_line_breakpointed(0));
-			CHECK(code_edit->get_breakpointed_lines()[0] == Variant(0));
+			CHECK(code_edit->get_breakpointed_lines()[0] == 0);
 			SIGNAL_CHECK("breakpoint_toggled", args);
 
 			code_edit->set_line_as_breakpoint(0, false);
@@ -451,7 +451,7 @@ TEST_CASE("[SceneTree][CodeEdit] line gutters") {
 			ERR_PRINT_ON;
 
 			code_edit->set_line_as_bookmarked(0, true);
-			CHECK(code_edit->get_bookmarked_lines()[0] == Variant(0));
+			CHECK(code_edit->get_bookmarked_lines()[0] == 0);
 			CHECK(code_edit->is_line_bookmarked(0));
 
 			code_edit->set_line_as_bookmarked(0, false);
@@ -657,7 +657,7 @@ TEST_CASE("[SceneTree][CodeEdit] line gutters") {
 			ERR_PRINT_ON;
 
 			code_edit->set_line_as_executing(0, true);
-			CHECK(code_edit->get_executing_lines()[0] == Variant(0));
+			CHECK(code_edit->get_executing_lines()[0] == 0);
 			CHECK(code_edit->is_line_executing(0));
 
 			code_edit->set_line_as_executing(0, false);
@@ -3245,7 +3245,7 @@ TEST_CASE("[SceneTree][CodeEdit] symbol lookup") {
 		code_edit->set_text("this is some text");
 
 		Point2 caret_pos = code_edit->get_caret_draw_pos();
-		caret_pos.x += 58;
+		caret_pos.x += 60;
 		SEND_GUI_MOUSE_BUTTON_EVENT(code_edit, caret_pos, MouseButton::NONE, MouseButton::NONE, Key::NONE);
 		CHECK(code_edit->get_text_for_symbol_lookup() == "this is s" + String::chr(0xFFFF) + "ome text");
 

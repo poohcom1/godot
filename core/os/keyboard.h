@@ -36,11 +36,11 @@
 enum class Key {
 	NONE = 0,
 	// Special key: The strategy here is similar to the one used by toolkits,
-	// which consists in leaving the 24 bits unicode range for printable
-	// characters, and use the upper 8 bits for special keys and modifiers.
+	// which consists in leaving the 21 bits unicode range for printable
+	// characters, and use the upper 11 bits for special keys and modifiers.
 	// This way everything (char/keycode) can fit nicely in one 32-bit
 	// integer (the enum's underlying type is `int` by default).
-	SPECIAL = (1 << 24),
+	SPECIAL = (1 << 22),
 	/* CURSOR/FUNCTION/BROWSER/MULTIMEDIA/MISC KEYS */
 	ESCAPE = SPECIAL | 0x01,
 	TAB = SPECIAL | 0x02,
@@ -312,84 +312,85 @@ enum class Key {
 };
 
 enum class KeyModifierMask {
-	CODE_MASK = ((1 << 25) - 1), ///< Apply this mask to any keycode to remove modifiers.
-	MODIFIER_MASK = (0x7F << 24), ///< Apply this mask to isolate modifiers.
+	CODE_MASK = ((1 << 23) - 1), ///< Apply this mask to any keycode to remove modifiers.
+	MODIFIER_MASK = (0x7F << 22), ///< Apply this mask to isolate modifiers.
+	//RESERVED = (1 << 23),
+	CMD_OR_CTRL = (1 << 24),
 	SHIFT = (1 << 25),
 	ALT = (1 << 26),
 	META = (1 << 27),
 	CTRL = (1 << 28),
-#ifdef APPLE_STYLE_KEYS
-	CMD = META,
-#else
-	CMD = CTRL,
-#endif
 	KPAD = (1 << 29),
 	GROUP_SWITCH = (1 << 30)
 };
 
 // To avoid having unnecessary operators, only define the ones that are needed.
 
-inline Key operator-(uint32_t a, Key b) {
+constexpr Key operator-(uint32_t a, Key b) {
 	return (Key)(a - (uint32_t)b);
 }
 
-inline Key &operator-=(Key &a, int b) {
-	return (Key &)((int &)a -= b);
+constexpr Key &operator-=(Key &a, int b) {
+	a = static_cast<Key>(static_cast<int>(a) - static_cast<int>(b));
+	return a;
 }
 
-inline Key operator+(Key a, int b) {
+constexpr Key operator+(Key a, int b) {
 	return (Key)((int)a + (int)b);
 }
 
-inline Key operator+(Key a, Key b) {
+constexpr Key operator+(Key a, Key b) {
 	return (Key)((int)a + (int)b);
 }
 
-inline Key operator-(Key a, Key b) {
+constexpr Key operator-(Key a, Key b) {
 	return (Key)((int)a - (int)b);
 }
 
-inline Key operator&(Key a, Key b) {
+constexpr Key operator&(Key a, Key b) {
 	return (Key)((int)a & (int)b);
 }
 
-inline Key operator|(Key a, Key b) {
+constexpr Key operator|(Key a, Key b) {
 	return (Key)((int)a | (int)b);
 }
 
-inline Key &operator|=(Key &a, Key b) {
-	return (Key &)((int &)a |= (int)b);
+constexpr Key &operator|=(Key &a, Key b) {
+	a = static_cast<Key>(static_cast<int>(a) | static_cast<int>(b));
+	return a;
 }
 
-inline Key &operator|=(Key &a, KeyModifierMask b) {
-	return (Key &)((int &)a |= (int)b);
+constexpr Key &operator|=(Key &a, KeyModifierMask b) {
+	a = static_cast<Key>(static_cast<int>(a) | static_cast<int>(b));
+	return a;
 }
 
-inline Key &operator&=(Key &a, KeyModifierMask b) {
-	return (Key &)((int &)a &= (int)b);
+constexpr Key &operator&=(Key &a, KeyModifierMask b) {
+	a = static_cast<Key>(static_cast<int>(a) & static_cast<int>(b));
+	return a;
 }
 
-inline Key operator|(Key a, KeyModifierMask b) {
+constexpr Key operator|(Key a, KeyModifierMask b) {
 	return (Key)((int)a | (int)b);
 }
 
-inline Key operator&(Key a, KeyModifierMask b) {
+constexpr Key operator&(Key a, KeyModifierMask b) {
 	return (Key)((int)a & (int)b);
 }
 
-inline Key operator+(KeyModifierMask a, Key b) {
+constexpr Key operator+(KeyModifierMask a, Key b) {
 	return (Key)((int)a + (int)b);
 }
 
-inline Key operator|(KeyModifierMask a, Key b) {
+constexpr Key operator|(KeyModifierMask a, Key b) {
 	return (Key)((int)a | (int)b);
 }
 
-inline KeyModifierMask operator+(KeyModifierMask a, KeyModifierMask b) {
+constexpr KeyModifierMask operator+(KeyModifierMask a, KeyModifierMask b) {
 	return (KeyModifierMask)((int)a + (int)b);
 }
 
-inline KeyModifierMask operator|(KeyModifierMask a, KeyModifierMask b) {
+constexpr KeyModifierMask operator|(KeyModifierMask a, KeyModifierMask b) {
 	return (KeyModifierMask)((int)a | (int)b);
 }
 

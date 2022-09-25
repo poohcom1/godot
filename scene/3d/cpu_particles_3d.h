@@ -198,7 +198,7 @@ private:
 protected:
 	static void _bind_methods();
 	void _notification(int p_what);
-	virtual void _validate_property(PropertyInfo &property) const override;
+	void _validate_property(PropertyInfo &p_property) const;
 
 public:
 	AABB get_aabb() const override;
@@ -302,7 +302,7 @@ public:
 	void set_gravity(const Vector3 &p_gravity);
 	Vector3 get_gravity() const;
 
-	TypedArray<String> get_configuration_warnings() const override;
+	PackedStringArray get_configuration_warnings() const override;
 
 	void restart();
 

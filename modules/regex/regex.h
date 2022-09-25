@@ -63,7 +63,7 @@ public:
 	int get_group_count() const;
 	Dictionary get_names() const;
 
-	Array get_strings() const;
+	PackedStringArray get_strings() const;
 	String get_string(const Variant &p_name) const;
 	int get_start(const Variant &p_name) const;
 	int get_end(const Variant &p_name) const;
@@ -94,7 +94,7 @@ public:
 	bool is_valid() const;
 	String get_pattern() const;
 	int get_group_count() const;
-	Array get_names() const;
+	PackedStringArray get_names() const;
 
 	RegEx();
 	RegEx(const String &p_pattern);

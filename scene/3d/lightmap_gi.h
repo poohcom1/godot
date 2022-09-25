@@ -36,6 +36,9 @@
 #include "scene/3d/lightmapper.h"
 #include "scene/3d/visual_instance_3d.h"
 
+class Sky;
+class CameraAttributes;
+
 class LightmapGIData : public Resource {
 	GDCLASS(LightmapGIData, Resource);
 	RES_BASE_EXTENSION("lmbake")
@@ -47,6 +50,7 @@ class LightmapGIData : public Resource {
 
 	RID lightmap;
 	AABB bounds;
+	float baked_exposure = 1.0;
 
 	struct User {
 		NodePath path;
@@ -83,8 +87,9 @@ public:
 	bool is_using_spherical_harmonics() const;
 
 	bool is_interior() const;
+	float get_baked_exposure() const;
 
-	void set_capture_data(const AABB &p_bounds, bool p_interior, const PackedVector3Array &p_points, const PackedColorArray &p_point_sh, const PackedInt32Array &p_tetrahedra, const PackedInt32Array &p_bsp_tree);
+	void set_capture_data(const AABB &p_bounds, bool p_interior, const PackedVector3Array &p_points, const PackedColorArray &p_point_sh, const PackedInt32Array &p_tetrahedra, const PackedInt32Array &p_bsp_tree, float p_baked_exposure);
 	PackedVector3Array get_capture_points() const;
 	PackedColorArray get_capture_sh() const;
 	PackedInt32Array get_capture_tetrahedra() const;
@@ -137,16 +142,17 @@ public:
 private:
 	BakeQuality bake_quality = BAKE_QUALITY_MEDIUM;
 	bool use_denoiser = true;
-	int bounces = 1;
+	int bounces = 3;
 	float bias = 0.0005;
 	int max_texture_size = 16384;
 	bool interior = false;
-	EnvironmentMode environment_mode = ENVIRONMENT_MODE_DISABLED;
+	EnvironmentMode environment_mode = ENVIRONMENT_MODE_SCENE;
 	Ref<Sky> environment_custom_sky;
-	Color environment_custom_color = Color(0.2, 0.7, 1.0);
+	Color environment_custom_color = Color(1, 1, 1);
 	float environment_custom_energy = 1.0;
 	bool directional = false;
-	GenerateProbes gen_probes = GENERATE_PROBES_DISABLED;
+	GenerateProbes gen_probes = GENERATE_PROBES_SUBDIV_8;
+	Ref<CameraAttributes> camera_attributes;
 
 	Ref<LightmapGIData> light_data;
 
@@ -216,7 +222,7 @@ private:
 	void _gen_new_positions_from_octree(const GenProbesOctree *p_cell, float p_cell_size, const Vector<Vector3> &probe_positions, LocalVector<Vector3> &new_probe_positions, HashMap<Vector3i, bool> &positions_used, const AABB &p_bounds);
 
 protected:
-	void _validate_property(PropertyInfo &property) const override;
+	void _validate_property(PropertyInfo &p_property) const;
 	static void _bind_methods();
 	void _notification(int p_what);
 
@@ -259,6 +265,9 @@ public:
 
 	void set_generate_probes(GenerateProbes p_generate_probes);
 	GenerateProbes get_generate_probes() const;
+
+	void set_camera_attributes(const Ref<CameraAttributes> &p_camera_attributes);
+	Ref<CameraAttributes> get_camera_attributes() const;
 
 	AABB get_aabb() const override;
 

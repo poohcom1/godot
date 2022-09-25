@@ -36,7 +36,7 @@
 void RayCast2D::set_target_position(const Vector2 &p_point) {
 	target_position = p_point;
 	if (is_inside_tree() && (Engine::get_singleton()->is_editor_hint() || get_tree()->is_debugging_collisions_hint())) {
-		update();
+		queue_redraw();
 	}
 }
 
@@ -82,6 +82,10 @@ Object *RayCast2D::get_collider() const {
 	return ObjectDB::get_instance(against);
 }
 
+RID RayCast2D::get_collider_rid() const {
+	return against_rid;
+}
+
 int RayCast2D::get_collider_shape() const {
 	return against_shape;
 }
@@ -96,7 +100,7 @@ Vector2 RayCast2D::get_collision_normal() const {
 
 void RayCast2D::set_enabled(bool p_enabled) {
 	enabled = p_enabled;
-	update();
+	queue_redraw();
 	if (is_inside_tree() && !Engine::get_singleton()->is_editor_hint()) {
 		set_physics_process_internal(p_enabled);
 	}
@@ -203,17 +207,19 @@ void RayCast2D::_update_raycast_state() {
 	if (dss->intersect_ray(ray_params, rr)) {
 		collided = true;
 		against = rr.collider_id;
+		against_rid = rr.rid;
 		collision_point = rr.position;
 		collision_normal = rr.normal;
 		against_shape = rr.shape;
 	} else {
 		collided = false;
 		against = ObjectID();
+		against_rid = RID();
 		against_shape = 0;
 	}
 
 	if (prev_collision_state != collided) {
-		update();
+		queue_redraw();
 	}
 }
 
@@ -321,6 +327,7 @@ void RayCast2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("force_raycast_update"), &RayCast2D::force_raycast_update);
 
 	ClassDB::bind_method(D_METHOD("get_collider"), &RayCast2D::get_collider);
+	ClassDB::bind_method(D_METHOD("get_collider_rid"), &RayCast2D::get_collider_rid);
 	ClassDB::bind_method(D_METHOD("get_collider_shape"), &RayCast2D::get_collider_shape);
 	ClassDB::bind_method(D_METHOD("get_collision_point"), &RayCast2D::get_collision_point);
 	ClassDB::bind_method(D_METHOD("get_collision_normal"), &RayCast2D::get_collision_normal);

@@ -54,10 +54,6 @@ double OS::get_unix_time() const {
 	return 0;
 }
 
-void OS::debug_break() {
-	// something
-}
-
 void OS::_set_logger(CompositeLogger *p_logger) {
 	if (_logger) {
 		memdelete(_logger);
@@ -159,15 +155,11 @@ int OS::get_process_id() const {
 }
 
 void OS::vibrate_handheld(int p_duration_ms) {
-	WARN_PRINT("vibrate_handheld() only works with Android, iOS and HTML5");
+	WARN_PRINT("vibrate_handheld() only works with Android, iOS and Web");
 }
 
 bool OS::is_stdout_verbose() const {
 	return _verbose_stdout;
-}
-
-bool OS::is_single_window() const {
-	return _single_window;
 }
 
 bool OS::is_stdout_debug_enabled() const {
@@ -188,50 +180,6 @@ void OS::set_stdout_enabled(bool p_enabled) {
 
 void OS::set_stderr_enabled(bool p_enabled) {
 	_stderr_enabled = p_enabled;
-}
-
-void OS::dump_memory_to_file(const char *p_file) {
-	//Memory::dump_static_mem_to_file(p_file);
-}
-
-static Ref<FileAccess> _OSPRF;
-
-static void _OS_printres(Object *p_obj) {
-	Resource *res = Object::cast_to<Resource>(p_obj);
-	if (!res) {
-		return;
-	}
-
-	String str = vformat("%s - %s - %s", res->to_string(), res->get_name(), res->get_path());
-	if (_OSPRF.is_valid()) {
-		_OSPRF->store_line(str);
-	} else {
-		print_line(str);
-	}
-}
-
-void OS::print_all_resources(String p_to_file) {
-	ERR_FAIL_COND(!p_to_file.is_empty() && _OSPRF.is_valid());
-	if (!p_to_file.is_empty()) {
-		Error err;
-		_OSPRF = FileAccess::open(p_to_file, FileAccess::WRITE, &err);
-		if (err != OK) {
-			_OSPRF.unref();
-			ERR_FAIL_MSG("Can't print all resources to file: " + String(p_to_file) + ".");
-		}
-	}
-
-	ObjectDB::debug_objects(_OS_printres);
-
-	_OSPRF.unref();
-}
-
-void OS::print_resources_in_use(bool p_short) {
-	ResourceCache::dump(nullptr, p_short);
-}
-
-void OS::dump_resources_to_file(const char *p_file) {
-	ResourceCache::dump(p_file);
 }
 
 int OS::get_exit_code() const {

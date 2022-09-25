@@ -267,7 +267,7 @@ RendererCompositorRD::RendererCompositorRD() {
 			if (err != OK) {
 				ERR_PRINT("Can't create shader cache folder, no shader caching will happen: " + shader_cache_dir);
 			} else {
-				shader_cache_dir = shader_cache_dir.plus_file("shader_cache");
+				shader_cache_dir = shader_cache_dir.path_join("shader_cache");
 
 				bool shader_cache_enabled = GLOBAL_GET("rendering/shader_compiler/shader_cache/enabled");
 				if (!Engine::get_singleton()->is_editor_hint() && !shader_cache_enabled) {
@@ -299,14 +299,19 @@ RendererCompositorRD::RendererCompositorRD() {
 	fog = memnew(RendererRD::Fog);
 	canvas = memnew(RendererCanvasRenderRD());
 
-	back_end = (bool)(int)GLOBAL_GET("rendering/vulkan/rendering/back_end");
+	String rendering_method = GLOBAL_GET("rendering/renderer/rendering_method");
 	uint64_t textures_per_stage = RD::get_singleton()->limit_get(RD::LIMIT_MAX_TEXTURES_PER_SHADER_STAGE);
 
-	if (back_end || textures_per_stage < 48) {
+	if (rendering_method == "mobile" || textures_per_stage < 48) {
 		scene = memnew(RendererSceneRenderImplementation::RenderForwardMobile());
-	} else { // back_end == false
+		if (rendering_method == "forward_plus") {
+			WARN_PRINT_ONCE("Platform supports less than 48 textures per stage which is less than required by the Clustered renderer. Defaulting to Mobile renderer.");
+		}
+	} else if (rendering_method == "forward_plus") {
 		// default to our high end renderer
 		scene = memnew(RendererSceneRenderImplementation::RenderForwardClustered());
+	} else {
+		ERR_FAIL_MSG("Cannot instantiate RenderingDevice-based renderer with renderer type " + rendering_method);
 	}
 
 	scene->init();

@@ -106,7 +106,6 @@ private:
 	bool shift_mem;
 	bool control_mem;
 	bool meta_mem;
-	bool force_quit;
 	MouseButton last_button_state = MouseButton::NONE;
 
 	CursorShape cursor_shape;
@@ -184,9 +183,10 @@ public:
 	virtual MainLoop *get_main_loop() const;
 
 	virtual String get_name() const;
+	virtual String get_distribution_name() const;
+	virtual String get_version() const;
 
-	virtual Date get_date(bool p_utc) const;
-	virtual Time get_time(bool p_utc) const;
+	virtual DateTime get_datetime(bool p_utc) const;
 	virtual TimeZoneInfo get_time_zone_info() const;
 	virtual uint64_t get_unix_time() const;
 

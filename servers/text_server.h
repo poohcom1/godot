@@ -37,6 +37,9 @@
 #include "core/variant/native_ptr.h"
 #include "core/variant/variant.h"
 
+template <typename T>
+class TypedArray;
+
 struct Glyph;
 struct CaretInfo;
 
@@ -44,6 +47,21 @@ class TextServer : public RefCounted {
 	GDCLASS(TextServer, RefCounted);
 
 public:
+	enum FontAntialiasing {
+		FONT_ANTIALIASING_NONE,
+		FONT_ANTIALIASING_GRAY,
+		FONT_ANTIALIASING_LCD,
+	};
+
+	enum FontLCDSubpixelLayout {
+		FONT_LCD_SUBPIXEL_LAYOUT_NONE,
+		FONT_LCD_SUBPIXEL_LAYOUT_HRGB,
+		FONT_LCD_SUBPIXEL_LAYOUT_HBGR,
+		FONT_LCD_SUBPIXEL_LAYOUT_VRGB,
+		FONT_LCD_SUBPIXEL_LAYOUT_VBGR,
+		FONT_LCD_SUBPIXEL_LAYOUT_MAX,
+	};
+
 	enum Direction {
 		DIRECTION_AUTO,
 		DIRECTION_LTR,
@@ -85,6 +103,7 @@ public:
 		BREAK_WORD_BOUND = 1 << 1,
 		BREAK_GRAPHEME_BOUND = 1 << 2,
 		BREAK_ADAPTIVE = 1 << 3,
+		BREAK_TRIM_EDGE_SPACES = 1 << 4,
 	};
 
 	enum OverrunBehavior {
@@ -230,8 +249,8 @@ public:
 	virtual void font_set_style_name(const RID &p_font_rid, const String &p_name) = 0;
 	virtual String font_get_style_name(const RID &p_font_rid) const = 0;
 
-	virtual void font_set_antialiased(const RID &p_font_rid, bool p_antialiased) = 0;
-	virtual bool font_is_antialiased(const RID &p_font_rid) const = 0;
+	virtual void font_set_antialiasing(RID p_font_rid, FontAntialiasing p_antialiasing) = 0;
+	virtual FontAntialiasing font_get_antialiasing(RID p_font_rid) const = 0;
 
 	virtual void font_set_generate_mipmaps(const RID &p_font_rid, bool p_generate_mipmaps) = 0;
 	virtual bool font_get_generate_mipmaps(const RID &p_font_rid) const = 0;
@@ -269,7 +288,7 @@ public:
 	virtual void font_set_oversampling(const RID &p_font_rid, double p_oversampling) = 0;
 	virtual double font_get_oversampling(const RID &p_font_rid) const = 0;
 
-	virtual Array font_get_size_cache_list(const RID &p_font_rid) const = 0;
+	virtual TypedArray<Vector2i> font_get_size_cache_list(const RID &p_font_rid) const = 0;
 	virtual void font_clear_size_cache(const RID &p_font_rid) = 0;
 	virtual void font_remove_size_cache(const RID &p_font_rid, const Vector2i &p_size) = 0;
 
@@ -298,7 +317,7 @@ public:
 	virtual void font_set_texture_offsets(const RID &p_font_rid, const Vector2i &p_size, int64_t p_texture_index, const PackedInt32Array &p_offset) = 0;
 	virtual PackedInt32Array font_get_texture_offsets(const RID &p_font_rid, const Vector2i &p_size, int64_t p_texture_index) const = 0;
 
-	virtual Array font_get_glyph_list(const RID &p_font_rid, const Vector2i &p_size) const = 0;
+	virtual PackedInt32Array font_get_glyph_list(const RID &p_font_rid, const Vector2i &p_size) const = 0;
 	virtual void font_clear_glyphs(const RID &p_font_rid, const Vector2i &p_size) = 0;
 	virtual void font_remove_glyph(const RID &p_font_rid, const Vector2i &p_size, int64_t p_glyph) = 0;
 
@@ -321,7 +340,7 @@ public:
 
 	virtual Dictionary font_get_glyph_contours(const RID &p_font, int64_t p_size, int64_t p_index) const = 0;
 
-	virtual Array font_get_kerning_list(const RID &p_font_rid, int64_t p_size) const = 0;
+	virtual TypedArray<Vector2i> font_get_kerning_list(const RID &p_font_rid, int64_t p_size) const = 0;
 	virtual void font_clear_kerning_map(const RID &p_font_rid, int64_t p_size) = 0;
 	virtual void font_remove_kerning(const RID &p_font_rid, int64_t p_size, const Vector2i &p_glyph_pair) = 0;
 
@@ -390,13 +409,13 @@ public:
 	virtual void shaped_text_set_spacing(const RID &p_shaped, SpacingType p_spacing, int64_t p_value) = 0;
 	virtual int64_t shaped_text_get_spacing(const RID &p_shaped, SpacingType p_spacing) const = 0;
 
-	virtual bool shaped_text_add_string(const RID &p_shaped, const String &p_text, const Array &p_fonts, int64_t p_size, const Dictionary &p_opentype_features = Dictionary(), const String &p_language = "", const Variant &p_meta = Variant()) = 0;
+	virtual bool shaped_text_add_string(const RID &p_shaped, const String &p_text, const TypedArray<RID> &p_fonts, int64_t p_size, const Dictionary &p_opentype_features = Dictionary(), const String &p_language = "", const Variant &p_meta = Variant()) = 0;
 	virtual bool shaped_text_add_object(const RID &p_shaped, const Variant &p_key, const Size2 &p_size, InlineAlignment p_inline_align = INLINE_ALIGNMENT_CENTER, int64_t p_length = 1) = 0;
 	virtual bool shaped_text_resize_object(const RID &p_shaped, const Variant &p_key, const Size2 &p_size, InlineAlignment p_inline_align = INLINE_ALIGNMENT_CENTER) = 0;
 
 	virtual int64_t shaped_get_span_count(const RID &p_shaped) const = 0;
 	virtual Variant shaped_get_span_meta(const RID &p_shaped, int64_t p_index) const = 0;
-	virtual void shaped_set_span_update_font(const RID &p_shaped, int64_t p_index, const Array &p_fonts, int64_t p_size, const Dictionary &p_opentype_features = Dictionary()) = 0;
+	virtual void shaped_set_span_update_font(const RID &p_shaped, int64_t p_index, const TypedArray<RID> &p_fonts, int64_t p_size, const Dictionary &p_opentype_features = Dictionary()) = 0;
 
 	virtual RID shaped_text_substr(const RID &p_shaped, int64_t p_start, int64_t p_length) const = 0; // Copy shaped substring (e.g. line break) without reshaping, but correctly reordered, preservers range.
 	virtual RID shaped_text_get_parent(const RID &p_shaped) const = 0;
@@ -411,9 +430,9 @@ public:
 	virtual bool shaped_text_is_ready(const RID &p_shaped) const = 0;
 
 	virtual const Glyph *shaped_text_get_glyphs(const RID &p_shaped) const = 0;
-	Array _shaped_text_get_glyphs_wrapper(const RID &p_shaped) const;
+	TypedArray<Dictionary> _shaped_text_get_glyphs_wrapper(const RID &p_shaped) const;
 	virtual const Glyph *shaped_text_sort_logical(const RID &p_shaped) = 0;
-	Array _shaped_text_sort_logical_wrapper(const RID &p_shaped);
+	TypedArray<Dictionary> _shaped_text_sort_logical_wrapper(const RID &p_shaped);
 	virtual int64_t shaped_text_get_glyph_count(const RID &p_shaped) const = 0;
 
 	virtual Vector2i shaped_text_get_range(const RID &p_shaped) const = 0;
@@ -425,7 +444,7 @@ public:
 	virtual int64_t shaped_text_get_trim_pos(const RID &p_shaped) const = 0;
 	virtual int64_t shaped_text_get_ellipsis_pos(const RID &p_shaped) const = 0;
 	virtual const Glyph *shaped_text_get_ellipsis_glyphs(const RID &p_shaped) const = 0;
-	Array _shaped_text_get_ellipsis_glyphs_wrapper(const RID &p_shaped) const;
+	TypedArray<Dictionary> _shaped_text_get_ellipsis_glyphs_wrapper(const RID &p_shaped) const;
 	virtual int64_t shaped_text_get_ellipsis_glyph_count(const RID &p_shaped) const = 0;
 
 	virtual void shaped_text_overrun_trim_to_width(const RID &p_shaped, double p_width, BitField<TextServer::TextOverrunFlag> p_trim_flags) = 0;
@@ -466,7 +485,7 @@ public:
 	// String functions.
 	virtual PackedInt32Array string_get_word_breaks(const String &p_string, const String &p_language = "") const = 0;
 
-	virtual int is_confusable(const String &p_string, const PackedStringArray &p_dict) const { return -1; };
+	virtual int64_t is_confusable(const String &p_string, const PackedStringArray &p_dict) const { return -1; };
 	virtual bool spoof_check(const String &p_string) const { return false; };
 
 	virtual String strip_diacritics(const String &p_string) const;
@@ -476,7 +495,7 @@ public:
 	virtual String string_to_upper(const String &p_string, const String &p_language = "") const = 0;
 	virtual String string_to_lower(const String &p_string, const String &p_language = "") const = 0;
 
-	Array parse_structured_text(StructuredTextParser p_parser_type, const Array &p_args, const String &p_text) const;
+	TypedArray<Vector2i> parse_structured_text(StructuredTextParser p_parser_type, const Array &p_args, const String &p_text) const;
 
 	TextServer();
 	~TextServer();
@@ -538,7 +557,7 @@ public:
 	int get_interface_count() const;
 	Ref<TextServer> get_interface(int p_index) const;
 	Ref<TextServer> find_interface(const String &p_name) const;
-	Array get_interfaces() const;
+	TypedArray<Dictionary> get_interfaces() const;
 
 	_FORCE_INLINE_ Ref<TextServer> get_primary_interface() const {
 		return primary_interface;
@@ -569,6 +588,8 @@ VARIANT_ENUM_CAST(TextServer::ContourPointTag);
 VARIANT_ENUM_CAST(TextServer::SpacingType);
 VARIANT_BITFIELD_CAST(TextServer::FontStyle);
 VARIANT_ENUM_CAST(TextServer::StructuredTextParser);
+VARIANT_ENUM_CAST(TextServer::FontAntialiasing);
+VARIANT_ENUM_CAST(TextServer::FontLCDSubpixelLayout);
 
 GDVIRTUAL_NATIVE_PTR(Glyph);
 GDVIRTUAL_NATIVE_PTR(CaretInfo);

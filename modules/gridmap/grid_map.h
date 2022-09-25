@@ -117,6 +117,10 @@ class GridMap : public Node3D {
 		HashSet<IndexKey> cells;
 		RID collision_debug;
 		RID collision_debug_instance;
+#ifdef DEBUG_ENABLED
+		RID navigation_debug_edge_connections_instance;
+		Ref<ArrayMesh> navigation_debug_edge_connections_mesh;
+#endif // DEBUG_ENABLED
 
 		bool dirty = false;
 		RID static_body;
@@ -148,6 +152,7 @@ class GridMap : public Node3D {
 	uint32_t collision_mask = 1;
 	Ref<PhysicsMaterial> physics_material;
 	bool bake_navigation = false;
+	RID map_override;
 	uint32_t navigation_layers = 1;
 
 	Transform3D last_transform;
@@ -186,6 +191,11 @@ class GridMap : public Node3D {
 	bool _octant_update(const OctantKey &p_key);
 	void _octant_clean_up(const OctantKey &p_key);
 	void _octant_transform(const OctantKey &p_key);
+#ifdef DEBUG_ENABLED
+	void _update_octant_navigation_debug_edge_connections_mesh(const OctantKey &p_key);
+	void _navigation_map_changed(RID p_map);
+	void _update_navigation_debug_edge_connections();
+#endif // DEBUG_ENABLED
 	bool awaiting_update = false;
 
 	void _queue_octants_dirty();
@@ -238,6 +248,9 @@ public:
 	void set_bake_navigation(bool p_bake_navigation);
 	bool is_baking_navigation();
 
+	void set_navigation_map(RID p_navigation_map);
+	RID get_navigation_map() const;
+
 	void set_navigation_layers(uint32_t p_navigation_layers);
 	uint32_t get_navigation_layers() const;
 
@@ -263,15 +276,18 @@ public:
 	void set_cell_item(const Vector3i &p_position, int p_item, int p_rot = 0);
 	int get_cell_item(const Vector3i &p_position) const;
 	int get_cell_item_orientation(const Vector3i &p_position) const;
+	Basis get_cell_item_basis(const Vector3i &p_position) const;
+	Basis get_basis_with_orthogonal_index(int p_index) const;
+	int get_orthogonal_index_from_basis(const Basis &p_basis) const;
 
-	Vector3i world_to_map(const Vector3 &p_world_position) const;
-	Vector3 map_to_world(const Vector3i &p_map_position) const;
+	Vector3i local_to_map(const Vector3 &p_local_position) const;
+	Vector3 map_to_local(const Vector3i &p_map_position) const;
 
 	void set_cell_scale(float p_scale);
 	float get_cell_scale() const;
 
-	Array get_used_cells() const;
-	Array get_used_cells_by_item(int p_item) const;
+	TypedArray<Vector3i> get_used_cells() const;
+	TypedArray<Vector3i> get_used_cells_by_item(int p_item) const;
 
 	Array get_meshes() const;
 

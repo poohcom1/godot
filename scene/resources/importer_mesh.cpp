@@ -154,7 +154,7 @@ Mesh::BlendShapeMode ImporterMesh::get_blend_shape_mode() const {
 	return blend_shape_mode;
 }
 
-void ImporterMesh::add_surface(Mesh::PrimitiveType p_primitive, const Array &p_arrays, const Array &p_blend_shapes, const Dictionary &p_lods, const Ref<Material> &p_material, const String &p_name, const uint32_t p_flags) {
+void ImporterMesh::add_surface(Mesh::PrimitiveType p_primitive, const Array &p_arrays, const TypedArray<Array> &p_blend_shapes, const Dictionary &p_lods, const Ref<Material> &p_material, const String &p_name, const uint32_t p_flags) {
 	ERR_FAIL_COND(p_blend_shapes.size() != blend_shapes.size());
 	ERR_FAIL_COND(p_arrays.size() != Mesh::ARRAY_MAX);
 	Surface s;
@@ -254,7 +254,20 @@ void ImporterMesh::set_surface_material(int p_surface, const Ref<Material> &p_ma
 	mesh.unref();
 }
 
-void ImporterMesh::generate_lods(float p_normal_merge_angle, float p_normal_split_angle) {
+#define VERTEX_SKIN_FUNC(bone_count, vert_idx, read_array, write_array, transform_array, bone_array, weight_array) \
+	Vector3 transformed_vert = Vector3();                                                                          \
+	for (unsigned int weight_idx = 0; weight_idx < bone_count; weight_idx++) {                                     \
+		int bone_idx = bone_array[vert_idx * bone_count + weight_idx];                                             \
+		float w = weight_array[vert_idx * bone_count + weight_idx];                                                \
+		if (w < FLT_EPSILON) {                                                                                     \
+			continue;                                                                                              \
+		}                                                                                                          \
+		ERR_FAIL_INDEX(bone_idx, static_cast<int>(transform_array.size()));                                        \
+		transformed_vert += transform_array[bone_idx].xform(read_array[vert_idx]) * w;                             \
+	}                                                                                                              \
+	write_array[vert_idx] = transformed_vert;
+
+void ImporterMesh::generate_lods(float p_normal_merge_angle, float p_normal_split_angle, Array p_bone_transform_array) {
 	if (!SurfaceTool::simplify_scale_func) {
 		return;
 	}
@@ -263,6 +276,12 @@ void ImporterMesh::generate_lods(float p_normal_merge_angle, float p_normal_spli
 	}
 	if (!SurfaceTool::optimize_vertex_cache_func) {
 		return;
+	}
+
+	LocalVector<Transform3D> bone_transform_vector;
+	for (int i = 0; i < p_bone_transform_array.size(); i++) {
+		ERR_FAIL_COND(p_bone_transform_array[i].get_type() != Variant::TRANSFORM3D);
+		bone_transform_vector.push_back(p_bone_transform_array[i]);
 	}
 
 	for (int i = 0; i < surfaces.size(); i++) {
@@ -276,6 +295,8 @@ void ImporterMesh::generate_lods(float p_normal_merge_angle, float p_normal_spli
 		Vector<Vector3> normals = surfaces[i].arrays[RS::ARRAY_NORMAL];
 		Vector<Vector2> uvs = surfaces[i].arrays[RS::ARRAY_TEX_UV];
 		Vector<Vector2> uv2s = surfaces[i].arrays[RS::ARRAY_TEX_UV2];
+		Vector<int> bones = surfaces[i].arrays[RS::ARRAY_BONES];
+		Vector<float> weights = surfaces[i].arrays[RS::ARRAY_WEIGHTS];
 
 		unsigned int index_count = indices.size();
 		unsigned int vertex_count = vertices.size();
@@ -301,9 +322,25 @@ void ImporterMesh::generate_lods(float p_normal_merge_angle, float p_normal_spli
 			}
 		}
 
-		float normal_merge_threshold = Math::cos(Math::deg2rad(p_normal_merge_angle));
-		float normal_pre_split_threshold = Math::cos(Math::deg2rad(MIN(180.0f, p_normal_split_angle * 2.0f)));
-		float normal_split_threshold = Math::cos(Math::deg2rad(p_normal_split_angle));
+		if (bones.size() > 0 && weights.size() && bone_transform_vector.size() > 0) {
+			Vector3 *vertices_ptrw = vertices.ptrw();
+
+			// Apply bone transforms to regular surface.
+			unsigned int bone_weight_length = surfaces[i].flags & Mesh::ARRAY_FLAG_USE_8_BONE_WEIGHTS ? 8 : 4;
+
+			const int *bo = bones.ptr();
+			const float *we = weights.ptr();
+
+			for (unsigned int j = 0; j < vertex_count; j++) {
+				VERTEX_SKIN_FUNC(bone_weight_length, j, vertices_ptr, vertices_ptrw, bone_transform_vector, bo, we)
+			}
+
+			vertices_ptr = vertices.ptr();
+		}
+
+		float normal_merge_threshold = Math::cos(Math::deg_to_rad(p_normal_merge_angle));
+		float normal_pre_split_threshold = Math::cos(Math::deg_to_rad(MIN(180.0f, p_normal_split_angle * 2.0f)));
+		float normal_split_threshold = Math::cos(Math::deg_to_rad(p_normal_split_angle));
 		const Vector3 *normals_ptr = normals.ptr();
 
 		HashMap<Vector3, LocalVector<Pair<int, int>>> unique_vertices;
@@ -1230,7 +1267,7 @@ void ImporterMesh::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_blend_shape_mode", "mode"), &ImporterMesh::set_blend_shape_mode);
 	ClassDB::bind_method(D_METHOD("get_blend_shape_mode"), &ImporterMesh::get_blend_shape_mode);
 
-	ClassDB::bind_method(D_METHOD("add_surface", "primitive", "arrays", "blend_shapes", "lods", "material", "name", "flags"), &ImporterMesh::add_surface, DEFVAL(Array()), DEFVAL(Dictionary()), DEFVAL(Ref<Material>()), DEFVAL(String()), DEFVAL(0));
+	ClassDB::bind_method(D_METHOD("add_surface", "primitive", "arrays", "blend_shapes", "lods", "material", "name", "flags"), &ImporterMesh::add_surface, DEFVAL(TypedArray<Array>()), DEFVAL(Dictionary()), DEFVAL(Ref<Material>()), DEFVAL(String()), DEFVAL(0));
 
 	ClassDB::bind_method(D_METHOD("get_surface_count"), &ImporterMesh::get_surface_count);
 	ClassDB::bind_method(D_METHOD("get_surface_primitive_type", "surface_idx"), &ImporterMesh::get_surface_primitive_type);
@@ -1246,7 +1283,7 @@ void ImporterMesh::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_surface_name", "surface_idx", "name"), &ImporterMesh::set_surface_name);
 	ClassDB::bind_method(D_METHOD("set_surface_material", "surface_idx", "material"), &ImporterMesh::set_surface_material);
 
-	ClassDB::bind_method(D_METHOD("generate_lods", "normal_merge_angle", "normal_split_angle"), &ImporterMesh::generate_lods);
+	ClassDB::bind_method(D_METHOD("generate_lods", "normal_merge_angle", "normal_split_angle", "bone_transform_array"), &ImporterMesh::generate_lods);
 	ClassDB::bind_method(D_METHOD("get_mesh", "base_mesh"), &ImporterMesh::get_mesh, DEFVAL(Ref<ArrayMesh>()));
 	ClassDB::bind_method(D_METHOD("clear"), &ImporterMesh::clear);
 

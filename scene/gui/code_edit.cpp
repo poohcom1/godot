@@ -268,7 +268,7 @@ void CodeEdit::gui_input(const Ref<InputEvent> &p_gui_input) {
 
 		if (is_code_completion_scroll_pressed && mb->get_button_index() == MouseButton::LEFT) {
 			is_code_completion_scroll_pressed = false;
-			update();
+			queue_redraw();
 			return;
 		}
 
@@ -281,13 +281,13 @@ void CodeEdit::gui_input(const Ref<InputEvent> &p_gui_input) {
 				case MouseButton::WHEEL_UP: {
 					if (code_completion_current_selected > 0) {
 						code_completion_current_selected--;
-						update();
+						queue_redraw();
 					}
 				} break;
 				case MouseButton::WHEEL_DOWN: {
 					if (code_completion_current_selected < code_completion_options.size() - 1) {
 						code_completion_current_selected++;
-						update();
+						queue_redraw();
 					}
 				} break;
 				case MouseButton::LEFT: {
@@ -295,7 +295,7 @@ void CodeEdit::gui_input(const Ref<InputEvent> &p_gui_input) {
 					if (mb->is_double_click()) {
 						confirm_code_completion();
 					}
-					update();
+					queue_redraw();
 				} break;
 				default:
 					break;
@@ -310,7 +310,7 @@ void CodeEdit::gui_input(const Ref<InputEvent> &p_gui_input) {
 				is_code_completion_scroll_pressed = true;
 
 				_update_scroll_selected_line(mb->get_position().y);
-				update();
+				queue_redraw();
 			}
 
 			return;
@@ -344,7 +344,7 @@ void CodeEdit::gui_input(const Ref<InputEvent> &p_gui_input) {
 			}
 		} else {
 			if (mb->get_button_index() == MouseButton::LEFT) {
-				if (mb->is_command_pressed() && !symbol_lookup_word.is_empty()) {
+				if (mb->is_command_or_control_pressed() && !symbol_lookup_word.is_empty()) {
 					Vector2i mpos = mb->get_position();
 					if (is_layout_rtl()) {
 						mpos.x = get_size().x - mpos.x;
@@ -371,7 +371,7 @@ void CodeEdit::gui_input(const Ref<InputEvent> &p_gui_input) {
 		}
 
 		if (symbol_lookup_on_click_enabled) {
-			if (mm->is_command_pressed() && mm->get_button_mask() == MouseButton::NONE && !is_dragging_cursor()) {
+			if (mm->is_command_or_control_pressed() && mm->get_button_mask() == MouseButton::NONE && !is_dragging_cursor()) {
 				symbol_lookup_new_word = get_word_at_pos(mpos);
 				if (symbol_lookup_new_word != symbol_lookup_word) {
 					emit_signal(SNAME("symbol_validate"), symbol_lookup_new_word);
@@ -384,12 +384,12 @@ void CodeEdit::gui_input(const Ref<InputEvent> &p_gui_input) {
 		bool scroll_hovered = code_completion_scroll_rect.has_point(mpos);
 		if (is_code_completion_scroll_hovered != scroll_hovered) {
 			is_code_completion_scroll_hovered = scroll_hovered;
-			update();
+			queue_redraw();
 		}
 
 		if (is_code_completion_scroll_pressed) {
 			_update_scroll_selected_line(mpos.y);
-			update();
+			queue_redraw();
 			return;
 		}
 	}
@@ -432,7 +432,7 @@ void CodeEdit::gui_input(const Ref<InputEvent> &p_gui_input) {
 
 	/* Allow unicode handling if:              */
 	/* No Modifiers are pressed (except shift) */
-	bool allow_unicode_handling = !(k->is_command_pressed() || k->is_ctrl_pressed() || k->is_alt_pressed() || k->is_meta_pressed());
+	bool allow_unicode_handling = !(k->is_command_or_control_pressed() || k->is_ctrl_pressed() || k->is_alt_pressed() || k->is_meta_pressed());
 
 	/* AUTO-COMPLETE */
 	if (code_completion_enabled && k->is_action("ui_text_completion_query", true)) {
@@ -448,7 +448,7 @@ void CodeEdit::gui_input(const Ref<InputEvent> &p_gui_input) {
 			} else {
 				code_completion_current_selected = code_completion_options.size() - 1;
 			}
-			update();
+			queue_redraw();
 			accept_event();
 			return;
 		}
@@ -458,31 +458,31 @@ void CodeEdit::gui_input(const Ref<InputEvent> &p_gui_input) {
 			} else {
 				code_completion_current_selected = 0;
 			}
-			update();
+			queue_redraw();
 			accept_event();
 			return;
 		}
 		if (k->is_action("ui_page_up", true)) {
 			code_completion_current_selected = MAX(0, code_completion_current_selected - code_completion_max_lines);
-			update();
+			queue_redraw();
 			accept_event();
 			return;
 		}
 		if (k->is_action("ui_page_down", true)) {
 			code_completion_current_selected = MIN(code_completion_options.size() - 1, code_completion_current_selected + code_completion_max_lines);
-			update();
+			queue_redraw();
 			accept_event();
 			return;
 		}
 		if (k->is_action("ui_home", true)) {
 			code_completion_current_selected = 0;
-			update();
+			queue_redraw();
 			accept_event();
 			return;
 		}
 		if (k->is_action("ui_end", true)) {
 			code_completion_current_selected = code_completion_options.size() - 1;
-			update();
+			queue_redraw();
 			accept_event();
 			return;
 		}
@@ -1106,7 +1106,7 @@ bool CodeEdit::is_auto_brace_completion_enabled() const {
 
 void CodeEdit::set_highlight_matching_braces_enabled(bool p_enabled) {
 	highlight_matching_braces_enabled = p_enabled;
-	update();
+	queue_redraw();
 }
 
 bool CodeEdit::is_highlight_matching_braces_enabled() const {
@@ -1265,7 +1265,7 @@ void CodeEdit::set_line_as_breakpoint(int p_line, bool p_breakpointed) {
 		breakpointed_lines.erase(p_line);
 	}
 	emit_signal(SNAME("breakpoint_toggled"), p_line);
-	update();
+	queue_redraw();
 }
 
 bool CodeEdit::is_line_breakpointed(int p_line) const {
@@ -1280,8 +1280,8 @@ void CodeEdit::clear_breakpointed_lines() {
 	}
 }
 
-Array CodeEdit::get_breakpointed_lines() const {
-	Array ret;
+PackedInt32Array CodeEdit::get_breakpointed_lines() const {
+	PackedInt32Array ret;
 	for (int i = 0; i < get_line_count(); i++) {
 		if (is_line_breakpointed(i)) {
 			ret.append(i);
@@ -1294,7 +1294,7 @@ Array CodeEdit::get_breakpointed_lines() const {
 void CodeEdit::set_line_as_bookmarked(int p_line, bool p_bookmarked) {
 	int mask = get_line_gutter_metadata(p_line, main_gutter);
 	set_line_gutter_metadata(p_line, main_gutter, p_bookmarked ? mask | MAIN_GUTTER_BOOKMARK : mask & ~MAIN_GUTTER_BOOKMARK);
-	update();
+	queue_redraw();
 }
 
 bool CodeEdit::is_line_bookmarked(int p_line) const {
@@ -1309,8 +1309,8 @@ void CodeEdit::clear_bookmarked_lines() {
 	}
 }
 
-Array CodeEdit::get_bookmarked_lines() const {
-	Array ret;
+PackedInt32Array CodeEdit::get_bookmarked_lines() const {
+	PackedInt32Array ret;
 	for (int i = 0; i < get_line_count(); i++) {
 		if (is_line_bookmarked(i)) {
 			ret.append(i);
@@ -1323,7 +1323,7 @@ Array CodeEdit::get_bookmarked_lines() const {
 void CodeEdit::set_line_as_executing(int p_line, bool p_executing) {
 	int mask = get_line_gutter_metadata(p_line, main_gutter);
 	set_line_gutter_metadata(p_line, main_gutter, p_executing ? mask | MAIN_GUTTER_EXECUTING : mask & ~MAIN_GUTTER_EXECUTING);
-	update();
+	queue_redraw();
 }
 
 bool CodeEdit::is_line_executing(int p_line) const {
@@ -1338,8 +1338,8 @@ void CodeEdit::clear_executing_lines() {
 	}
 }
 
-Array CodeEdit::get_executing_lines() const {
-	Array ret;
+PackedInt32Array CodeEdit::get_executing_lines() const {
+	PackedInt32Array ret;
 	for (int i = 0; i < get_line_count(); i++) {
 		if (is_line_executing(i)) {
 			ret.append(i);
@@ -1359,7 +1359,7 @@ bool CodeEdit::is_draw_line_numbers_enabled() const {
 
 void CodeEdit::set_line_numbers_zero_padded(bool p_zero_padded) {
 	p_zero_padded ? line_number_padding = "0" : line_number_padding = " ";
-	update();
+	queue_redraw();
 }
 
 bool CodeEdit::is_line_numbers_zero_padded() const {
@@ -1529,7 +1529,7 @@ void CodeEdit::fold_line(int p_line) {
 		set_caret_line(p_line, false, false);
 		set_caret_column(get_line(p_line).length(), false);
 	}
-	update();
+	queue_redraw();
 }
 
 void CodeEdit::unfold_line(int p_line) {
@@ -1552,14 +1552,14 @@ void CodeEdit::unfold_line(int p_line) {
 		}
 		_set_line_as_hidden(i, false);
 	}
-	update();
+	queue_redraw();
 }
 
 void CodeEdit::fold_all_lines() {
 	for (int i = 0; i < get_line_count(); i++) {
 		fold_line(i);
 	}
-	update();
+	queue_redraw();
 }
 
 void CodeEdit::unfold_all_lines() {
@@ -1765,12 +1765,12 @@ Point2 CodeEdit::get_delimiter_end_position(int p_line, int p_column) const {
 void CodeEdit::set_code_hint(const String &p_hint) {
 	code_hint = p_hint;
 	code_hint_xpos = -0xFFFF;
-	update();
+	queue_redraw();
 }
 
 void CodeEdit::set_code_hint_draw_below(bool p_below) {
 	code_hint_draw_below = p_below;
-	update();
+	queue_redraw();
 }
 
 /* Code Completion */
@@ -1929,7 +1929,7 @@ void CodeEdit::set_code_completion_selected_index(int p_index) {
 	}
 	ERR_FAIL_INDEX(p_index, code_completion_options.size());
 	code_completion_current_selected = p_index;
-	update();
+	queue_redraw();
 }
 
 void CodeEdit::confirm_code_completion(bool p_replace) {
@@ -2043,13 +2043,13 @@ void CodeEdit::cancel_code_completion() {
 	}
 	code_completion_forced = false;
 	code_completion_active = false;
-	update();
+	queue_redraw();
 }
 
 /* Line length guidelines */
 void CodeEdit::set_line_length_guidelines(TypedArray<int> p_guideline_columns) {
 	line_length_guideline_columns = p_guideline_columns;
-	update();
+	queue_redraw();
 }
 
 TypedArray<int> CodeEdit::get_line_length_guidelines() const {
@@ -2769,7 +2769,7 @@ void CodeEdit::_filter_code_completion_candidates_impl() {
 			i++;
 		}
 
-		Array completion_options;
+		TypedArray<Dictionary> completion_options;
 
 		GDVIRTUAL_CALL(_filter_code_completion_candidates, completion_options_sources, completion_options);
 
@@ -2802,7 +2802,7 @@ void CodeEdit::_filter_code_completion_candidates_impl() {
 		code_completion_longest_line = MIN(max_width, code_completion_max_width * font_size);
 		code_completion_current_selected = 0;
 		code_completion_active = true;
-		update();
+		queue_redraw();
 		return;
 	}
 
@@ -3052,7 +3052,7 @@ void CodeEdit::_filter_code_completion_candidates_impl() {
 	code_completion_longest_line = MIN(max_width, code_completion_max_width * font_size);
 	code_completion_current_selected = 0;
 	code_completion_active = true;
-	update();
+	queue_redraw();
 }
 
 void CodeEdit::_lines_edited_from(int p_from_line, int p_to_line) {

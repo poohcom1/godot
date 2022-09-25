@@ -2,6 +2,7 @@ import os
 import platform
 import sys
 from methods import get_compiler_version, using_gcc
+from platform_methods import detect_arch
 
 
 def is_active():
@@ -30,7 +31,6 @@ def get_opts():
     return [
         EnumVariable("linker", "Linker program", "default", ("default", "bfd", "gold", "lld", "mold")),
         BoolVariable("use_llvm", "Use the LLVM compiler", False),
-        BoolVariable("use_thinlto", "Use ThinLTO (LLVM only, requires linker=lld, implies use_lto=yes)", False),
         BoolVariable("use_static_cpp", "Link libgcc and libstdc++ statically for better portability", True),
         BoolVariable("use_coverage", "Test Godot coverage", False),
         BoolVariable("use_ubsan", "Use LLVM/GCC compiler undefined behavior sanitizer (UBSAN)", False),
@@ -39,7 +39,7 @@ def get_opts():
         BoolVariable("use_tsan", "Use LLVM/GCC compiler thread sanitizer (TSAN)", False),
         BoolVariable("use_msan", "Use LLVM compiler memory sanitizer (MSAN)", False),
         BoolVariable("pulseaudio", "Detect and use PulseAudio", True),
-        BoolVariable("dbus", "Detect and use D-Bus to handle screensaver", True),
+        BoolVariable("dbus", "Detect and use D-Bus to handle screensaver and portal desktop settings", True),
         BoolVariable("speechd", "Detect and use Speech Dispatcher for Text-to-Speech support", True),
         BoolVariable("fontconfig", "Detect and use fontconfig for system fonts support", True),
         BoolVariable("udev", "Use udev for gamepad connection callbacks", True),
@@ -52,10 +52,21 @@ def get_opts():
 
 
 def get_flags():
-    return []
+    return [
+        ("arch", detect_arch()),
+    ]
 
 
 def configure(env):
+    # Validate arch.
+    supported_arches = ["x86_32", "x86_64", "arm32", "arm64", "rv64", "ppc32", "ppc64"]
+    if env["arch"] not in supported_arches:
+        print(
+            'Unsupported CPU architecture "%s" for Linux / *BSD. Supported architectures are: %s.'
+            % (env["arch"], ", ".join(supported_arches))
+        )
+        sys.exit()
+
     ## Build type
 
     if env["target"] == "release":
@@ -80,23 +91,7 @@ def configure(env):
         env.Prepend(CCFLAGS=["-g3"])
         env.Append(LINKFLAGS=["-rdynamic"])
 
-    ## Architecture
-
-    is64 = sys.maxsize > 2**32
-    if env["bits"] == "default":
-        env["bits"] = "64" if is64 else "32"
-
-    machines = {
-        "riscv64": "rv64",
-        "ppc64le": "ppc64",
-        "ppc64": "ppc64",
-        "ppcle": "ppc",
-        "ppc": "ppc",
-    }
-
-    if env["arch"] == "" and platform.machine() in machines:
-        env["arch"] = machines[platform.machine()]
-
+    # CPU architecture flags.
     if env["arch"] == "rv64":
         # G = General-purpose extensions, C = Compression extension (very common).
         env.Append(CCFLAGS=["-march=rv64gc"])
@@ -132,13 +127,6 @@ def configure(env):
                 env.Append(LINKFLAGS=["-fuse-ld=mold"])
         else:
             env.Append(LINKFLAGS=["-fuse-ld=%s" % env["linker"]])
-
-    if env["use_thinlto"]:
-        if not env["use_llvm"] or env["linker"] != "lld":
-            print("ThinLTO is only compatible with LLVM and the LLD linker, use `use_llvm=yes linker=lld`.")
-            sys.exit(255)
-        else:
-            env["use_lto"] = True  # ThinLTO implies LTO
 
     if env["use_coverage"]:
         env.Append(CCFLAGS=["-ftest-coverage", "-fprofile-arcs"])
@@ -182,8 +170,16 @@ def configure(env):
             env.Append(CCFLAGS=["-fsanitize-recover=memory"])
             env.Append(LINKFLAGS=["-fsanitize=memory"])
 
-    if env["use_lto"]:
-        if env["use_thinlto"]:
+    # LTO
+
+    if env["lto"] == "auto":  # Full LTO for production.
+        env["lto"] = "full"
+
+    if env["lto"] != "none":
+        if env["lto"] == "thin":
+            if not env["use_llvm"]:
+                print("ThinLTO is only compatible with LLVM, use `use_llvm=yes` or `lto=full`.")
+                sys.exit(255)
             env.Append(CCFLAGS=["-flto=thin"])
             env.Append(LINKFLAGS=["-flto=thin"])
         elif not env["use_llvm"] and env.GetOption("num_jobs") > 1:
@@ -262,8 +258,7 @@ def configure(env):
         env["builtin_libvorbis"] = False  # Needed to link against system libtheora
         env.ParseConfig("pkg-config theora theoradec --cflags --libs")
     else:
-        list_of_x86 = ["x86_64", "x86", "i386", "i586"]
-        if any(platform.machine() in s for s in list_of_x86):
+        if env["arch"] in ["x86_64", "x86_32"]:
             env["x86_libtheora_opt_gcc"] = True
 
     if not env["builtin_libvorbis"]:
@@ -392,7 +387,9 @@ def configure(env):
         import subprocess
         import re
 
-        linker_version_str = subprocess.check_output([env.subst(env["LINK"]), "-Wl,--version"]).decode("utf-8")
+        linker_version_str = subprocess.check_output(
+            [env.subst(env["LINK"]), "-Wl,--version"] + env.subst(env["LINKFLAGS"])
+        ).decode("utf-8")
         gnu_ld_version = re.search("^GNU ld [^$]*(\d+\.\d+)$", linker_version_str, re.MULTILINE)
         if not gnu_ld_version:
             print(
@@ -405,11 +402,12 @@ def configure(env):
                 env.Append(LINKFLAGS=["-T", "platform/linuxbsd/pck_embed.legacy.ld"])
 
     ## Cross-compilation
-
-    if is64 and env["bits"] == "32":
+    # TODO: Support cross-compilation on architectures other than x86.
+    host_is_64_bit = sys.maxsize > 2**32
+    if host_is_64_bit and env["arch"] == "x86_32":
         env.Append(CCFLAGS=["-m32"])
         env.Append(LINKFLAGS=["-m32", "-L/usr/lib/i386-linux-gnu"])
-    elif not is64 and env["bits"] == "64":
+    elif not host_is_64_bit and env["arch"] == "x86_64":
         env.Append(CCFLAGS=["-m64"])
         env.Append(LINKFLAGS=["-m64", "-L/usr/lib/i686-linux-gnu"])
 

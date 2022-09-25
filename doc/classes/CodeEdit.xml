@@ -18,7 +18,7 @@
 			</description>
 		</method>
 		<method name="_filter_code_completion_candidates" qualifiers="virtual const">
-			<return type="Array" />
+			<return type="Dictionary[]" />
 			<param index="0" name="candidates" type="Dictionary[]" />
 			<description>
 				Override this method to define what items in [param candidates] should be displayed.
@@ -159,13 +159,13 @@
 			</description>
 		</method>
 		<method name="get_bookmarked_lines" qualifiers="const">
-			<return type="Array" />
+			<return type="PackedInt32Array" />
 			<description>
 				Gets all bookmarked lines.
 			</description>
 		</method>
 		<method name="get_breakpointed_lines" qualifiers="const">
-			<return type="Array" />
+			<return type="PackedInt32Array" />
 			<description>
 				Gets all breakpointed lines.
 			</description>
@@ -226,7 +226,7 @@
 			</description>
 		</method>
 		<method name="get_executing_lines" qualifiers="const">
-			<return type="Array" />
+			<return type="PackedInt32Array" />
 			<description>
 				Gets all executing lines.
 			</description>
@@ -482,7 +482,7 @@
 			Prefixes to trigger an automatic indent.
 		</member>
 		<member name="indent_size" type="int" setter="set_indent_size" getter="get_indent_size" default="4">
-			Size of tabs, if [code]indent_use_spaces[/code] is enabled the amount of spaces to use.
+			Size of tabs, if [code]indent_use_spaces[/code] is enabled the number of spaces to use.
 		</member>
 		<member name="indent_use_spaces" type="bool" setter="set_indent_using_spaces" getter="is_indent_using_spaces" default="false">
 			Use spaces instead of tabs for indentation.

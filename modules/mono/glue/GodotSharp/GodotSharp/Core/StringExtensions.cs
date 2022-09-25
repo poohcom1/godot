@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.Runtime.CompilerServices;
 using System.Security;
 using System.Text;
 using System.Text.RegularExpressions;
+using Godot.NativeInterop;
+
+#nullable enable
 
 namespace Godot
 {
@@ -177,6 +179,7 @@ namespace Godot
                 {
                     return 0;
                 }
+
                 if (from == 0 && to == len)
                 {
                     str = instance;
@@ -214,7 +217,7 @@ namespace Godot
         /// <returns>The escaped string.</returns>
         public static string CEscape(this string instance)
         {
-            var sb = new StringBuilder(string.Copy(instance));
+            var sb = new StringBuilder(instance);
 
             sb.Replace("\\", "\\\\");
             sb.Replace("\a", "\\a");
@@ -239,7 +242,7 @@ namespace Godot
         /// <returns>The unescaped string.</returns>
         public static string CUnescape(this string instance)
         {
-            var sb = new StringBuilder(string.Copy(instance));
+            var sb = new StringBuilder(instance);
 
             sb.Replace("\\a", "\a");
             sb.Replace("\\b", "\b");
@@ -282,6 +285,45 @@ namespace Godot
             }
 
             return cap;
+        }
+
+        /// <summary>
+        /// Returns the string converted to <c>camelCase</c>.
+        /// </summary>
+        /// <param name="instance">The string to convert.</param>
+        /// <returns>The converted string.</returns>
+        public static string ToCamelCase(this string instance)
+        {
+            using godot_string instanceStr = Marshaling.ConvertStringToNative(instance);
+            NativeFuncs.godotsharp_string_to_camel_case(instanceStr, out godot_string camelCase);
+            using (camelCase)
+                return Marshaling.ConvertStringToManaged(camelCase);
+        }
+
+        /// <summary>
+        /// Returns the string converted to <c>PascalCase</c>.
+        /// </summary>
+        /// <param name="instance">The string to convert.</param>
+        /// <returns>The converted string.</returns>
+        public static string ToPascalCase(this string instance)
+        {
+            using godot_string instanceStr = Marshaling.ConvertStringToNative(instance);
+            NativeFuncs.godotsharp_string_to_pascal_case(instanceStr, out godot_string pascalCase);
+            using (pascalCase)
+                return Marshaling.ConvertStringToManaged(pascalCase);
+        }
+
+        /// <summary>
+        /// Returns the string converted to <c>snake_case</c>.
+        /// </summary>
+        /// <param name="instance">The string to convert.</param>
+        /// <returns>The converted string.</returns>
+        public static string ToSnakeCase(this string instance)
+        {
+            using godot_string instanceStr = Marshaling.ConvertStringToNative(instance);
+            NativeFuncs.godotsharp_string_to_snake_case(instanceStr, out godot_string snakeCase);
+            using (snakeCase)
+                return Marshaling.ConvertStringToManaged(snakeCase);
         }
 
         private static string CamelcaseToUnderscore(this string instance, bool lowerCase)
@@ -471,7 +513,8 @@ namespace Godot
         /// <returns>The starting position of the substring, or -1 if not found.</returns>
         public static int Find(this string instance, string what, int from = 0, bool caseSensitive = true)
         {
-            return instance.IndexOf(what, from, caseSensitive ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase);
+            return instance.IndexOf(what, from,
+                caseSensitive ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>
@@ -490,7 +533,8 @@ namespace Godot
         {
             // TODO: Could be more efficient if we get a char version of `IndexOf`.
             // See https://github.com/dotnet/runtime/issues/44116
-            return instance.IndexOf(what.ToString(), from, caseSensitive ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase);
+            return instance.IndexOf(what.ToString(), from,
+                caseSensitive ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>Find the last occurrence of a substring.</summary>
@@ -519,7 +563,8 @@ namespace Godot
         /// <returns>The starting position of the substring, or -1 if not found.</returns>
         public static int FindLast(this string instance, string what, int from, bool caseSensitive = true)
         {
-            return instance.LastIndexOf(what, from, caseSensitive ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase);
+            return instance.LastIndexOf(what, from,
+                caseSensitive ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>
@@ -804,6 +849,7 @@ namespace Godot
                 {
                     match = instance[source] == text[target];
                 }
+
                 if (match)
                 {
                     source++;
@@ -926,7 +972,7 @@ namespace Godot
         /// <returns>The escaped string.</returns>
         public static string JSONEscape(this string instance)
         {
-            var sb = new StringBuilder(string.Copy(instance));
+            var sb = new StringBuilder(instance);
 
             sb.Replace("\\", "\\\\");
             sb.Replace("\b", "\\b");
@@ -1015,15 +1061,18 @@ namespace Godot
             switch (expr[0])
             {
                 case '*':
-                    return ExprMatch(instance, expr.Substring(1), caseSensitive) || (instance.Length > 0 && ExprMatch(instance.Substring(1), expr, caseSensitive));
+                    return ExprMatch(instance, expr.Substring(1), caseSensitive) || (instance.Length > 0 &&
+                        ExprMatch(instance.Substring(1), expr, caseSensitive));
                 case '?':
-                    return instance.Length > 0 && instance[0] != '.' && ExprMatch(instance.Substring(1), expr.Substring(1), caseSensitive);
+                    return instance.Length > 0 && instance[0] != '.' &&
+                           ExprMatch(instance.Substring(1), expr.Substring(1), caseSensitive);
                 default:
                     if (instance.Length == 0)
                         return false;
                     if (caseSensitive)
                         return instance[0] == expr[0];
-                    return (char.ToUpper(instance[0]) == char.ToUpper(expr[0])) && ExprMatch(instance.Substring(1), expr.Substring(1), caseSensitive);
+                    return (char.ToUpper(instance[0]) == char.ToUpper(expr[0])) &&
+                           ExprMatch(instance.Substring(1), expr.Substring(1), caseSensitive);
             }
         }
 
@@ -1070,11 +1119,11 @@ namespace Godot
         /// <returns>The MD5 hash of the string.</returns>
         public static byte[] MD5Buffer(this string instance)
         {
-            return godot_icall_String_md5_buffer(instance);
+            using godot_string instanceStr = Marshaling.ConvertStringToNative(instance);
+            NativeFuncs.godotsharp_string_md5_buffer(instanceStr, out var md5Buffer);
+            using (md5Buffer)
+                return Marshaling.ConvertNativePackedByteArrayToSystemArray(md5Buffer);
         }
-
-        [MethodImpl(MethodImplOptions.InternalCall)]
-        internal static extern byte[] godot_icall_String_md5_buffer(string str);
 
         /// <summary>
         /// Returns the MD5 hash of the string as a string.
@@ -1084,11 +1133,11 @@ namespace Godot
         /// <returns>The MD5 hash of the string.</returns>
         public static string MD5Text(this string instance)
         {
-            return godot_icall_String_md5_text(instance);
+            using godot_string instanceStr = Marshaling.ConvertStringToNative(instance);
+            NativeFuncs.godotsharp_string_md5_text(instanceStr, out var md5Text);
+            using (md5Text)
+                return Marshaling.ConvertStringToManaged(md5Text);
         }
-
-        [MethodImpl(MethodImplOptions.InternalCall)]
-        internal static extern string godot_icall_String_md5_text(string str);
 
         /// <summary>
         /// Perform a case-insensitive comparison to another string, return -1 if less, 0 if equal and +1 if greater.
@@ -1196,12 +1245,12 @@ namespace Godot
         /// <summary>
         /// If the string is a path, this concatenates <paramref name="file"/>
         /// at the end of the string as a subpath.
-        /// E.g. <c>"this/is".PlusFile("path") == "this/is/path"</c>.
+        /// E.g. <c>"this/is".PathJoin("path") == "this/is/path"</c>.
         /// </summary>
         /// <param name="instance">The path that will be concatenated.</param>
         /// <param name="file">File name to concatenate with the path.</param>
         /// <returns>The concatenated path with the given file name.</returns>
-        public static string PlusFile(this string instance, string file)
+        public static string PathJoin(this string instance, string file)
         {
             if (instance.Length > 0 && instance[instance.Length - 1] == '/')
                 return instance + file;
@@ -1244,11 +1293,10 @@ namespace Godot
         /// <returns>The position at which the substring was found, or -1 if not found.</returns>
         public static int RFind(this string instance, string what, int from = -1)
         {
-            return godot_icall_String_rfind(instance, what, from);
+            using godot_string instanceStr = Marshaling.ConvertStringToNative(instance);
+            using godot_string whatStr = Marshaling.ConvertStringToNative(instance);
+            return NativeFuncs.godotsharp_string_rfind(instanceStr, whatStr, from);
         }
-
-        [MethodImpl(MethodImplOptions.InternalCall)]
-        internal static extern int godot_icall_String_rfind(string str, string what, int from);
 
         /// <summary>
         /// Perform a search for a substring, but start from the end of the string instead of the beginning.
@@ -1261,11 +1309,10 @@ namespace Godot
         /// <returns>The position at which the substring was found, or -1 if not found.</returns>
         public static int RFindN(this string instance, string what, int from = -1)
         {
-            return godot_icall_String_rfindn(instance, what, from);
+            using godot_string instanceStr = Marshaling.ConvertStringToNative(instance);
+            using godot_string whatStr = Marshaling.ConvertStringToNative(instance);
+            return NativeFuncs.godotsharp_string_rfindn(instanceStr, whatStr, from);
         }
-
-        [MethodImpl(MethodImplOptions.InternalCall)]
-        internal static extern int godot_icall_String_rfindn(string str, string what, int from);
 
         /// <summary>
         /// Returns the right side of the string from a given position.
@@ -1321,11 +1368,11 @@ namespace Godot
         /// <returns>The SHA-256 hash of the string.</returns>
         public static byte[] SHA256Buffer(this string instance)
         {
-            return godot_icall_String_sha256_buffer(instance);
+            using godot_string instanceStr = Marshaling.ConvertStringToNative(instance);
+            NativeFuncs.godotsharp_string_sha256_buffer(instanceStr, out var sha256Buffer);
+            using (sha256Buffer)
+                return Marshaling.ConvertNativePackedByteArrayToSystemArray(sha256Buffer);
         }
-
-        [MethodImpl(MethodImplOptions.InternalCall)]
-        internal static extern byte[] godot_icall_String_sha256_buffer(string str);
 
         /// <summary>
         /// Returns the SHA-256 hash of the string as a string.
@@ -1335,11 +1382,11 @@ namespace Godot
         /// <returns>The SHA-256 hash of the string.</returns>
         public static string SHA256Text(this string instance)
         {
-            return godot_icall_String_sha256_text(instance);
+            using godot_string instanceStr = Marshaling.ConvertStringToNative(instance);
+            NativeFuncs.godotsharp_string_sha256_text(instanceStr, out var sha256Text);
+            using (sha256Text)
+                return Marshaling.ConvertStringToManaged(sha256Text);
         }
-
-        [MethodImpl(MethodImplOptions.InternalCall)]
-        internal static extern string godot_icall_String_sha256_text(string str);
 
         /// <summary>
         /// Returns the similarity index of the text compared to this string.
@@ -1355,6 +1402,7 @@ namespace Godot
                 // Equal strings are totally similar
                 return 1.0f;
             }
+
             if (instance.Length < 2 || text.Length < 2)
             {
                 // No way to calculate similarity without a single bigram
@@ -1390,11 +1438,11 @@ namespace Godot
         /// </summary>
         public static string SimplifyPath(this string instance)
         {
-            return godot_icall_String_simplify_path(instance);
+            using godot_string instanceStr = Marshaling.ConvertStringToNative(instance);
+            NativeFuncs.godotsharp_string_simplify_path(instanceStr, out godot_string simplifiedPath);
+            using (simplifiedPath)
+                return Marshaling.ConvertStringToManaged(simplifiedPath);
         }
-
-        [MethodImpl(MethodImplOptions.InternalCall)]
-        internal static extern string godot_icall_String_simplify_path(string str);
 
         /// <summary>
         /// Split the string by a divisor string, return an array of the substrings.
@@ -1409,7 +1457,8 @@ namespace Godot
         /// <returns>The array of strings split from the string.</returns>
         public static string[] Split(this string instance, string divisor, bool allowEmpty = true)
         {
-            return instance.Split(new[] { divisor }, allowEmpty ? StringSplitOptions.None : StringSplitOptions.RemoveEmptyEntries);
+            return instance.Split(new[] { divisor },
+                allowEmpty ? StringSplitOptions.None : StringSplitOptions.RemoveEmptyEntries);
         }
 
         /// <summary>
@@ -1605,9 +1654,9 @@ namespace Godot
         /// <seealso cref="XMLEscape(string)"/>
         /// <param name="instance">The string to unescape.</param>
         /// <returns>The unescaped string.</returns>
-        public static string XMLUnescape(this string instance)
+        public static string? XMLUnescape(this string instance)
         {
-            return SecurityElement.FromString(instance).Text;
+            return SecurityElement.FromString(instance)?.Text;
         }
     }
 }

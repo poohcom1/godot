@@ -531,10 +531,12 @@ String &String::operator+=(const String &p_str) {
 
 	resize(lhs_len + rhs_len + 1);
 
-	const char32_t *src = p_str.get_data();
+	const char32_t *src = p_str.ptr();
 	char32_t *dst = ptrw() + lhs_len;
 
-	memcpy(dst, src, (rhs_len + 1) * sizeof(char32_t));
+	// Don't copy the terminating null with `memcpy` to avoid undefined behavior when string is being added to itself (it would overlap the destination).
+	memcpy(dst, src, rhs_len * sizeof(char32_t));
+	*(dst + rhs_len) = _null;
 
 	return *this;
 }
@@ -968,8 +970,42 @@ const char32_t *String::get_data() const {
 	return size() ? &operator[](0) : &zero;
 }
 
+String String::_camelcase_to_underscore() const {
+	const char32_t *cstr = get_data();
+	String new_string;
+	int start_index = 0;
+
+	for (int i = 1; i < this->size(); i++) {
+		bool is_prev_upper = is_ascii_upper_case(cstr[i - 1]);
+		bool is_prev_lower = is_ascii_lower_case(cstr[i - 1]);
+		bool is_prev_digit = is_digit(cstr[i - 1]);
+
+		bool is_curr_upper = is_ascii_upper_case(cstr[i]);
+		bool is_curr_lower = is_ascii_lower_case(cstr[i]);
+		bool is_curr_digit = is_digit(cstr[i]);
+
+		bool is_next_lower = false;
+		if (i + 1 < this->size()) {
+			is_next_lower = is_ascii_lower_case(cstr[i + 1]);
+		}
+
+		const bool cond_a = is_prev_lower && is_curr_upper; // aA
+		const bool cond_b = (is_prev_upper || is_prev_digit) && is_curr_upper && is_next_lower; // AAa, 2Aa
+		const bool cond_c = is_prev_digit && is_curr_lower && is_next_lower; // 2aa
+		const bool cond_d = (is_prev_upper || is_prev_lower) && is_curr_digit; // A2, a2
+
+		if (cond_a || cond_b || cond_c || cond_d) {
+			new_string += this->substr(start_index, i - start_index) + "_";
+			start_index = i;
+		}
+	}
+
+	new_string += this->substr(start_index, this->size() - start_index);
+	return new_string.to_lower();
+}
+
 String String::capitalize() const {
-	String aux = this->camelcase_to_underscore(true).replace("_", " ").strip_edges();
+	String aux = this->_camelcase_to_underscore().replace("_", " ").strip_edges();
 	String cap;
 	for (int i = 0; i < aux.get_slice_count(" "); i++) {
 		String slice = aux.get_slicec(' ', i);
@@ -985,45 +1021,20 @@ String String::capitalize() const {
 	return cap;
 }
 
-String String::camelcase_to_underscore(bool lowercase) const {
-	const char32_t *cstr = get_data();
-	String new_string;
-	int start_index = 0;
-
-	for (int i = 1; i < this->size(); i++) {
-		bool is_upper = is_ascii_upper_case(cstr[i]);
-		bool is_number = is_digit(cstr[i]);
-
-		bool are_next_2_lower = false;
-		bool is_next_lower = false;
-		bool is_next_number = false;
-		bool was_precedent_upper = is_ascii_upper_case(cstr[i - 1]);
-		bool was_precedent_number = is_digit(cstr[i - 1]);
-
-		if (i + 2 < this->size()) {
-			are_next_2_lower = is_ascii_lower_case(cstr[i + 1]) && is_ascii_lower_case(cstr[i + 2]);
-		}
-
-		if (i + 1 < this->size()) {
-			is_next_lower = is_ascii_lower_case(cstr[i + 1]);
-			is_next_number = is_digit(cstr[i + 1]);
-		}
-
-		const bool cond_a = is_upper && !was_precedent_upper && !was_precedent_number;
-		const bool cond_b = was_precedent_upper && is_upper && are_next_2_lower;
-		const bool cond_c = is_number && !was_precedent_number;
-		const bool can_break_number_letter = is_number && !was_precedent_number && is_next_lower;
-		const bool can_break_letter_number = !is_number && was_precedent_number && (is_next_lower || is_next_number);
-
-		bool should_split = cond_a || cond_b || cond_c || can_break_number_letter || can_break_letter_number;
-		if (should_split) {
-			new_string += this->substr(start_index, i - start_index) + "_";
-			start_index = i;
-		}
+String String::to_camel_case() const {
+	String s = this->to_pascal_case();
+	if (!s.is_empty()) {
+		s[0] = _find_lower(s[0]);
 	}
+	return s;
+}
 
-	new_string += this->substr(start_index, this->size() - start_index);
-	return lowercase ? new_string.to_lower() : new_string;
+String String::to_pascal_case() const {
+	return this->capitalize().replace(" ", "");
+}
+
+String String::to_snake_case() const {
+	return this->_camelcase_to_underscore().replace(" ", "_").strip_edges();
 }
 
 String String::get_with_code_lines() const {
@@ -3449,18 +3460,19 @@ String String::replacen(const String &p_key, const String &p_with) const {
 String String::repeat(int p_count) const {
 	ERR_FAIL_COND_V_MSG(p_count < 0, "", "Parameter count should be a positive number.");
 
-	String new_string;
-	const char32_t *src = this->get_data();
+	int len = length();
+	String new_string = *this;
+	new_string.resize(p_count * len + 1);
 
-	new_string.resize(length() * p_count + 1);
-	new_string[length() * p_count] = 0;
-
-	for (int i = 0; i < p_count; i++) {
-		for (int j = 0; j < length(); j++) {
-			new_string[i * length() + j] = src[j];
-		}
+	char32_t *dst = new_string.ptrw();
+	int offset = 1;
+	int stride = 1;
+	while (offset < p_count) {
+		memcpy(dst + offset * len, dst, stride * len * sizeof(char32_t));
+		offset += stride;
+		stride = MIN(stride * 2, p_count - offset);
 	}
-
+	dst[p_count * len] = _null;
 	return new_string;
 }
 
@@ -4448,7 +4460,7 @@ String String::get_extension() const {
 	return substr(pos + 1, length());
 }
 
-String String::plus_file(const String &p_file) const {
+String String::path_join(const String &p_file) const {
 	if (is_empty()) {
 		return p_file;
 	}
@@ -4664,6 +4676,71 @@ String String::sprintf(const Array &values, bool *error) const {
 					in_format = false;
 					break;
 				}
+				case 'v': { // Vector2/3/4/2i/3i/4i
+					if (value_index >= values.size()) {
+						return "not enough arguments for format string";
+					}
+
+					int count;
+					switch (values[value_index].get_type()) {
+						case Variant::VECTOR2:
+						case Variant::VECTOR2I: {
+							count = 2;
+						} break;
+						case Variant::VECTOR3:
+						case Variant::VECTOR3I: {
+							count = 3;
+						} break;
+						case Variant::VECTOR4:
+						case Variant::VECTOR4I: {
+							count = 4;
+						} break;
+						default: {
+							return "%v requires a vector type (Vector2/3/4/2i/3i/4i)";
+						}
+					}
+
+					Vector4 vec = values[value_index];
+					String str = "(";
+					for (int i = 0; i < count; i++) {
+						double val = vec[i];
+						// Pad decimals out.
+						String number_str = String::num(ABS(val), min_decimals).pad_decimals(min_decimals);
+
+						int initial_len = number_str.length();
+
+						// Padding. Leave room for sign later if required.
+						int pad_chars_count = val < 0 ? min_chars - 1 : min_chars;
+						String pad_char = pad_with_zeros ? String("0") : String(" ");
+						if (left_justified) {
+							number_str = number_str.rpad(pad_chars_count, pad_char);
+						} else {
+							number_str = number_str.lpad(pad_chars_count, pad_char);
+						}
+
+						// Add sign if needed.
+						if (val < 0) {
+							if (left_justified) {
+								number_str = number_str.insert(0, "-");
+							} else {
+								number_str = number_str.insert(pad_with_zeros ? 0 : number_str.length() - initial_len, "-");
+							}
+						}
+
+						// Add number to combined string
+						str += number_str;
+
+						if (i < count - 1) {
+							str += ", ";
+						}
+					}
+					str += ")";
+
+					formatted += str;
+					++value_index;
+					in_format = false;
+					break;
+				}
 				case 's': { // String
 					if (value_index >= values.size()) {
 						return "not enough arguments for format string";
@@ -4756,7 +4833,7 @@ String String::sprintf(const Array &values, bool *error) const {
 					}
 					break;
 				}
-				case '.': { // Float separator.
+				case '.': { // Float/Vector separator.
 					if (in_decimals) {
 						return "too many decimal points in format";
 					}
@@ -4770,8 +4847,12 @@ String String::sprintf(const Array &values, bool *error) const {
 						return "not enough arguments for format string";
 					}
 
-					if (!values[value_index].is_num()) {
-						return "* wants number";
+					Variant::Type value_type = values[value_index].get_type();
+					if (!values[value_index].is_num() &&
+							value_type != Variant::VECTOR2 && value_type != Variant::VECTOR2I &&
+							value_type != Variant::VECTOR3 && value_type != Variant::VECTOR3I &&
+							value_type != Variant::VECTOR4 && value_type != Variant::VECTOR4I) {
+						return "* wants number or vector";
 					}
 
 					int size = values[value_index];

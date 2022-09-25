@@ -1,8 +1,3 @@
-#if REAL_T_IS_DOUBLE
-using real_t = System.Double;
-#else
-using real_t = System.Single;
-#endif
 using System;
 using System.Runtime.InteropServices;
 
@@ -37,6 +32,9 @@ namespace Godot
         /// The fourth column is the <see cref="origin"/> vector.
         /// </summary>
         /// <param name="column">Which column vector.</param>
+        /// <exception cref="ArgumentOutOfRangeException">
+        /// <paramref name="column"/> is not 0, 1, 2 or 3.
+        /// </exception>
         public Vector3 this[int column]
         {
             get
@@ -52,7 +50,7 @@ namespace Godot
                     case 3:
                         return origin;
                     default:
-                        throw new IndexOutOfRangeException();
+                        throw new ArgumentOutOfRangeException(nameof(column));
                 }
             }
             set
@@ -72,7 +70,7 @@ namespace Godot
                         origin = value;
                         return;
                     default:
-                        throw new IndexOutOfRangeException();
+                        throw new ArgumentOutOfRangeException(nameof(column));
                 }
             }
         }
@@ -113,7 +111,7 @@ namespace Godot
         public Transform3D AffineInverse()
         {
             Basis basisInv = basis.Inverse();
-            return new Transform3D(basisInv, basisInv.Xform(-origin));
+            return new Transform3D(basisInv, basisInv * -origin);
         }
 
         /// <summary>
@@ -124,23 +122,9 @@ namespace Godot
         /// <returns>The interpolated transform.</returns>
         public Transform3D InterpolateWith(Transform3D transform, real_t weight)
         {
-            /* not sure if very "efficient" but good enough? */
-
-            Vector3 sourceScale = basis.Scale;
-            Quaternion sourceRotation = basis.GetRotationQuaternion();
-            Vector3 sourceLocation = origin;
-
-            Vector3 destinationScale = transform.basis.Scale;
-            Quaternion destinationRotation = transform.basis.GetRotationQuaternion();
-            Vector3 destinationLocation = transform.origin;
-
-            var interpolated = new Transform3D();
-            Quaternion quaternion = sourceRotation.Slerp(destinationRotation, weight).Normalized();
-            Vector3 scale = sourceScale.Lerp(destinationScale, weight);
-            interpolated.basis.SetQuaternionScale(quaternion, scale);
-            interpolated.origin = sourceLocation.Lerp(destinationLocation, weight);
-
-            return interpolated;
+            Basis retBasis = basis.Lerp(transform.basis, weight);
+            Vector3 retOrigin = origin.Lerp(transform.origin, weight);
+            return new Transform3D(retBasis, retOrigin);
         }
 
         /// <summary>
@@ -152,7 +136,7 @@ namespace Godot
         public Transform3D Inverse()
         {
             Basis basisTr = basis.Transposed();
-            return new Transform3D(basisTr, basisTr.Xform(-origin));
+            return new Transform3D(basisTr, basisTr * -origin);
         }
 
         /// <summary>
@@ -168,7 +152,7 @@ namespace Godot
         /// <param name="target">The object to look at.</param>
         /// <param name="up">The relative up direction.</param>
         /// <returns>The resulting transform.</returns>
-        public Transform3D LookingAt(Vector3 target, Vector3 up)
+        public readonly Transform3D LookingAt(Vector3 target, Vector3 up)
         {
             Transform3D t = this;
             t.SetLookAt(origin, target, up);
@@ -194,7 +178,7 @@ namespace Godot
         /// <param name="axis">The axis to rotate around. Must be normalized.</param>
         /// <param name="angle">The angle to rotate, in radians.</param>
         /// <returns>The rotated transformation matrix.</returns>
-        public Transform3D Rotated(Vector3 axis, real_t angle)
+        public readonly Transform3D Rotated(Vector3 axis, real_t angle)
         {
             return new Transform3D(new Basis(axis, angle), new Vector3()) * this;
         }
@@ -237,6 +221,34 @@ namespace Godot
         {
             Basis tmpBasis = Basis.FromScale(scale);
             return new Transform3D(basis * tmpBasis, origin);
+        }
+
+        /// <summary>
+        /// Returns a transform spherically interpolated between this transform and
+        /// another <paramref name="transform"/> by <paramref name="weight"/>.
+        /// </summary>
+        /// <param name="transform">The other transform.</param>
+        /// <param name="weight">A value on the range of 0.0 to 1.0, representing the amount of interpolation.</param>
+        /// <returns>The interpolated transform.</returns>
+        public Transform3D SphericalInterpolateWith(Transform3D transform, real_t weight)
+        {
+            /* not sure if very "efficient" but good enough? */
+
+            Vector3 sourceScale = basis.Scale;
+            Quaternion sourceRotation = basis.GetRotationQuaternion();
+            Vector3 sourceLocation = origin;
+
+            Vector3 destinationScale = transform.basis.Scale;
+            Quaternion destinationRotation = transform.basis.GetRotationQuaternion();
+            Vector3 destinationLocation = transform.origin;
+
+            var interpolated = new Transform3D();
+            Quaternion quaternion = sourceRotation.Slerp(destinationRotation, weight).Normalized();
+            Vector3 scale = sourceScale.Lerp(destinationScale, weight);
+            interpolated.basis.SetQuaternionScale(quaternion, scale);
+            interpolated.origin = sourceLocation.Lerp(destinationLocation, weight);
+
+            return interpolated;
         }
 
         private void SetLookAt(Vector3 eye, Vector3 target, Vector3 up)
@@ -289,43 +301,6 @@ namespace Godot
                 origin[1] + basis.Row1.Dot(offset),
                 origin[2] + basis.Row2.Dot(offset)
             ));
-        }
-
-        /// <summary>
-        /// Returns a vector transformed (multiplied) by this transformation matrix.
-        /// </summary>
-        /// <seealso cref="XformInv(Vector3)"/>
-        /// <param name="v">A vector to transform.</param>
-        /// <returns>The transformed vector.</returns>
-        public Vector3 Xform(Vector3 v)
-        {
-            return new Vector3
-            (
-                basis.Row0.Dot(v) + origin.x,
-                basis.Row1.Dot(v) + origin.y,
-                basis.Row2.Dot(v) + origin.z
-            );
-        }
-
-        /// <summary>
-        /// Returns a vector transformed (multiplied) by the transposed transformation matrix.
-        ///
-        /// Note: This results in a multiplication by the inverse of the
-        /// transformation matrix only if it represents a rotation-reflection.
-        /// </summary>
-        /// <seealso cref="Xform(Vector3)"/>
-        /// <param name="v">A vector to inversely transform.</param>
-        /// <returns>The inversely transformed vector.</returns>
-        public Vector3 XformInv(Vector3 v)
-        {
-            Vector3 vInv = v - origin;
-
-            return new Vector3
-            (
-                (basis.Row0[0] * vInv.x) + (basis.Row1[0] * vInv.y) + (basis.Row2[0] * vInv.z),
-                (basis.Row0[1] * vInv.x) + (basis.Row1[1] * vInv.y) + (basis.Row2[1] * vInv.z),
-                (basis.Row0[2] * vInv.x) + (basis.Row1[2] * vInv.y) + (basis.Row2[2] * vInv.z)
-            );
         }
 
         // Constants
@@ -404,9 +379,185 @@ namespace Godot
         /// <returns>The composed transform.</returns>
         public static Transform3D operator *(Transform3D left, Transform3D right)
         {
-            left.origin = left.Xform(right.origin);
+            left.origin = left * right.origin;
             left.basis *= right.basis;
             return left;
+        }
+
+        /// <summary>
+        /// Returns a Vector3 transformed (multiplied) by the transformation matrix.
+        /// </summary>
+        /// <param name="transform">The transformation to apply.</param>
+        /// <param name="vector">A Vector3 to transform.</param>
+        /// <returns>The transformed Vector3.</returns>
+        public static Vector3 operator *(Transform3D transform, Vector3 vector)
+        {
+            return new Vector3
+            (
+                transform.basis.Row0.Dot(vector) + transform.origin.x,
+                transform.basis.Row1.Dot(vector) + transform.origin.y,
+                transform.basis.Row2.Dot(vector) + transform.origin.z
+            );
+        }
+
+        /// <summary>
+        /// Returns a Vector3 transformed (multiplied) by the transposed transformation matrix.
+        ///
+        /// Note: This results in a multiplication by the inverse of the
+        /// transformation matrix only if it represents a rotation-reflection.
+        /// </summary>
+        /// <param name="vector">A Vector3 to inversely transform.</param>
+        /// <param name="transform">The transformation to apply.</param>
+        /// <returns>The inversely transformed Vector3.</returns>
+        public static Vector3 operator *(Vector3 vector, Transform3D transform)
+        {
+            Vector3 vInv = vector - transform.origin;
+
+            return new Vector3
+            (
+                (transform.basis.Row0[0] * vInv.x) + (transform.basis.Row1[0] * vInv.y) + (transform.basis.Row2[0] * vInv.z),
+                (transform.basis.Row0[1] * vInv.x) + (transform.basis.Row1[1] * vInv.y) + (transform.basis.Row2[1] * vInv.z),
+                (transform.basis.Row0[2] * vInv.x) + (transform.basis.Row1[2] * vInv.y) + (transform.basis.Row2[2] * vInv.z)
+            );
+        }
+
+        /// <summary>
+        /// Returns an AABB transformed (multiplied) by the transformation matrix.
+        /// </summary>
+        /// <param name="transform">The transformation to apply.</param>
+        /// <param name="aabb">An AABB to transform.</param>
+        /// <returns>The transformed AABB.</returns>
+        public static AABB operator *(Transform3D transform, AABB aabb)
+        {
+            Vector3 min = aabb.Position;
+            Vector3 max = aabb.Position + aabb.Size;
+
+            Vector3 tmin = transform.origin;
+            Vector3 tmax = transform.origin;
+            for (int i = 0; i < 3; i++)
+            {
+                for (int j = 0; j < 3; j++)
+                {
+                    real_t e = transform.basis[i][j] * min[j];
+                    real_t f = transform.basis[i][j] * max[j];
+                    if (e < f)
+                    {
+                        tmin[i] += e;
+                        tmax[i] += f;
+                    }
+                    else
+                    {
+                        tmin[i] += f;
+                        tmax[i] += e;
+                    }
+                }
+            }
+
+            return new AABB(tmin, tmax - tmin);
+        }
+
+        /// <summary>
+        /// Returns an AABB transformed (multiplied) by the inverse transformation matrix.
+        /// </summary>
+        /// <param name="aabb">An AABB to inversely transform.</param>
+        /// <param name="transform">The transformation to apply.</param>
+        /// <returns>The inversely transformed AABB.</returns>
+        public static AABB operator *(AABB aabb, Transform3D transform)
+        {
+            Vector3 pos = new Vector3(aabb.Position.x + aabb.Size.x, aabb.Position.y + aabb.Size.y, aabb.Position.z + aabb.Size.z) * transform;
+            Vector3 to1 = new Vector3(aabb.Position.x + aabb.Size.x, aabb.Position.y + aabb.Size.y, aabb.Position.z) * transform;
+            Vector3 to2 = new Vector3(aabb.Position.x + aabb.Size.x, aabb.Position.y, aabb.Position.z + aabb.Size.z) * transform;
+            Vector3 to3 = new Vector3(aabb.Position.x + aabb.Size.x, aabb.Position.y, aabb.Position.z) * transform;
+            Vector3 to4 = new Vector3(aabb.Position.x, aabb.Position.y + aabb.Size.y, aabb.Position.z + aabb.Size.z) * transform;
+            Vector3 to5 = new Vector3(aabb.Position.x, aabb.Position.y + aabb.Size.y, aabb.Position.z) * transform;
+            Vector3 to6 = new Vector3(aabb.Position.x, aabb.Position.y, aabb.Position.z + aabb.Size.z) * transform;
+            Vector3 to7 = new Vector3(aabb.Position.x, aabb.Position.y, aabb.Position.z) * transform;
+
+            return new AABB(pos, new Vector3()).Expand(to1).Expand(to2).Expand(to3).Expand(to4).Expand(to5).Expand(to6).Expand(to7);
+        }
+
+        /// <summary>
+        /// Returns a Plane transformed (multiplied) by the transformation matrix.
+        /// </summary>
+        /// <param name="transform">The transformation to apply.</param>
+        /// <param name="plane">A Plane to transform.</param>
+        /// <returns>The transformed Plane.</returns>
+        public static Plane operator *(Transform3D transform, Plane plane)
+        {
+            Basis bInvTrans = transform.basis.Inverse().Transposed();
+
+            // Transform a single point on the plane.
+            Vector3 point = transform * (plane.Normal * plane.D);
+
+            // Use inverse transpose for correct normals with non-uniform scaling.
+            Vector3 normal = (bInvTrans * plane.Normal).Normalized();
+
+            real_t d = normal.Dot(point);
+            return new Plane(normal, d);
+        }
+
+        /// <summary>
+        /// Returns a Plane transformed (multiplied) by the inverse transformation matrix.
+        /// </summary>
+        /// <param name="plane">A Plane to inversely transform.</param>
+        /// <param name="transform">The transformation to apply.</param>
+        /// <returns>The inversely transformed Plane.</returns>
+        public static Plane operator *(Plane plane, Transform3D transform)
+        {
+            Transform3D tInv = transform.AffineInverse();
+            Basis bTrans = transform.basis.Transposed();
+
+            // Transform a single point on the plane.
+            Vector3 point = tInv * (plane.Normal * plane.D);
+
+            // Note that instead of precalculating the transpose, an alternative
+            // would be to use the transpose for the basis transform.
+            // However that would be less SIMD friendly (requiring a swizzle).
+            // So the cost is one extra precalced value in the calling code.
+            // This is probably worth it, as this could be used in bottleneck areas. And
+            // where it is not a bottleneck, the non-fast method is fine.
+
+            // Use transpose for correct normals with non-uniform scaling.
+            Vector3 normal = (bTrans * plane.Normal).Normalized();
+
+            real_t d = normal.Dot(point);
+            return new Plane(normal, d);
+        }
+
+        /// <summary>
+        /// Returns a copy of the given Vector3[] transformed (multiplied) by the transformation matrix.
+        /// </summary>
+        /// <param name="transform">The transformation to apply.</param>
+        /// <param name="array">A Vector3[] to transform.</param>
+        /// <returns>The transformed copy of the Vector3[].</returns>
+        public static Vector3[] operator *(Transform3D transform, Vector3[] array)
+        {
+            Vector3[] newArray = new Vector3[array.Length];
+
+            for (int i = 0; i < array.Length; i++)
+            {
+                newArray[i] = transform * array[i];
+            }
+
+            return newArray;
+        }
+
+        /// <summary>
+        /// Returns a copy of the given Vector3[] transformed (multiplied) by the inverse transformation matrix.
+        /// </summary>
+        /// <param name="array">A Vector3[] to inversely transform.</param>
+        /// <param name="transform">The transformation to apply.</param>
+        /// <returns>The inversely transformed copy of the Vector3[].</returns>
+        public static Vector3[] operator *(Vector3[] array, Transform3D transform)
+        {
+            Vector3[] newArray = new Vector3[array.Length];
+
+            for (int i = 0; i < array.Length; i++)
+            {
+                newArray[i] = array[i] * transform;
+            }
+
+            return newArray;
         }
 
         /// <summary>
@@ -443,14 +594,9 @@ namespace Godot
         /// </summary>
         /// <param name="obj">The object to compare with.</param>
         /// <returns>Whether or not the transform and the object are exactly equal.</returns>
-        public override bool Equals(object obj)
+        public override readonly bool Equals(object obj)
         {
-            if (obj is Transform3D)
-            {
-                return Equals((Transform3D)obj);
-            }
-
-            return false;
+            return obj is Transform3D other && Equals(other);
         }
 
         /// <summary>
@@ -460,7 +606,7 @@ namespace Godot
         /// </summary>
         /// <param name="other">The other transform to compare.</param>
         /// <returns>Whether or not the matrices are exactly equal.</returns>
-        public bool Equals(Transform3D other)
+        public readonly bool Equals(Transform3D other)
         {
             return basis.Equals(other.basis) && origin.Equals(other.origin);
         }

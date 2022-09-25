@@ -178,15 +178,15 @@ public:
 	void set_lightmap_scale(LightmapScale p_scale);
 	LightmapScale get_lightmap_scale() const;
 
-	void set_instance_shader_uniform(const StringName &p_uniform, const Variant &p_value);
-	Variant get_instance_shader_uniform(const StringName &p_uniform) const;
+	void set_instance_shader_parameter(const StringName &p_name, const Variant &p_value);
+	Variant get_instance_shader_parameter(const StringName &p_name) const;
 
 	void set_custom_aabb(AABB aabb);
 
 	void set_ignore_occlusion_culling(bool p_enabled);
 	bool is_ignoring_occlusion_culling();
 
-	TypedArray<String> get_configuration_warnings() const override;
+	PackedStringArray get_configuration_warnings() const override;
 	GeometryInstance3D();
 	virtual ~GeometryInstance3D();
 };

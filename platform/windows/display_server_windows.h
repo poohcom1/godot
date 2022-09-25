@@ -152,6 +152,13 @@ typedef UINT(WINAPI *WTInfoPtr)(UINT p_category, UINT p_index, LPVOID p_output);
 typedef BOOL(WINAPI *WTPacketPtr)(HANDLE p_ctx, UINT p_param, LPVOID p_packets);
 typedef BOOL(WINAPI *WTEnablePtr)(HANDLE p_ctx, BOOL p_enable);
 
+typedef bool(WINAPI *IsDarkModeAllowedForAppPtr)();
+typedef bool(WINAPI *ShouldAppsUseDarkModePtr)();
+typedef DWORD(WINAPI *GetImmersiveColorFromColorSetExPtr)(UINT dwImmersiveColorSet, UINT dwImmersiveColorType, bool bIgnoreHighContrast, UINT dwHighContrastCacheMode);
+typedef int(WINAPI *GetImmersiveColorTypeFromNamePtr)(const WCHAR *name);
+typedef int(WINAPI *GetImmersiveUserColorSetPreferencePtr)(bool bForceCheckRegistry, bool bSkipCheckOnFail);
+typedef HRESULT(WINAPI *RtlGetVersionPtr)(OSVERSIONINFOW *lpVersionInformation);
+
 // Windows Ink API
 #ifndef POINTER_STRUCTURES
 
@@ -278,6 +285,15 @@ class DisplayServerWindows : public DisplayServer {
 
 	_THREAD_SAFE_CLASS_
 
+	// UXTheme API
+	static bool dark_title_available;
+	static bool ux_theme_available;
+	static IsDarkModeAllowedForAppPtr IsDarkModeAllowedForApp;
+	static ShouldAppsUseDarkModePtr ShouldAppsUseDarkMode;
+	static GetImmersiveColorFromColorSetExPtr GetImmersiveColorFromColorSetEx;
+	static GetImmersiveColorTypeFromNamePtr GetImmersiveColorTypeFromName;
+	static GetImmersiveUserColorSetPreferencePtr GetImmersiveUserColorSetPreference;
+
 	// WinTab API
 	static bool wintab_available;
 	static WTOpenPtr wintab_WTOpen;
@@ -294,8 +310,6 @@ class DisplayServerWindows : public DisplayServer {
 	void _update_tablet_ctx(const String &p_old_driver, const String &p_new_driver);
 	String tablet_driver;
 	Vector<String> tablet_drivers;
-
-	void GetMaskBitmaps(HBITMAP hSourceBitmap, COLORREF clrTransparent, OUT HBITMAP &hAndMaskBitmap, OUT HBITMAP &hXorMaskBitmap);
 
 	enum {
 		KEY_EVENT_BUFFER_SIZE = 512
@@ -338,7 +352,6 @@ class DisplayServerWindows : public DisplayServer {
 
 	struct WindowData {
 		HWND hWnd;
-		//layered window
 
 		Vector<Vector2> mpath;
 
@@ -378,10 +391,6 @@ class DisplayServerWindows : public DisplayServer {
 		Vector2 last_tilt;
 		bool last_pen_inverted = false;
 
-		HBITMAP hBitmap; //DIB section for layered window
-		uint8_t *dib_data = nullptr;
-		Size2 dib_size;
-		HDC hDC_dib;
 		Size2 min_size;
 		Size2 max_size;
 		int width = 0, height = 0;
@@ -457,6 +466,8 @@ class DisplayServerWindows : public DisplayServer {
 	void _update_real_mouse_position(WindowID p_window);
 
 	void _set_mouse_mode_impl(MouseMode p_mode);
+	WindowID _get_focused_window_or_popup() const;
+	void _register_raw_input_devices(WindowID p_target_window);
 
 	void _process_activate_event(WindowID p_window_id, WPARAM wParam, LPARAM lParam);
 	void _process_key_events();
@@ -478,12 +489,16 @@ public:
 
 	virtual bool tts_is_speaking() const override;
 	virtual bool tts_is_paused() const override;
-	virtual Array tts_get_voices() const override;
+	virtual TypedArray<Dictionary> tts_get_voices() const override;
 
 	virtual void tts_speak(const String &p_text, const String &p_voice, int p_volume = 50, float p_pitch = 1.f, float p_rate = 1.f, int p_utterance_id = 0, bool p_interrupt = false) override;
 	virtual void tts_pause() override;
 	virtual void tts_resume() override;
 	virtual void tts_stop() override;
+
+	virtual bool is_dark_mode_supported() const override;
+	virtual bool is_dark_mode() const override;
+	virtual Color get_accent_color() const override;
 
 	virtual void mouse_set_mode(MouseMode p_mode) override;
 	virtual MouseMode mouse_get_mode() const override;

@@ -82,9 +82,11 @@ private:
 
 	void _attach_sub_emitter();
 
+	void _texture_changed();
+
 protected:
 	static void _bind_methods();
-	virtual void _validate_property(PropertyInfo &property) const override;
+	void _validate_property(PropertyInfo &p_property) const;
 	void _notification(int p_what);
 	void _update_collision_size();
 
@@ -143,7 +145,7 @@ public:
 	void set_texture(const Ref<Texture2D> &p_texture);
 	Ref<Texture2D> get_texture() const;
 
-	TypedArray<String> get_configuration_warnings() const override;
+	PackedStringArray get_configuration_warnings() const override;
 
 	void set_sub_emitter(const NodePath &p_path);
 	NodePath get_sub_emitter() const;

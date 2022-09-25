@@ -90,14 +90,14 @@ bool Polygon2D::_edit_is_selected_on_click(const Point2 &p_point, double p_toler
 }
 #endif
 
-void Polygon2D::_validate_property(PropertyInfo &property) const {
-	if (!invert && property.name == "invert_border") {
-		property.usage = PROPERTY_USAGE_NO_EDITOR;
+void Polygon2D::_validate_property(PropertyInfo &p_property) const {
+	if (!invert && p_property.name == "invert_border") {
+		p_property.usage = PROPERTY_USAGE_NO_EDITOR;
 	}
 }
 
 void Polygon2D::_skeleton_bone_setup_changed() {
-	update();
+	queue_redraw();
 }
 
 void Polygon2D::_notification(int p_what) {
@@ -375,7 +375,7 @@ void Polygon2D::_notification(int p_what) {
 void Polygon2D::set_polygon(const Vector<Vector2> &p_polygon) {
 	polygon = p_polygon;
 	rect_cache_dirty = true;
-	update();
+	queue_redraw();
 }
 
 Vector<Vector2> Polygon2D::get_polygon() const {
@@ -392,7 +392,7 @@ int Polygon2D::get_internal_vertex_count() const {
 
 void Polygon2D::set_uv(const Vector<Vector2> &p_uv) {
 	uv = p_uv;
-	update();
+	queue_redraw();
 }
 
 Vector<Vector2> Polygon2D::get_uv() const {
@@ -401,7 +401,7 @@ Vector<Vector2> Polygon2D::get_uv() const {
 
 void Polygon2D::set_polygons(const Array &p_polygons) {
 	polygons = p_polygons;
-	update();
+	queue_redraw();
 }
 
 Array Polygon2D::get_polygons() const {
@@ -410,7 +410,7 @@ Array Polygon2D::get_polygons() const {
 
 void Polygon2D::set_color(const Color &p_color) {
 	color = p_color;
-	update();
+	queue_redraw();
 }
 
 Color Polygon2D::get_color() const {
@@ -419,7 +419,7 @@ Color Polygon2D::get_color() const {
 
 void Polygon2D::set_vertex_colors(const Vector<Color> &p_colors) {
 	vertex_colors = p_colors;
-	update();
+	queue_redraw();
 }
 
 Vector<Color> Polygon2D::get_vertex_colors() const {
@@ -428,7 +428,7 @@ Vector<Color> Polygon2D::get_vertex_colors() const {
 
 void Polygon2D::set_texture(const Ref<Texture2D> &p_texture) {
 	texture = p_texture;
-	update();
+	queue_redraw();
 }
 
 Ref<Texture2D> Polygon2D::get_texture() const {
@@ -437,7 +437,7 @@ Ref<Texture2D> Polygon2D::get_texture() const {
 
 void Polygon2D::set_texture_offset(const Vector2 &p_offset) {
 	tex_ofs = p_offset;
-	update();
+	queue_redraw();
 }
 
 Vector2 Polygon2D::get_texture_offset() const {
@@ -446,7 +446,7 @@ Vector2 Polygon2D::get_texture_offset() const {
 
 void Polygon2D::set_texture_rotation(real_t p_rot) {
 	tex_rot = p_rot;
-	update();
+	queue_redraw();
 }
 
 real_t Polygon2D::get_texture_rotation() const {
@@ -455,7 +455,7 @@ real_t Polygon2D::get_texture_rotation() const {
 
 void Polygon2D::set_texture_scale(const Size2 &p_scale) {
 	tex_scale = p_scale;
-	update();
+	queue_redraw();
 }
 
 Size2 Polygon2D::get_texture_scale() const {
@@ -464,7 +464,7 @@ Size2 Polygon2D::get_texture_scale() const {
 
 void Polygon2D::set_invert(bool p_invert) {
 	invert = p_invert;
-	update();
+	queue_redraw();
 	notify_property_list_changed();
 }
 
@@ -474,7 +474,7 @@ bool Polygon2D::get_invert() const {
 
 void Polygon2D::set_antialiased(bool p_antialiased) {
 	antialiased = p_antialiased;
-	update();
+	queue_redraw();
 }
 
 bool Polygon2D::get_antialiased() const {
@@ -483,7 +483,7 @@ bool Polygon2D::get_antialiased() const {
 
 void Polygon2D::set_invert_border(real_t p_invert_border) {
 	invert_border = p_invert_border;
-	update();
+	queue_redraw();
 }
 
 real_t Polygon2D::get_invert_border() const {
@@ -493,7 +493,7 @@ real_t Polygon2D::get_invert_border() const {
 void Polygon2D::set_offset(const Vector2 &p_offset) {
 	offset = p_offset;
 	rect_cache_dirty = true;
-	update();
+	queue_redraw();
 }
 
 Vector2 Polygon2D::get_offset() const {
@@ -533,13 +533,13 @@ void Polygon2D::clear_bones() {
 void Polygon2D::set_bone_weights(int p_index, const Vector<float> &p_weights) {
 	ERR_FAIL_INDEX(p_index, bone_weights.size());
 	bone_weights.write[p_index].weights = p_weights;
-	update();
+	queue_redraw();
 }
 
 void Polygon2D::set_bone_path(int p_index, const NodePath &p_path) {
 	ERR_FAIL_INDEX(p_index, bone_weights.size());
 	bone_weights.write[p_index].path = p_path;
-	update();
+	queue_redraw();
 }
 
 Array Polygon2D::_get_bones() const {
@@ -567,7 +567,7 @@ void Polygon2D::set_skeleton(const NodePath &p_skeleton) {
 		return;
 	}
 	skeleton = p_skeleton;
-	update();
+	queue_redraw();
 }
 
 NodePath Polygon2D::get_skeleton() const {
@@ -602,8 +602,8 @@ void Polygon2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_texture_scale", "texture_scale"), &Polygon2D::set_texture_scale);
 	ClassDB::bind_method(D_METHOD("get_texture_scale"), &Polygon2D::get_texture_scale);
 
-	ClassDB::bind_method(D_METHOD("set_invert", "invert"), &Polygon2D::set_invert);
-	ClassDB::bind_method(D_METHOD("get_invert"), &Polygon2D::get_invert);
+	ClassDB::bind_method(D_METHOD("set_invert_enabled", "invert"), &Polygon2D::set_invert);
+	ClassDB::bind_method(D_METHOD("get_invert_enabled"), &Polygon2D::get_invert);
 
 	ClassDB::bind_method(D_METHOD("set_antialiased", "antialiased"), &Polygon2D::set_antialiased);
 	ClassDB::bind_method(D_METHOD("get_antialiased"), &Polygon2D::get_antialiased);
@@ -640,13 +640,13 @@ void Polygon2D::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "texture", PROPERTY_HINT_RESOURCE_TYPE, "Texture2D"), "set_texture", "get_texture");
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "texture_offset", PROPERTY_HINT_NONE, "suffix:px"), "set_texture_offset", "get_texture_offset");
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "texture_scale", PROPERTY_HINT_LINK), "set_texture_scale", "get_texture_scale");
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "texture_rotation", PROPERTY_HINT_RANGE, "-360,360,0.1,or_lesser,or_greater,radians"), "set_texture_rotation", "get_texture_rotation");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "texture_rotation", PROPERTY_HINT_RANGE, "-360,360,0.1,or_less,or_greater,radians"), "set_texture_rotation", "get_texture_rotation");
 
 	ADD_GROUP("Skeleton", "");
 	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "skeleton", PROPERTY_HINT_NODE_PATH_VALID_TYPES, "Skeleton2D"), "set_skeleton", "get_skeleton");
 
 	ADD_GROUP("Invert", "invert_");
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "invert_enable"), "set_invert", "get_invert");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "invert_enabled"), "set_invert_enabled", "get_invert_enabled");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "invert_border", PROPERTY_HINT_RANGE, "0.1,16384,0.1,suffix:px"), "set_invert_border", "get_invert_border");
 
 	ADD_GROUP("Data", "");

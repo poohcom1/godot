@@ -36,6 +36,7 @@
 #include "editor/editor_node.h"
 #include "editor/editor_scale.h"
 #include "editor/editor_settings.h"
+#include "editor/editor_undo_redo_manager.h"
 #include "scene/gui/separator.h"
 
 bool AbstractPolygon2DEditor::Vertex::operator==(const AbstractPolygon2DEditor::Vertex &p_vertex) const {
@@ -234,13 +235,13 @@ void AbstractPolygon2DEditor::disable_polygon_editing(bool p_disable, String p_r
 	button_delete->set_disabled(p_disable);
 
 	if (p_disable) {
-		button_create->set_tooltip(p_reason);
-		button_edit->set_tooltip(p_reason);
-		button_delete->set_tooltip(p_reason);
+		button_create->set_tooltip_text(p_reason);
+		button_edit->set_tooltip_text(p_reason);
+		button_delete->set_tooltip_text(p_reason);
 	} else {
-		button_create->set_tooltip(TTR("Create points."));
-		button_edit->set_tooltip(TTR("Edit points.\nLMB: Move Point\nRMB: Erase Point"));
-		button_delete->set_tooltip(TTR("Erase points."));
+		button_create->set_tooltip_text(TTR("Create points."));
+		button_edit->set_tooltip_text(TTR("Edit points.\nLMB: Move Point\nRMB: Erase Point"));
+		button_delete->set_tooltip_text(TTR("Erase points."));
 	}
 }
 

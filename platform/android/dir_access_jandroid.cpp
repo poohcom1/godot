@@ -135,6 +135,30 @@ String DirAccessJAndroid::get_drive(int p_drive) {
 	}
 }
 
+String DirAccessJAndroid::_get_root_string() const {
+	if (get_access_type() == ACCESS_FILESYSTEM) {
+		return "/";
+	}
+	return DirAccessUnix::_get_root_string();
+}
+
+String DirAccessJAndroid::get_current_dir(bool p_include_drive) const {
+	String base = _get_root_path();
+	String bd = current_dir;
+	if (!base.is_empty()) {
+		bd = current_dir.replace_first(base, "");
+	}
+
+	String root_string = _get_root_string();
+	if (bd.begins_with(root_string)) {
+		return bd;
+	} else if (bd.begins_with("/")) {
+		return root_string + bd.substr(1, bd.length());
+	} else {
+		return root_string + bd;
+	}
+}
+
 Error DirAccessJAndroid::change_dir(String p_dir) {
 	String new_dir = get_absolute_path(p_dir);
 	if (new_dir == current_dir) {
@@ -155,7 +179,7 @@ String DirAccessJAndroid::get_absolute_path(String p_path) {
 	}
 
 	if (p_path.is_relative_path()) {
-		p_path = get_current_dir().plus_file(p_path);
+		p_path = get_current_dir().path_join(p_path);
 	}
 
 	p_path = fix_path(p_path);

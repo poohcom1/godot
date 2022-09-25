@@ -40,9 +40,10 @@ RendererParticlesStorage *RenderingServerGlobals::particles_storage = nullptr;
 RendererTextureStorage *RenderingServerGlobals::texture_storage = nullptr;
 RendererGI *RenderingServerGlobals::gi = nullptr;
 RendererFog *RenderingServerGlobals::fog = nullptr;
+RendererCameraAttributes *RenderingServerGlobals::camera_attributes = nullptr;
 RendererCanvasRender *RenderingServerGlobals::canvas_render = nullptr;
 RendererCompositor *RenderingServerGlobals::rasterizer = nullptr;
 
 RendererCanvasCull *RenderingServerGlobals::canvas = nullptr;
 RendererViewport *RenderingServerGlobals::viewport = nullptr;
-RendererScene *RenderingServerGlobals::scene = nullptr;
+RenderingMethod *RenderingServerGlobals::scene = nullptr;

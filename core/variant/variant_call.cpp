@@ -1506,6 +1506,9 @@ static void _register_variant_builtin_methods() {
 	bind_method(String, repeat, sarray("count"), varray());
 	bind_method(String, insert, sarray("position", "what"), varray());
 	bind_method(String, capitalize, sarray(), varray());
+	bind_method(String, to_camel_case, sarray(), varray());
+	bind_method(String, to_pascal_case, sarray(), varray());
+	bind_method(String, to_snake_case, sarray(), varray());
 	bind_method(String, split, sarray("delimiter", "allow_empty", "maxsplit"), varray(true, 0));
 	bind_method(String, rsplit, sarray("delimiter", "allow_empty", "maxsplit"), varray(true, 0));
 	bind_method(String, split_floats, sarray("delimiter", "allow_empty"), varray(true));
@@ -1523,7 +1526,7 @@ static void _register_variant_builtin_methods() {
 	bind_method(String, rstrip, sarray("chars"), varray());
 	bind_method(String, get_extension, sarray(), varray());
 	bind_method(String, get_basename, sarray(), varray());
-	bind_method(String, plus_file, sarray("file"), varray());
+	bind_method(String, path_join, sarray("file"), varray());
 	bind_method(String, unicode_at, sarray("at"), varray());
 	bind_method(String, indent, sarray("prefix"), varray());
 	bind_method(String, dedent, sarray(), varray());
@@ -1602,12 +1605,14 @@ static void _register_variant_builtin_methods() {
 	bind_method(Vector2, normalized, sarray(), varray());
 	bind_method(Vector2, is_normalized, sarray(), varray());
 	bind_method(Vector2, is_equal_approx, sarray("to"), varray());
+	bind_method(Vector2, is_zero_approx, sarray(), varray());
 	bind_method(Vector2, posmod, sarray("mod"), varray());
 	bind_method(Vector2, posmodv, sarray("modv"), varray());
 	bind_method(Vector2, project, sarray("b"), varray());
 	bind_method(Vector2, lerp, sarray("to", "weight"), varray());
 	bind_method(Vector2, slerp, sarray("to", "weight"), varray());
 	bind_method(Vector2, cubic_interpolate, sarray("b", "pre_a", "post_b", "weight"), varray());
+	bind_method(Vector2, cubic_interpolate_in_time, sarray("b", "pre_a", "post_b", "weight", "b_t", "pre_a_t", "post_b_t"), varray());
 	bind_method(Vector2, bezier_interpolate, sarray("control_1", "control_2", "end", "t"), varray());
 	bind_method(Vector2, max_axis_index, sarray(), varray());
 	bind_method(Vector2, min_axis_index, sarray(), varray());
@@ -1645,7 +1650,7 @@ static void _register_variant_builtin_methods() {
 
 	bind_method(Rect2, get_center, sarray(), varray());
 	bind_method(Rect2, get_area, sarray(), varray());
-	bind_method(Rect2, has_no_area, sarray(), varray());
+	bind_method(Rect2, has_area, sarray(), varray());
 	bind_method(Rect2, has_point, sarray("point"), varray());
 	bind_method(Rect2, is_equal_approx, sarray("rect"), varray());
 	bind_method(Rect2, intersects, sarray("b", "include_borders"), varray(false));
@@ -1662,7 +1667,7 @@ static void _register_variant_builtin_methods() {
 
 	bind_method(Rect2i, get_center, sarray(), varray());
 	bind_method(Rect2i, get_area, sarray(), varray());
-	bind_method(Rect2i, has_no_area, sarray(), varray());
+	bind_method(Rect2i, has_area, sarray(), varray());
 	bind_method(Rect2i, has_point, sarray("point"), varray());
 	bind_method(Rect2i, intersects, sarray("b"), varray());
 	bind_method(Rect2i, encloses, sarray("b"), varray());
@@ -1689,6 +1694,7 @@ static void _register_variant_builtin_methods() {
 	bind_method(Vector3, normalized, sarray(), varray());
 	bind_method(Vector3, is_normalized, sarray(), varray());
 	bind_method(Vector3, is_equal_approx, sarray("to"), varray());
+	bind_method(Vector3, is_zero_approx, sarray(), varray());
 	bind_method(Vector3, inverse, sarray(), varray());
 	bind_method(Vector3, clamp, sarray("min", "max"), varray());
 	bind_method(Vector3, snapped, sarray("step"), varray());
@@ -1696,6 +1702,7 @@ static void _register_variant_builtin_methods() {
 	bind_method(Vector3, lerp, sarray("to", "weight"), varray());
 	bind_method(Vector3, slerp, sarray("to", "weight"), varray());
 	bind_method(Vector3, cubic_interpolate, sarray("b", "pre_a", "post_b", "weight"), varray());
+	bind_method(Vector3, cubic_interpolate_in_time, sarray("b", "pre_a", "post_b", "weight", "b_t", "pre_a_t", "post_b_t"), varray());
 	bind_method(Vector3, bezier_interpolate, sarray("control_1", "control_2", "end", "t"), varray());
 	bind_method(Vector3, move_toward, sarray("to", "delta"), varray());
 	bind_method(Vector3, dot, sarray("with"), varray());
@@ -1738,6 +1745,7 @@ static void _register_variant_builtin_methods() {
 	bind_method(Vector4, round, sarray(), varray());
 	bind_method(Vector4, lerp, sarray("to", "weight"), varray());
 	bind_method(Vector4, cubic_interpolate, sarray("b", "pre_a", "post_b", "weight"), varray());
+	bind_method(Vector4, cubic_interpolate_in_time, sarray("b", "pre_a", "post_b", "weight", "b_t", "pre_a_t", "post_b_t"), varray());
 	bind_method(Vector4, posmod, sarray("mod"), varray());
 	bind_method(Vector4, posmodv, sarray("modv"), varray());
 	bind_method(Vector4, snapped, sarray("step"), varray());
@@ -1750,6 +1758,7 @@ static void _register_variant_builtin_methods() {
 	bind_method(Vector4, dot, sarray("with"), varray());
 	bind_method(Vector4, inverse, sarray(), varray());
 	bind_method(Vector4, is_equal_approx, sarray("with"), varray());
+	bind_method(Vector4, is_zero_approx, sarray(), varray());
 
 	/* Vector4i */
 
@@ -1789,6 +1798,7 @@ static void _register_variant_builtin_methods() {
 	bind_method(Quaternion, slerp, sarray("to", "weight"), varray());
 	bind_method(Quaternion, slerpni, sarray("to", "weight"), varray());
 	bind_method(Quaternion, spherical_cubic_interpolate, sarray("b", "pre_a", "post_b", "weight"), varray());
+	bind_method(Quaternion, spherical_cubic_interpolate_in_time, sarray("b", "pre_a", "post_b", "weight", "b_t", "pre_a_t", "post_b_t"), varray());
 	bind_method(Quaternion, get_euler, sarray(), varray());
 	bind_method(Quaternion, get_axis, sarray(), varray());
 	bind_method(Quaternion, get_angle, sarray(), varray());
@@ -1849,6 +1859,7 @@ static void _register_variant_builtin_methods() {
 
 	/* Callable */
 
+	bind_method(Callable, callv, sarray("arguments"), varray());
 	bind_method(Callable, is_null, sarray(), varray());
 	bind_method(Callable, is_custom, sarray(), varray());
 	bind_method(Callable, is_standard, sarray(), varray());
@@ -1916,7 +1927,6 @@ static void _register_variant_builtin_methods() {
 	bind_method(Basis, tdotx, sarray("with"), varray());
 	bind_method(Basis, tdoty, sarray("with"), varray());
 	bind_method(Basis, tdotz, sarray("with"), varray());
-	bind_method(Basis, get_orthogonal_index, sarray(), varray());
 	bind_method(Basis, slerp, sarray("to", "weight"), varray());
 	bind_method(Basis, is_equal_approx, sarray("b"), varray());
 	bind_method(Basis, get_rotation_quaternion, sarray(), varray());
@@ -1929,8 +1939,8 @@ static void _register_variant_builtin_methods() {
 	bind_method(AABB, abs, sarray(), varray());
 	bind_method(AABB, get_center, sarray(), varray());
 	bind_method(AABB, get_volume, sarray(), varray());
-	bind_method(AABB, has_no_volume, sarray(), varray());
-	bind_method(AABB, has_no_surface, sarray(), varray());
+	bind_method(AABB, has_volume, sarray(), varray());
+	bind_method(AABB, has_surface, sarray(), varray());
 	bind_method(AABB, has_point, sarray("point"), varray());
 	bind_method(AABB, is_equal_approx, sarray("aabb"), varray());
 	bind_method(AABB, intersects, sarray("with"), varray());
@@ -1963,7 +1973,6 @@ static void _register_variant_builtin_methods() {
 	bind_method(Transform3D, translated, sarray("offset"), varray());
 	bind_method(Transform3D, translated_local, sarray("offset"), varray());
 	bind_method(Transform3D, looking_at, sarray("target", "up"), varray(Vector3(0, 1, 0)));
-	bind_method(Transform3D, spherical_interpolate_with, sarray("xform", "weight"), varray());
 	bind_method(Transform3D, interpolate_with, sarray("xform", "weight"), varray());
 	bind_method(Transform3D, is_equal_approx, sarray("xform"), varray());
 
@@ -2009,6 +2018,7 @@ static void _register_variant_builtin_methods() {
 	bind_method(Dictionary, merge, sarray("dictionary", "overwrite"), varray(false));
 	bind_method(Dictionary, has, sarray("key"), varray());
 	bind_method(Dictionary, has_all, sarray("keys"), varray());
+	bind_method(Dictionary, find_key, sarray("value"), varray());
 	bind_method(Dictionary, erase, sarray("key"), varray());
 	bind_method(Dictionary, hash, sarray(), varray());
 	bind_method(Dictionary, keys, sarray(), varray());
@@ -2056,6 +2066,14 @@ static void _register_variant_builtin_methods() {
 	bind_method(Array, all, sarray("method"), varray());
 	bind_method(Array, max, sarray(), varray());
 	bind_method(Array, min, sarray(), varray());
+	bind_method(Array, typed_assign, sarray("array"), varray());
+	bind_method(Array, set_typed, sarray("type", "class_name", "script"), varray());
+	bind_method(Array, is_typed, sarray(), varray());
+	bind_method(Array, get_typed_builtin, sarray(), varray());
+	bind_method(Array, get_typed_class_name, sarray(), varray());
+	bind_method(Array, get_typed_script, sarray(), varray());
+	bind_method(Array, set_read_only, sarray("enable"), varray());
+	bind_method(Array, is_read_only, sarray(), varray());
 
 	/* Byte Array */
 	bind_method(PackedByteArray, size, sarray(), varray());

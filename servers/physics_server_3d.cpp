@@ -32,6 +32,7 @@
 
 #include "core/config/project_settings.h"
 #include "core/string/print_string.h"
+#include "core/variant/typed_array.h"
 
 void PhysicsServer3DRenderingServerHandler::set_vertex(int p_vertex_id, const void *p_vector3) {
 	GDVIRTUAL_REQUIRED_CALL(_set_vertex, p_vertex_id, p_vector3);
@@ -366,8 +367,8 @@ Dictionary PhysicsDirectSpaceState3D::_intersect_ray(const Ref<PhysicsRayQueryPa
 	return d;
 }
 
-Array PhysicsDirectSpaceState3D::_intersect_point(const Ref<PhysicsPointQueryParameters3D> &p_point_query, int p_max_results) {
-	ERR_FAIL_COND_V(p_point_query.is_null(), Array());
+TypedArray<Dictionary> PhysicsDirectSpaceState3D::_intersect_point(const Ref<PhysicsPointQueryParameters3D> &p_point_query, int p_max_results) {
+	ERR_FAIL_COND_V(p_point_query.is_null(), TypedArray<Dictionary>());
 
 	Vector<ShapeResult> ret;
 	ret.resize(p_max_results);
@@ -375,10 +376,10 @@ Array PhysicsDirectSpaceState3D::_intersect_point(const Ref<PhysicsPointQueryPar
 	int rc = intersect_point(p_point_query->get_parameters(), ret.ptrw(), ret.size());
 
 	if (rc == 0) {
-		return Array();
+		return TypedArray<Dictionary>();
 	}
 
-	Array r;
+	TypedArray<Dictionary> r;
 	r.resize(rc);
 	for (int i = 0; i < rc; i++) {
 		Dictionary d;
@@ -391,13 +392,13 @@ Array PhysicsDirectSpaceState3D::_intersect_point(const Ref<PhysicsPointQueryPar
 	return r;
 }
 
-Array PhysicsDirectSpaceState3D::_intersect_shape(const Ref<PhysicsShapeQueryParameters3D> &p_shape_query, int p_max_results) {
-	ERR_FAIL_COND_V(!p_shape_query.is_valid(), Array());
+TypedArray<Dictionary> PhysicsDirectSpaceState3D::_intersect_shape(const Ref<PhysicsShapeQueryParameters3D> &p_shape_query, int p_max_results) {
+	ERR_FAIL_COND_V(!p_shape_query.is_valid(), TypedArray<Dictionary>());
 
 	Vector<ShapeResult> sr;
 	sr.resize(p_max_results);
 	int rc = intersect_shape(p_shape_query->get_parameters(), sr.ptrw(), sr.size());
-	Array ret;
+	TypedArray<Dictionary> ret;
 	ret.resize(rc);
 	for (int i = 0; i < rc; i++) {
 		Dictionary d;
@@ -411,22 +412,22 @@ Array PhysicsDirectSpaceState3D::_intersect_shape(const Ref<PhysicsShapeQueryPar
 	return ret;
 }
 
-Array PhysicsDirectSpaceState3D::_cast_motion(const Ref<PhysicsShapeQueryParameters3D> &p_shape_query) {
-	ERR_FAIL_COND_V(!p_shape_query.is_valid(), Array());
+Vector<real_t> PhysicsDirectSpaceState3D::_cast_motion(const Ref<PhysicsShapeQueryParameters3D> &p_shape_query) {
+	ERR_FAIL_COND_V(!p_shape_query.is_valid(), Vector<real_t>());
 
 	real_t closest_safe = 1.0f, closest_unsafe = 1.0f;
 	bool res = cast_motion(p_shape_query->get_parameters(), closest_safe, closest_unsafe);
 	if (!res) {
-		return Array();
+		return Vector<real_t>();
 	}
-	Array ret;
+	Vector<real_t> ret;
 	ret.resize(2);
-	ret[0] = closest_safe;
-	ret[1] = closest_unsafe;
+	ret.write[0] = closest_safe;
+	ret.write[1] = closest_unsafe;
 	return ret;
 }
 
-Array PhysicsDirectSpaceState3D::_collide_shape(const Ref<PhysicsShapeQueryParameters3D> &p_shape_query, int p_max_results) {
+TypedArray<PackedVector2Array> PhysicsDirectSpaceState3D::_collide_shape(const Ref<PhysicsShapeQueryParameters3D> &p_shape_query, int p_max_results) {
 	ERR_FAIL_COND_V(!p_shape_query.is_valid(), Array());
 
 	Vector<Vector3> ret;
@@ -434,9 +435,9 @@ Array PhysicsDirectSpaceState3D::_collide_shape(const Ref<PhysicsShapeQueryParam
 	int rc = 0;
 	bool res = collide_shape(p_shape_query->get_parameters(), ret.ptrw(), p_max_results, rc);
 	if (!res) {
-		return Array();
+		return TypedArray<PackedVector2Array>();
 	}
-	Array r;
+	TypedArray<PackedVector2Array> r;
 	r.resize(rc * 2);
 	for (int i = 0; i < rc * 2; i++) {
 		r[i] = ret[i];
@@ -719,7 +720,10 @@ void PhysicsServer3D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("area_clear_shapes", "area"), &PhysicsServer3D::area_clear_shapes);
 
 	ClassDB::bind_method(D_METHOD("area_set_collision_layer", "area", "layer"), &PhysicsServer3D::area_set_collision_layer);
+	ClassDB::bind_method(D_METHOD("area_get_collision_layer", "area"), &PhysicsServer3D::area_get_collision_layer);
+
 	ClassDB::bind_method(D_METHOD("area_set_collision_mask", "area", "mask"), &PhysicsServer3D::area_set_collision_mask);
+	ClassDB::bind_method(D_METHOD("area_get_collision_mask", "area"), &PhysicsServer3D::area_get_collision_mask);
 
 	ClassDB::bind_method(D_METHOD("area_set_param", "area", "param", "value"), &PhysicsServer3D::area_set_param);
 	ClassDB::bind_method(D_METHOD("area_set_transform", "area", "transform"), &PhysicsServer3D::area_set_transform);
@@ -749,6 +753,9 @@ void PhysicsServer3D::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("body_set_collision_mask", "body", "mask"), &PhysicsServer3D::body_set_collision_mask);
 	ClassDB::bind_method(D_METHOD("body_get_collision_mask", "body"), &PhysicsServer3D::body_get_collision_mask);
+
+	ClassDB::bind_method(D_METHOD("body_set_collision_priority", "body", "priority"), &PhysicsServer3D::body_set_collision_priority);
+	ClassDB::bind_method(D_METHOD("body_get_collision_priority", "body"), &PhysicsServer3D::body_get_collision_priority);
 
 	ClassDB::bind_method(D_METHOD("body_add_shape", "body", "shape", "transform", "disabled"), &PhysicsServer3D::body_add_shape, DEFVAL(Transform3D()), DEFVAL(false));
 	ClassDB::bind_method(D_METHOD("body_set_shape", "body", "shape_idx", "shape"), &PhysicsServer3D::body_set_shape);
@@ -984,8 +991,8 @@ void PhysicsServer3D::_bind_methods() {
 
 	BIND_ENUM_CONSTANT(BODY_MODE_STATIC);
 	BIND_ENUM_CONSTANT(BODY_MODE_KINEMATIC);
-	BIND_ENUM_CONSTANT(BODY_MODE_DYNAMIC);
-	BIND_ENUM_CONSTANT(BODY_MODE_DYNAMIC_LINEAR);
+	BIND_ENUM_CONSTANT(BODY_MODE_RIGID);
+	BIND_ENUM_CONSTANT(BODY_MODE_RIGID_LINEAR);
 
 	BIND_ENUM_CONSTANT(BODY_PARAM_BOUNCE);
 	BIND_ENUM_CONSTANT(BODY_PARAM_FRICTION);
@@ -1042,9 +1049,7 @@ PhysicsServer3D::~PhysicsServer3D() {
 	singleton = nullptr;
 }
 
-Vector<PhysicsServer3DManager::ClassInfo> PhysicsServer3DManager::physics_servers;
-int PhysicsServer3DManager::default_server_id = -1;
-int PhysicsServer3DManager::default_server_priority = -1;
+PhysicsServer3DManager *PhysicsServer3DManager::singleton = nullptr;
 const String PhysicsServer3DManager::setting_property_name(PNAME("physics/3d/physics_engine"));
 
 void PhysicsServer3DManager::on_servers_changed() {
@@ -1055,10 +1060,19 @@ void PhysicsServer3DManager::on_servers_changed() {
 	ProjectSettings::get_singleton()->set_custom_property_info(setting_property_name, PropertyInfo(Variant::STRING, setting_property_name, PROPERTY_HINT_ENUM, physics_servers2));
 }
 
-void PhysicsServer3DManager::register_server(const String &p_name, CreatePhysicsServer3DCallback p_creat_callback) {
-	ERR_FAIL_COND(!p_creat_callback);
+void PhysicsServer3DManager::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("register_server", "name", "create_callback"), &PhysicsServer3DManager::register_server);
+	ClassDB::bind_method(D_METHOD("set_default_server", "name", "priority"), &PhysicsServer3DManager::set_default_server);
+}
+
+PhysicsServer3DManager *PhysicsServer3DManager::get_singleton() {
+	return singleton;
+}
+
+void PhysicsServer3DManager::register_server(const String &p_name, const Callable &p_create_callback) {
+	//ERR_FAIL_COND(!p_create_callback.is_valid());
 	ERR_FAIL_COND(find_server_id(p_name) != -1);
-	physics_servers.push_back(ClassInfo(p_name, p_creat_callback));
+	physics_servers.push_back(ClassInfo(p_name, p_create_callback));
 	on_servers_changed();
 }
 
@@ -1091,7 +1105,11 @@ String PhysicsServer3DManager::get_server_name(int p_id) {
 
 PhysicsServer3D *PhysicsServer3DManager::new_default_server() {
 	ERR_FAIL_COND_V(default_server_id == -1, nullptr);
-	return physics_servers[default_server_id].create_callback();
+	Variant ret;
+	Callable::CallError ce;
+	physics_servers[default_server_id].create_callback.callp(nullptr, 0, ret, ce);
+	ERR_FAIL_COND_V(ce.error != Callable::CallError::CALL_OK, nullptr);
+	return Object::cast_to<PhysicsServer3D>(ret.get_validated_object());
 }
 
 PhysicsServer3D *PhysicsServer3DManager::new_server(const String &p_name) {
@@ -1099,6 +1117,18 @@ PhysicsServer3D *PhysicsServer3DManager::new_server(const String &p_name) {
 	if (id == -1) {
 		return nullptr;
 	} else {
-		return physics_servers[id].create_callback();
+		Variant ret;
+		Callable::CallError ce;
+		physics_servers[id].create_callback.callp(nullptr, 0, ret, ce);
+		ERR_FAIL_COND_V(ce.error != Callable::CallError::CALL_OK, nullptr);
+		return Object::cast_to<PhysicsServer3D>(ret.get_validated_object());
 	}
+}
+
+PhysicsServer3DManager::PhysicsServer3DManager() {
+	singleton = this;
+}
+
+PhysicsServer3DManager::~PhysicsServer3DManager() {
+	singleton = nullptr;
 }

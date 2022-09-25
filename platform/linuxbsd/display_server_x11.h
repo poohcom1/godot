@@ -60,6 +60,7 @@
 #endif
 
 #if defined(DBUS_ENABLED)
+#include "freedesktop_portal_desktop.h"
 #include "freedesktop_screensaver.h"
 #endif
 
@@ -120,6 +121,10 @@ class DisplayServerX11 : public DisplayServer {
 	TTS_Linux *tts = nullptr;
 #endif
 
+#if defined(DBUS_ENABLED)
+	FreeDesktopPortalDesktop *portal_desktop = nullptr;
+#endif
+
 	struct WindowData {
 		Window x11_window;
 		::XIC xic;
@@ -152,7 +157,9 @@ class DisplayServerX11 : public DisplayServer {
 		Vector2i last_position_before_fs;
 		bool focused = true;
 		bool minimized = false;
+		bool maximized = false;
 		bool is_popup = false;
+		bool layered_window = false;
 
 		Rect2i parent_safe_rect;
 
@@ -245,8 +252,6 @@ class DisplayServerX11 : public DisplayServer {
 	CursorShape current_cursor = CURSOR_ARROW;
 	HashMap<CursorShape, Vector<Variant>> cursors_cache;
 
-	bool layered_window = false;
-
 	String rendering_driver;
 	void set_wm_fullscreen(bool p_enabled);
 	void set_wm_above(bool p_enabled);
@@ -268,13 +273,18 @@ class DisplayServerX11 : public DisplayServer {
 	void _update_real_mouse_position(const WindowData &wd);
 	bool _window_maximize_check(WindowID p_window, const char *p_atom_name) const;
 	bool _window_fullscreen_check(WindowID p_window) const;
+	bool _window_minimize_check(WindowID p_window) const;
+	void _validate_mode_on_map(WindowID p_window);
 	void _update_size_hints(WindowID p_window);
 	void _set_wm_fullscreen(WindowID p_window, bool p_enabled);
 	void _set_wm_maximized(WindowID p_window, bool p_enabled);
+	void _set_wm_minimized(WindowID p_window, bool p_enabled);
 
 	void _update_context(WindowData &wd);
 
 	Context context = CONTEXT_ENGINE;
+
+	WindowID _get_focused_window_or_popup() const;
 
 	void _send_window_event(const WindowData &wd, WindowEvent p_event);
 	static void _dispatch_input_events(const Ref<InputEvent> &p_event);
@@ -308,12 +318,17 @@ public:
 #ifdef SPEECHD_ENABLED
 	virtual bool tts_is_speaking() const override;
 	virtual bool tts_is_paused() const override;
-	virtual Array tts_get_voices() const override;
+	virtual TypedArray<Dictionary> tts_get_voices() const override;
 
 	virtual void tts_speak(const String &p_text, const String &p_voice, int p_volume = 50, float p_pitch = 1.f, float p_rate = 1.f, int p_utterance_id = 0, bool p_interrupt = false) override;
 	virtual void tts_pause() override;
 	virtual void tts_resume() override;
 	virtual void tts_stop() override;
+#endif
+
+#if defined(DBUS_ENABLED)
+	virtual bool is_dark_mode_supported() const override;
+	virtual bool is_dark_mode() const override;
 #endif
 
 	virtual void mouse_set_mode(MouseMode p_mode) override;

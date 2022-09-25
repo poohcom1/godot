@@ -35,6 +35,7 @@
 #include "default_theme_icons.gen.h"
 #include "scene/resources/font.h"
 #include "scene/resources/theme.h"
+#include "scene/theme/theme_db.h"
 #include "servers/text_server.h"
 
 #include "modules/modules_enabled.gen.h" // For svg.
@@ -50,10 +51,7 @@ static const int default_corner_radius = 3;
 static Ref<StyleBoxFlat> make_flat_stylebox(Color p_color, float p_margin_left = default_margin, float p_margin_top = default_margin, float p_margin_right = default_margin, float p_margin_bottom = default_margin, int p_corner_radius = default_corner_radius, bool p_draw_center = true, int p_border_width = 0) {
 	Ref<StyleBoxFlat> style(memnew(StyleBoxFlat));
 	style->set_bg_color(p_color);
-	style->set_default_margin(SIDE_LEFT, p_margin_left * scale);
-	style->set_default_margin(SIDE_RIGHT, p_margin_right * scale);
-	style->set_default_margin(SIDE_BOTTOM, p_margin_bottom * scale);
-	style->set_default_margin(SIDE_TOP, p_margin_top * scale);
+	style->set_default_margin_individual(p_margin_left * scale, p_margin_top * scale, p_margin_right * scale, p_margin_bottom * scale);
 
 	style->set_corner_radius_all(p_corner_radius);
 	style->set_anti_aliased(true);
@@ -84,7 +82,7 @@ static Ref<ImageTexture> generate_icon(int p_index) {
 	// with integer scales.
 	const bool upsample = !Math::is_equal_approx(Math::round(scale), scale);
 	ImageLoaderSVG img_loader;
-	img_loader.create_image_from_string(img, default_theme_icons_sources[p_index], scale, upsample, false);
+	img_loader.create_image_from_string(img, default_theme_icons_sources[p_index], scale, upsample, HashMap<Color, Color>());
 #endif
 
 	return ImageTexture::create_from_image(img);
@@ -92,12 +90,7 @@ static Ref<ImageTexture> generate_icon(int p_index) {
 
 static Ref<StyleBox> make_empty_stylebox(float p_margin_left = -1, float p_margin_top = -1, float p_margin_right = -1, float p_margin_bottom = -1) {
 	Ref<StyleBox> style(memnew(StyleBoxEmpty));
-
-	style->set_default_margin(SIDE_LEFT, p_margin_left * scale);
-	style->set_default_margin(SIDE_RIGHT, p_margin_right * scale);
-	style->set_default_margin(SIDE_BOTTOM, p_margin_bottom * scale);
-	style->set_default_margin(SIDE_TOP, p_margin_top * scale);
-
+	style->set_default_margin_individual(p_margin_left * scale, p_margin_top * scale, p_margin_right * scale, p_margin_bottom * scale);
 	return style;
 }
 
@@ -138,7 +131,6 @@ void fill_default_theme(Ref<Theme> &theme, const Ref<Font> &default_font, const 
 
 	// Panel
 	theme->set_stylebox("panel", "Panel", make_flat_stylebox(style_normal_color, 0, 0, 0, 0));
-	theme->set_stylebox("panel_fg", "Panel", make_flat_stylebox(style_normal_color, 0, 0, 0, 0));
 
 	// Button
 
@@ -176,6 +168,27 @@ void fill_default_theme(Ref<Theme> &theme, const Ref<Font> &default_font, const 
 	theme->set_color("icon_disabled_color", "Button", Color(1, 1, 1, 0.4));
 
 	theme->set_constant("h_separation", "Button", 2 * scale);
+
+	// MenuBar
+	theme->set_stylebox("normal", "MenuBar", button_normal);
+	theme->set_stylebox("hover", "MenuBar", button_hover);
+	theme->set_stylebox("pressed", "MenuBar", button_pressed);
+	theme->set_stylebox("disabled", "MenuBar", button_disabled);
+	theme->set_stylebox("focus", "MenuBar", focus);
+
+	theme->set_font("font", "MenuBar", Ref<Font>());
+	theme->set_font_size("font_size", "MenuBar", -1);
+	theme->set_constant("outline_size", "MenuBar", 0 * scale);
+
+	theme->set_color("font_color", "MenuBar", control_font_color);
+	theme->set_color("font_pressed_color", "MenuBar", control_font_pressed_color);
+	theme->set_color("font_hover_color", "MenuBar", control_font_hover_color);
+	theme->set_color("font_focus_color", "MenuBar", control_font_focus_color);
+	theme->set_color("font_hover_pressed_color", "MenuBar", control_font_pressed_color);
+	theme->set_color("font_disabled_color", "MenuBar", control_font_disabled_color);
+	theme->set_color("font_outline_color", "MenuBar", Color(1, 1, 1));
+
+	theme->set_constant("h_separation", "MenuBar", 4 * scale);
 
 	// LinkButton
 
@@ -258,15 +271,9 @@ void fill_default_theme(Ref<Theme> &theme, const Ref<Font> &default_font, const 
 	// CheckBox
 
 	Ref<StyleBox> cbx_empty = memnew(StyleBoxEmpty);
-	cbx_empty->set_default_margin(SIDE_LEFT, 4 * scale);
-	cbx_empty->set_default_margin(SIDE_RIGHT, 4 * scale);
-	cbx_empty->set_default_margin(SIDE_TOP, 4 * scale);
-	cbx_empty->set_default_margin(SIDE_BOTTOM, 4 * scale);
+	cbx_empty->set_default_margin_all(4 * scale);
 	Ref<StyleBox> cbx_focus = focus;
-	cbx_focus->set_default_margin(SIDE_LEFT, 4 * scale);
-	cbx_focus->set_default_margin(SIDE_RIGHT, 4 * scale);
-	cbx_focus->set_default_margin(SIDE_TOP, 4 * scale);
-	cbx_focus->set_default_margin(SIDE_BOTTOM, 4 * scale);
+	cbx_focus->set_default_margin_all(4 * scale);
 
 	theme->set_stylebox("normal", "CheckBox", cbx_empty);
 	theme->set_stylebox("pressed", "CheckBox", cbx_empty);
@@ -296,16 +303,13 @@ void fill_default_theme(Ref<Theme> &theme, const Ref<Font> &default_font, const 
 	theme->set_color("font_outline_color", "CheckBox", Color(1, 1, 1));
 
 	theme->set_constant("h_separation", "CheckBox", 4 * scale);
-	theme->set_constant("check_v_adjust", "CheckBox", 0 * scale);
+	theme->set_constant("check_v_offset", "CheckBox", 0 * scale);
 	theme->set_constant("outline_size", "CheckBox", 0);
 
 	// CheckButton
 
 	Ref<StyleBox> cb_empty = memnew(StyleBoxEmpty);
-	cb_empty->set_default_margin(SIDE_LEFT, 6 * scale);
-	cb_empty->set_default_margin(SIDE_RIGHT, 6 * scale);
-	cb_empty->set_default_margin(SIDE_TOP, 4 * scale);
-	cb_empty->set_default_margin(SIDE_BOTTOM, 4 * scale);
+	cb_empty->set_default_margin_individual(6 * scale, 4 * scale, 6 * scale, 4 * scale);
 
 	theme->set_stylebox("normal", "CheckButton", cb_empty);
 	theme->set_stylebox("pressed", "CheckButton", cb_empty);
@@ -314,15 +318,15 @@ void fill_default_theme(Ref<Theme> &theme, const Ref<Font> &default_font, const 
 	theme->set_stylebox("hover_pressed", "CheckButton", cb_empty);
 	theme->set_stylebox("focus", "CheckButton", focus);
 
-	theme->set_icon("on", "CheckButton", icons["toggle_on"]);
-	theme->set_icon("on_disabled", "CheckButton", icons["toggle_on_disabled"]);
-	theme->set_icon("off", "CheckButton", icons["toggle_off"]);
-	theme->set_icon("off_disabled", "CheckButton", icons["toggle_off_disabled"]);
+	theme->set_icon("checked", "CheckButton", icons["toggle_on"]);
+	theme->set_icon("checked_disabled", "CheckButton", icons["toggle_on_disabled"]);
+	theme->set_icon("unchecked", "CheckButton", icons["toggle_off"]);
+	theme->set_icon("unchecked_disabled", "CheckButton", icons["toggle_off_disabled"]);
 
-	theme->set_icon("on_mirrored", "CheckButton", icons["toggle_on_mirrored"]);
-	theme->set_icon("on_disabled_mirrored", "CheckButton", icons["toggle_on_disabled_mirrored"]);
-	theme->set_icon("off_mirrored", "CheckButton", icons["toggle_off_mirrored"]);
-	theme->set_icon("off_disabled_mirrored", "CheckButton", icons["toggle_off_disabled_mirrored"]);
+	theme->set_icon("checked_mirrored", "CheckButton", icons["toggle_on_mirrored"]);
+	theme->set_icon("checked_disabled_mirrored", "CheckButton", icons["toggle_on_disabled_mirrored"]);
+	theme->set_icon("unchecked_mirrored", "CheckButton", icons["toggle_off_mirrored"]);
+	theme->set_icon("unchecked_disabled_mirrored", "CheckButton", icons["toggle_off_disabled_mirrored"]);
 
 	theme->set_font("font", "CheckButton", Ref<Font>());
 	theme->set_font_size("font_size", "CheckButton", -1);
@@ -336,7 +340,7 @@ void fill_default_theme(Ref<Theme> &theme, const Ref<Font> &default_font, const 
 	theme->set_color("font_outline_color", "CheckButton", Color(1, 1, 1));
 
 	theme->set_constant("h_separation", "CheckButton", 4 * scale);
-	theme->set_constant("check_v_adjust", "CheckButton", 0 * scale);
+	theme->set_constant("check_v_offset", "CheckButton", 0 * scale);
 	theme->set_constant("outline_size", "CheckButton", 0);
 
 	// Label
@@ -401,8 +405,8 @@ void fill_default_theme(Ref<Theme> &theme, const Ref<Font> &default_font, const 
 
 	// ProgressBar
 
-	theme->set_stylebox("bg", "ProgressBar", make_flat_stylebox(style_disabled_color, 2, 2, 2, 2, 6));
-	theme->set_stylebox("fg", "ProgressBar", make_flat_stylebox(style_progress_color, 2, 2, 2, 2, 6));
+	theme->set_stylebox("background", "ProgressBar", make_flat_stylebox(style_disabled_color, 2, 2, 2, 2, 6));
+	theme->set_stylebox("fill", "ProgressBar", make_flat_stylebox(style_progress_color, 2, 2, 2, 2, 6));
 
 	theme->set_font("font", "ProgressBar", Ref<Font>());
 	theme->set_font_size("font_size", "ProgressBar", -1);
@@ -566,7 +570,7 @@ void fill_default_theme(Ref<Theme> &theme, const Ref<Font> &default_font, const 
 
 	Ref<StyleBoxEmpty> empty;
 	empty.instantiate();
-	theme->set_stylebox("bg", "ScrollContainer", empty);
+	theme->set_stylebox("panel", "ScrollContainer", empty);
 
 	// Window
 
@@ -587,12 +591,9 @@ void fill_default_theme(Ref<Theme> &theme, const Ref<Font> &default_font, const 
 
 	// Dialogs
 
-	theme->set_constant("margin", "Dialogs", 8 * scale);
-	theme->set_constant("button_margin", "Dialogs", 32 * scale);
-
-	// AcceptDialog
-
-	theme->set_stylebox("panel", "AcceptDialog", make_flat_stylebox(style_popup_color, 0, 0, 0, 0));
+	// AcceptDialog is currently the base dialog, so this defines styles for all extending nodes.
+	theme->set_stylebox("panel", "AcceptDialog", make_flat_stylebox(style_popup_color, 8 * scale, 8 * scale, 8 * scale, 8 * scale));
+	theme->set_constant("buttons_separation", "AcceptDialog", 10 * scale);
 
 	// File Dialog
 
@@ -603,9 +604,9 @@ void fill_default_theme(Ref<Theme> &theme, const Ref<Font> &default_font, const 
 	theme->set_icon("toggle_hidden", "FileDialog", icons["visibility_visible"]);
 	theme->set_icon("folder", "FileDialog", icons["folder"]);
 	theme->set_icon("file", "FileDialog", icons["file"]);
-	theme->set_color("folder_icon_modulate", "FileDialog", Color(1, 1, 1));
-	theme->set_color("file_icon_modulate", "FileDialog", Color(1, 1, 1));
-	theme->set_color("files_disabled", "FileDialog", Color(1, 1, 1, 0.25));
+	theme->set_color("folder_icon_color", "FileDialog", Color(1, 1, 1));
+	theme->set_color("file_icon_color", "FileDialog", Color(1, 1, 1));
+	theme->set_color("file_disabled_color", "FileDialog", Color(1, 1, 1, 0.25));
 
 	// Popup
 
@@ -620,16 +621,10 @@ void fill_default_theme(Ref<Theme> &theme, const Ref<Font> &default_font, const 
 	Ref<StyleBoxLine> separator_horizontal = memnew(StyleBoxLine);
 	separator_horizontal->set_thickness(Math::round(scale));
 	separator_horizontal->set_color(style_separator_color);
-	separator_horizontal->set_default_margin(SIDE_LEFT, default_margin);
-	separator_horizontal->set_default_margin(SIDE_TOP, 0);
-	separator_horizontal->set_default_margin(SIDE_RIGHT, default_margin);
-	separator_horizontal->set_default_margin(SIDE_BOTTOM, 0);
+	separator_horizontal->set_default_margin_individual(default_margin, 0, default_margin, 0);
 	Ref<StyleBoxLine> separator_vertical = separator_horizontal->duplicate();
 	separator_vertical->set_vertical(true);
-	separator_vertical->set_default_margin(SIDE_LEFT, 0);
-	separator_vertical->set_default_margin(SIDE_TOP, default_margin);
-	separator_vertical->set_default_margin(SIDE_RIGHT, 0);
-	separator_vertical->set_default_margin(SIDE_BOTTOM, default_margin);
+	separator_vertical->set_default_margin_individual(0, default_margin, 0, default_margin);
 
 	// Always display a border for PopupMenus so they can be distinguished from their background.
 	Ref<StyleBoxFlat> style_popup_panel = make_flat_stylebox(style_popup_color);
@@ -669,6 +664,7 @@ void fill_default_theme(Ref<Theme> &theme, const Ref<Font> &default_font, const 
 	theme->set_color("font_outline_color", "PopupMenu", Color(1, 1, 1));
 	theme->set_color("font_separator_outline_color", "PopupMenu", Color(1, 1, 1));
 
+	theme->set_constant("indent", "PopupMenu", 10 * scale);
 	theme->set_constant("h_separation", "PopupMenu", 4 * scale);
 	theme->set_constant("v_separation", "PopupMenu", 4 * scale);
 	theme->set_constant("outline_size", "PopupMenu", 0);
@@ -716,8 +712,8 @@ void fill_default_theme(Ref<Theme> &theme, const Ref<Font> &default_font, const 
 
 	// Tree
 
-	theme->set_stylebox("bg", "Tree", make_flat_stylebox(style_normal_color, 4, 4, 4, 5));
-	theme->set_stylebox("bg_focus", "Tree", focus);
+	theme->set_stylebox("panel", "Tree", make_flat_stylebox(style_normal_color, 4, 4, 4, 5));
+	theme->set_stylebox("focus", "Tree", focus);
 	theme->set_stylebox("selected", "Tree", make_flat_stylebox(style_selected_color));
 	theme->set_stylebox("selected_focus", "Tree", make_flat_stylebox(style_selected_color));
 	theme->set_stylebox("cursor", "Tree", focus);
@@ -770,8 +766,8 @@ void fill_default_theme(Ref<Theme> &theme, const Ref<Font> &default_font, const 
 
 	// ItemList
 
-	theme->set_stylebox("bg", "ItemList", make_flat_stylebox(style_normal_color));
-	theme->set_stylebox("bg_focus", "ItemList", focus);
+	theme->set_stylebox("panel", "ItemList", make_flat_stylebox(style_normal_color));
+	theme->set_stylebox("focus", "ItemList", focus);
 	theme->set_constant("h_separation", "ItemList", 4);
 	theme->set_constant("v_separation", "ItemList", 2);
 	theme->set_constant("icon_margin", "ItemList", 4);
@@ -808,6 +804,7 @@ void fill_default_theme(Ref<Theme> &theme, const Ref<Font> &default_font, const 
 	theme->set_stylebox("tab_unselected", "TabContainer", style_tab_unselected);
 	theme->set_stylebox("tab_disabled", "TabContainer", style_tab_disabled);
 	theme->set_stylebox("panel", "TabContainer", make_flat_stylebox(style_normal_color, 0, 0, 0, 0));
+	theme->set_stylebox("tabbar_background", "TabContainer", make_empty_stylebox(0, 0, 0, 0));
 
 	theme->set_icon("increment", "TabContainer", icons["scroll_button_right"]);
 	theme->set_icon("increment_highlight", "TabContainer", icons["scroll_button_right_hl"]);
@@ -974,9 +971,12 @@ void fill_default_theme(Ref<Theme> &theme, const Ref<Font> &default_font, const 
 
 	// Containers
 
+	theme->set_icon("h_grabber", "SplitContainer", icons["hsplitter"]);
+	theme->set_icon("v_grabber", "SplitContainer", icons["vsplitter"]);
 	theme->set_icon("grabber", "VSplitContainer", icons["vsplitter"]);
 	theme->set_icon("grabber", "HSplitContainer", icons["hsplitter"]);
 
+	theme->set_constant("separation", "BoxContainer", 4 * scale);
 	theme->set_constant("separation", "HBoxContainer", 4 * scale);
 	theme->set_constant("separation", "VBoxContainer", 4 * scale);
 	theme->set_constant("margin_left", "MarginContainer", 0 * scale);
@@ -985,10 +985,17 @@ void fill_default_theme(Ref<Theme> &theme, const Ref<Font> &default_font, const 
 	theme->set_constant("margin_bottom", "MarginContainer", 0 * scale);
 	theme->set_constant("h_separation", "GridContainer", 4 * scale);
 	theme->set_constant("v_separation", "GridContainer", 4 * scale);
+	theme->set_constant("separation", "SplitContainer", 12 * scale);
 	theme->set_constant("separation", "HSplitContainer", 12 * scale);
 	theme->set_constant("separation", "VSplitContainer", 12 * scale);
+	theme->set_constant("minimum_grab_thickness", "SplitContainer", 6 * scale);
+	theme->set_constant("minimum_grab_thickness", "HSplitContainer", 6 * scale);
+	theme->set_constant("minimum_grab_thickness", "VSplitContainer", 6 * scale);
+	theme->set_constant("autohide", "SplitContainer", 1 * scale);
 	theme->set_constant("autohide", "HSplitContainer", 1 * scale);
 	theme->set_constant("autohide", "VSplitContainer", 1 * scale);
+	theme->set_constant("h_separation", "FlowContainer", 4 * scale);
+	theme->set_constant("v_separation", "FlowContainer", 4 * scale);
 	theme->set_constant("h_separation", "HFlowContainer", 4 * scale);
 	theme->set_constant("v_separation", "HFlowContainer", 4 * scale);
 	theme->set_constant("h_separation", "VFlowContainer", 4 * scale);
@@ -1031,7 +1038,7 @@ void fill_default_theme(Ref<Theme> &theme, const Ref<Font> &default_font, const 
 	default_style = make_flat_stylebox(Color(1, 0.365, 0.365), 4, 4, 4, 4, 0, false, 2);
 }
 
-void make_default_theme(float p_scale, Ref<Font> p_font, TextServer::SubpixelPositioning p_font_subpixel, TextServer::Hinting p_font_hinting, bool p_font_antialiased, bool p_font_msdf, bool p_font_generate_mipmaps) {
+void make_default_theme(float p_scale, Ref<Font> p_font, TextServer::SubpixelPositioning p_font_subpixel, TextServer::Hinting p_font_hinting, TextServer::FontAntialiasing p_font_antialiasing, bool p_font_msdf, bool p_font_generate_mipmaps) {
 	Ref<Theme> t;
 	t.instantiate();
 
@@ -1055,7 +1062,7 @@ void make_default_theme(float p_scale, Ref<Font> p_font, TextServer::SubpixelPos
 		dynamic_font->set_data_ptr(_font_OpenSans_SemiBold, _font_OpenSans_SemiBold_size);
 		dynamic_font->set_subpixel_positioning(p_font_subpixel);
 		dynamic_font->set_hinting(p_font_hinting);
-		dynamic_font->set_antialiased(p_font_antialiased);
+		dynamic_font->set_antialiasing(p_font_antialiasing);
 		dynamic_font->set_multichannel_signed_distance_field(p_font_msdf);
 		dynamic_font->set_generate_mipmaps(p_font_generate_mipmaps);
 
@@ -1079,18 +1086,11 @@ void make_default_theme(float p_scale, Ref<Font> p_font, TextServer::SubpixelPos
 
 	fill_default_theme(t, default_font, bold_font, bold_italics_font, italics_font, default_icon, default_style, default_scale);
 
-	Theme::set_default(t);
-	Theme::set_fallback_base_scale(default_scale);
-	Theme::set_fallback_icon(default_icon);
-	Theme::set_fallback_style(default_style);
-	Theme::set_fallback_font(default_font);
-	Theme::set_fallback_font_size(default_font_size * default_scale);
-}
+	ThemeDB::get_singleton()->set_default_theme(t);
 
-void clear_default_theme() {
-	Theme::set_project_default(nullptr);
-	Theme::set_default(nullptr);
-	Theme::set_fallback_icon(nullptr);
-	Theme::set_fallback_style(nullptr);
-	Theme::set_fallback_font(nullptr);
+	ThemeDB::get_singleton()->set_fallback_base_scale(default_scale);
+	ThemeDB::get_singleton()->set_fallback_icon(default_icon);
+	ThemeDB::get_singleton()->set_fallback_stylebox(default_style);
+	ThemeDB::get_singleton()->set_fallback_font(default_font);
+	ThemeDB::get_singleton()->set_fallback_font_size(default_font_size * default_scale);
 }

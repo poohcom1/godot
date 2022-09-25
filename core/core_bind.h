@@ -32,9 +32,6 @@
 #define CORE_BIND_H
 
 #include "core/debugger/engine_profiler.h"
-#include "core/io/compression.h"
-#include "core/io/dir_access.h"
-#include "core/io/file_access.h"
 #include "core/io/image.h"
 #include "core/io/resource_loader.h"
 #include "core/io/resource_saver.h"
@@ -45,6 +42,8 @@
 #include "core/templates/safe_refcount.h"
 
 class MainLoop;
+template <typename T>
+class TypedArray;
 
 namespace core_bind {
 
@@ -191,6 +190,8 @@ public:
 	bool set_environment(const String &p_var, const String &p_value) const;
 
 	String get_name() const;
+	String get_distribution_name() const;
+	String get_version() const;
 	Vector<String> get_cmdline_args();
 	Vector<String> get_cmdline_user_args();
 
@@ -198,14 +199,6 @@ public:
 	String get_locale_language() const;
 
 	String get_model_name() const;
-
-	void dump_memory_to_file(const String &p_file);
-	void dump_resources_to_file(const String &p_file);
-
-	void print_resources_in_use(bool p_short = false);
-	void print_all_resources(const String &p_to_file);
-	void print_all_textures_by_size();
-	void print_resources_by_type(const Vector<String> &p_types);
 
 	bool is_debug_build() const;
 
@@ -293,6 +286,7 @@ public:
 	Vector<int> triangulate_polygon(const Vector<Vector2> &p_polygon);
 	Vector<int> triangulate_delaunay(const Vector<Vector2> &p_points);
 	Vector<Point2> convex_hull(const Vector<Point2> &p_points);
+	TypedArray<PackedVector2Array> decompose_polygon_in_convex(const Vector<Vector2> &p_polygon);
 
 	enum PolyBooleanOperation {
 		OPERATION_UNION,
@@ -301,14 +295,14 @@ public:
 		OPERATION_XOR
 	};
 	// 2D polygon boolean operations.
-	Array merge_polygons(const Vector<Vector2> &p_polygon_a, const Vector<Vector2> &p_polygon_b); // Union (add).
-	Array clip_polygons(const Vector<Vector2> &p_polygon_a, const Vector<Vector2> &p_polygon_b); // Difference (subtract).
-	Array intersect_polygons(const Vector<Vector2> &p_polygon_a, const Vector<Vector2> &p_polygon_b); // Common area (multiply).
-	Array exclude_polygons(const Vector<Vector2> &p_polygon_a, const Vector<Vector2> &p_polygon_b); // All but common area (xor).
+	TypedArray<PackedVector2Array> merge_polygons(const Vector<Vector2> &p_polygon_a, const Vector<Vector2> &p_polygon_b); // Union (add).
+	TypedArray<PackedVector2Array> clip_polygons(const Vector<Vector2> &p_polygon_a, const Vector<Vector2> &p_polygon_b); // Difference (subtract).
+	TypedArray<PackedVector2Array> intersect_polygons(const Vector<Vector2> &p_polygon_a, const Vector<Vector2> &p_polygon_b); // Common area (multiply).
+	TypedArray<PackedVector2Array> exclude_polygons(const Vector<Vector2> &p_polygon_a, const Vector<Vector2> &p_polygon_b); // All but common area (xor).
 
 	// 2D polyline vs polygon operations.
-	Array clip_polyline_with_polygon(const Vector<Vector2> &p_polyline, const Vector<Vector2> &p_polygon); // Cut.
-	Array intersect_polyline_with_polygon(const Vector<Vector2> &p_polyline, const Vector<Vector2> &p_polygon); // Chop.
+	TypedArray<PackedVector2Array> clip_polyline_with_polygon(const Vector<Vector2> &p_polyline, const Vector<Vector2> &p_polygon); // Cut.
+	TypedArray<PackedVector2Array> intersect_polyline_with_polygon(const Vector<Vector2> &p_polyline, const Vector<Vector2> &p_polygon); // Chop.
 
 	// 2D offset polygons/polylines.
 	enum PolyJoinType {
@@ -323,8 +317,8 @@ public:
 		END_SQUARE,
 		END_ROUND
 	};
-	Array offset_polygon(const Vector<Vector2> &p_polygon, real_t p_delta, PolyJoinType p_join_type = JOIN_SQUARE);
-	Array offset_polyline(const Vector<Vector2> &p_polygon, real_t p_delta, PolyJoinType p_join_type = JOIN_SQUARE, PolyEndType p_end_type = END_SQUARE);
+	TypedArray<PackedVector2Array> offset_polygon(const Vector<Vector2> &p_polygon, real_t p_delta, PolyJoinType p_join_type = JOIN_SQUARE);
+	TypedArray<PackedVector2Array> offset_polyline(const Vector<Vector2> &p_polygon, real_t p_delta, PolyJoinType p_join_type = JOIN_SQUARE, PolyEndType p_end_type = END_SQUARE);
 
 	Dictionary make_atlas(const Vector<Size2> &p_rects);
 
@@ -341,9 +335,9 @@ protected:
 
 public:
 	static Geometry3D *get_singleton();
-	Vector<Plane> build_box_planes(const Vector3 &p_extents);
-	Vector<Plane> build_cylinder_planes(float p_radius, float p_height, int p_sides, Vector3::Axis p_axis = Vector3::AXIS_Z);
-	Vector<Plane> build_capsule_planes(float p_radius, float p_height, int p_sides, int p_lats, Vector3::Axis p_axis = Vector3::AXIS_Z);
+	TypedArray<Plane> build_box_planes(const Vector3 &p_extents);
+	TypedArray<Plane> build_cylinder_planes(float p_radius, float p_height, int p_sides, Vector3::Axis p_axis = Vector3::AXIS_Z);
+	TypedArray<Plane> build_capsule_planes(float p_radius, float p_height, int p_sides, int p_lats, Vector3::Axis p_axis = Vector3::AXIS_Z);
 	Vector<Vector3> get_closest_points_between_segments(const Vector3 &p1, const Vector3 &p2, const Vector3 &q1, const Vector3 &q2);
 	Vector3 get_closest_point_to_segment(const Vector3 &p_point, const Vector3 &p_a, const Vector3 &p_b);
 	Vector3 get_closest_point_to_segment_uncapped(const Vector3 &p_point, const Vector3 &p_a, const Vector3 &p_b);
@@ -357,156 +351,6 @@ public:
 	Vector<Vector3> clip_polygon(const Vector<Vector3> &p_points, const Plane &p_plane);
 
 	Geometry3D() { singleton = this; }
-};
-
-class File : public RefCounted {
-	GDCLASS(File, RefCounted);
-
-	Ref<FileAccess> f;
-	bool big_endian = false;
-
-protected:
-	static void _bind_methods();
-
-public:
-	enum ModeFlags {
-		READ = 1,
-		WRITE = 2,
-		READ_WRITE = 3,
-		WRITE_READ = 7,
-	};
-
-	enum CompressionMode {
-		COMPRESSION_FASTLZ = Compression::MODE_FASTLZ,
-		COMPRESSION_DEFLATE = Compression::MODE_DEFLATE,
-		COMPRESSION_ZSTD = Compression::MODE_ZSTD,
-		COMPRESSION_GZIP = Compression::MODE_GZIP
-	};
-
-	Error open_encrypted(const String &p_path, ModeFlags p_mode_flags, const Vector<uint8_t> &p_key);
-	Error open_encrypted_pass(const String &p_path, ModeFlags p_mode_flags, const String &p_pass);
-	Error open_compressed(const String &p_path, ModeFlags p_mode_flags, CompressionMode p_compress_mode = COMPRESSION_FASTLZ);
-
-	Error open(const String &p_path, ModeFlags p_mode_flags); // open a file.
-	void flush(); // Flush a file (write its buffer to disk).
-	void close(); // Close a file.
-	bool is_open() const; // True when file is open.
-
-	String get_path() const; // Returns the path for the current open file.
-	String get_path_absolute() const; // Returns the absolute path for the current open file.
-
-	void seek(int64_t p_position); // Seek to a given position.
-	void seek_end(int64_t p_position = 0); // Seek from the end of file.
-	uint64_t get_position() const; // Get position in the file.
-	uint64_t get_length() const; // Get size of the file.
-
-	bool eof_reached() const; // Reading passed EOF.
-
-	uint8_t get_8() const; // Get a byte.
-	uint16_t get_16() const; // Get 16 bits uint.
-	uint32_t get_32() const; // Get 32 bits uint.
-	uint64_t get_64() const; // Get 64 bits uint.
-
-	float get_float() const;
-	double get_double() const;
-	real_t get_real() const;
-
-	Variant get_var(bool p_allow_objects = false) const;
-
-	Vector<uint8_t> get_buffer(int64_t p_length) const; // Get an array of bytes.
-	String get_line() const;
-	Vector<String> get_csv_line(const String &p_delim = ",") const;
-	String get_as_text(bool p_skip_cr = false) const;
-	String get_md5(const String &p_path) const;
-	String get_sha256(const String &p_path) const;
-
-	/*
-	 * Use this for files WRITTEN in _big_ endian machines (ie, amiga/mac).
-	 * It's not about the current CPU type but file formats.
-	 * This flag gets reset to `false` (little endian) on each open.
-	 */
-	void set_big_endian(bool p_big_endian);
-	bool is_big_endian();
-
-	Error get_error() const; // Get last error.
-
-	void store_8(uint8_t p_dest); // Store a byte.
-	void store_16(uint16_t p_dest); // Store 16 bits uint.
-	void store_32(uint32_t p_dest); // Store 32 bits uint.
-	void store_64(uint64_t p_dest); // Store 64 bits uint.
-
-	void store_float(float p_dest);
-	void store_double(double p_dest);
-	void store_real(real_t p_real);
-
-	void store_string(const String &p_string);
-	void store_line(const String &p_string);
-	void store_csv_line(const Vector<String> &p_values, const String &p_delim = ",");
-
-	virtual void store_pascal_string(const String &p_string);
-	virtual String get_pascal_string();
-
-	void store_buffer(const Vector<uint8_t> &p_buffer); // Store an array of bytes.
-
-	void store_var(const Variant &p_var, bool p_full_objects = false);
-
-	static bool file_exists(const String &p_name); // Return true if a file exists.
-
-	uint64_t get_modified_time(const String &p_file) const;
-
-	File() {}
-};
-
-class Directory : public RefCounted {
-	GDCLASS(Directory, RefCounted);
-	Ref<DirAccess> d;
-
-	bool dir_open = false;
-	bool include_navigational = false;
-	bool include_hidden = false;
-
-protected:
-	static void _bind_methods();
-
-public:
-	Error open(const String &p_path);
-
-	bool is_open() const;
-
-	Error list_dir_begin();
-	String get_next();
-	bool current_is_dir() const;
-	void list_dir_end();
-
-	PackedStringArray get_files();
-	PackedStringArray get_directories();
-	PackedStringArray _get_contents(bool p_directories);
-
-	void set_include_navigational(bool p_enable);
-	bool get_include_navigational() const;
-	void set_include_hidden(bool p_enable);
-	bool get_include_hidden() const;
-
-	int get_drive_count();
-	String get_drive(int p_drive);
-	int get_current_drive();
-
-	Error change_dir(String p_dir); // Can be relative or absolute, return false on success.
-	String get_current_dir(); // Return current dir location.
-
-	Error make_dir(String p_dir);
-	Error make_dir_recursive(String p_dir);
-
-	bool file_exists(String p_file);
-	bool dir_exists(String p_dir);
-
-	uint64_t get_space_left();
-
-	Error copy(String p_from, String p_to);
-	Error rename(String p_from, String p_to);
-	Error remove(String p_name);
-
-	Directory();
 };
 
 class Marshalls : public Object {
@@ -602,15 +446,15 @@ public:
 
 	bool has_signal(StringName p_class, StringName p_signal) const;
 	Dictionary get_signal(StringName p_class, StringName p_signal) const;
-	Array get_signal_list(StringName p_class, bool p_no_inheritance = false) const;
+	TypedArray<Dictionary> get_signal_list(StringName p_class, bool p_no_inheritance = false) const;
 
-	Array get_property_list(StringName p_class, bool p_no_inheritance = false) const;
+	TypedArray<Dictionary> get_property_list(StringName p_class, bool p_no_inheritance = false) const;
 	Variant get_property(Object *p_object, const StringName &p_property) const;
 	Error set_property(Object *p_object, const StringName &p_property, const Variant &p_value) const;
 
 	bool has_method(StringName p_class, StringName p_method, bool p_no_inheritance = false) const;
 
-	Array get_method_list(StringName p_class, bool p_no_inheritance = false) const;
+	TypedArray<Dictionary> get_method_list(StringName p_class, bool p_no_inheritance = false) const;
 
 	PackedStringArray get_integer_constant_list(const StringName &p_class, bool p_no_inheritance = false) const;
 	bool has_integer_constant(const StringName &p_class, const StringName &p_name) const;
@@ -661,7 +505,7 @@ public:
 
 	Dictionary get_version_info() const;
 	Dictionary get_author_info() const;
-	Array get_copyright_info() const;
+	TypedArray<Dictionary> get_copyright_info() const;
 	Dictionary get_donor_info() const;
 	Dictionary get_license_info() const;
 	String get_license_text() const;
@@ -741,9 +585,6 @@ VARIANT_ENUM_CAST(core_bind::OS::SystemDir);
 VARIANT_ENUM_CAST(core_bind::Geometry2D::PolyBooleanOperation);
 VARIANT_ENUM_CAST(core_bind::Geometry2D::PolyJoinType);
 VARIANT_ENUM_CAST(core_bind::Geometry2D::PolyEndType);
-
-VARIANT_ENUM_CAST(core_bind::File::ModeFlags);
-VARIANT_ENUM_CAST(core_bind::File::CompressionMode);
 
 VARIANT_ENUM_CAST(core_bind::Thread::Priority);
 

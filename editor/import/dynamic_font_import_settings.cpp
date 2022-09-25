@@ -302,6 +302,7 @@ static UniRange unicode_ranges[] = {
 	{ 0x10D00, 0x10D3F, U"Hanifi Rohingya" },
 	{ 0x10E60, 0x10E7F, U"Rumi Numeral Symbols" },
 	{ 0x10E80, 0x10EBF, U"Yezidi" },
+	{ 0x10EC0, 0x10EFF, U"Arabic Extended-C" },
 	{ 0x10F00, 0x10F2F, U"Old Sogdian" },
 	{ 0x10F30, 0x10F6F, U"Sogdian" },
 	{ 0x10F70, 0x10FAF, U"Old Uyghur" },
@@ -333,11 +334,13 @@ static UniRange unicode_ranges[] = {
 	{ 0x11A50, 0x11AAF, U"Soyombo" },
 	{ 0x11AB0, 0x11ABF, U"Unified Canadian Aboriginal Syllabics Extended-A" },
 	{ 0x11AC0, 0x11AFF, U"Pau Cin Hau" },
+	{ 0x11B00, 0x11B5F, U"Devanagari Extended-A" },
 	{ 0x11C00, 0x11C6F, U"Bhaiksuki" },
 	{ 0x11C70, 0x11CBF, U"Marchen" },
 	{ 0x11D00, 0x11D5F, U"Masaram Gondi" },
 	{ 0x11D60, 0x11DAF, U"Gunjala Gondi" },
 	{ 0x11EE0, 0x11EFF, U"Makasar" },
+	{ 0x11F00, 0x11F5F, U"Kawi" },
 	{ 0x11FB0, 0x11FBF, U"Lisu Supplement" },
 	{ 0x11FC0, 0x11FFF, U"Tamil Supplement" },
 	{ 0x12000, 0x123FF, U"Cuneiform" },
@@ -370,6 +373,7 @@ static UniRange unicode_ranges[] = {
 	{ 0x1D000, 0x1D0FF, U"Byzantine Musical Symbols" },
 	{ 0x1D100, 0x1D1FF, U"Musical Symbols" },
 	{ 0x1D200, 0x1D24F, U"Ancient Greek Musical Notation" },
+	{ 0x1D2C0, 0x1D2DF, U"Kaktovik Numerals" },
 	{ 0x1D2E0, 0x1D2FF, U"Mayan Numerals" },
 	{ 0x1D300, 0x1D35F, U"Tai Xuan Jing Symbols" },
 	{ 0x1D360, 0x1D37F, U"Counting Rod Numerals" },
@@ -377,9 +381,11 @@ static UniRange unicode_ranges[] = {
 	{ 0x1D800, 0x1DAAF, U"Sutton SignWriting" },
 	{ 0x1DF00, 0x1DFFF, U"Latin Extended-G" },
 	{ 0x1E000, 0x1E02F, U"Glagolitic Supplement" },
+	{ 0x1E030, 0x1E08F, U"Cyrillic Extended-D" },
 	{ 0x1E100, 0x1E14F, U"Nyiakeng Puachue Hmong" },
 	{ 0x1E290, 0x1E2BF, U"Toto" },
 	{ 0x1E2C0, 0x1E2FF, U"Wancho" },
+	{ 0x1E4D0, 0x1E4FF, U"Nag Mundari" },
 	{ 0x1E7E0, 0x1E7FF, U"Ethiopic Extended-B" },
 	{ 0x1E800, 0x1E8DF, U"Mende Kikakui" },
 	{ 0x1E900, 0x1E95F, U"Adlam" },
@@ -409,6 +415,7 @@ static UniRange unicode_ranges[] = {
 	{ 0x2CEB0, 0x2EBEF, U"CJK Unified Ideographs Extension F" },
 	{ 0x2F800, 0x2FA1F, U"CJK Compatibility Ideographs Supplement" },
 	{ 0x30000, 0x3134F, U"CJK Unified Ideographs Extension G" },
+	{ 0x31350, 0x323AF, U"CJK Unified Ideographs Extension H" },
 	//{ 0xE0000, 0xE007F, U"Tags" },
 	//{ 0xE0100, 0xE01EF, U"Variation Selectors Supplement" },
 	{ 0xF0000, 0xFFFFF, U"Supplementary Private Use Area-A" },
@@ -449,8 +456,8 @@ void DynamicFontImportSettings::_main_prop_changed(const String &p_edited_proper
 	// Update font preview.
 
 	if (font_preview.is_valid()) {
-		if (p_edited_property == "antialiased") {
-			font_preview->set_antialiased(import_settings_data->get("antialiased"));
+		if (p_edited_property == "antialiasing") {
+			font_preview->set_antialiasing((TextServer::FontAntialiasing)import_settings_data->get("antialiasing").operator int());
 		} else if (p_edited_property == "generate_mipmaps") {
 			font_preview->set_generate_mipmaps(import_settings_data->get("generate_mipmaps"));
 		} else if (p_edited_property == "multichannel_signed_distance_field") {
@@ -474,7 +481,7 @@ void DynamicFontImportSettings::_main_prop_changed(const String &p_edited_proper
 
 	font_preview_label->add_theme_font_override("font", font_preview);
 	font_preview_label->add_theme_font_size_override("font_size", 200 * EDSCALE);
-	font_preview_label->update();
+	font_preview_label->queue_redraw();
 }
 
 /*************************************************************************/
@@ -573,6 +580,12 @@ void DynamicFontImportSettings::_variations_validate() {
 				}
 			}
 		}
+	}
+	if ((TextServer::FontAntialiasing)(int)import_settings_data->get("antialiasing") == TextServer::FONT_ANTIALIASING_LCD) {
+		warn += "\n" + TTR("Note: LCD sub-pixel anti-aliasing is selected, each of the glyphs will be pre-rendered for all supported sub-pixel layouts (5x).");
+	}
+	if ((TextServer::SubpixelPositioning)(int)import_settings_data->get("subpixel_positioning") != TextServer::SUBPIXEL_POSITIONING_DISABLED) {
+		warn += "\n" + TTR("Note: Sub-pixel positioning is selected, each of the glyphs might be pre-rendered for multiple sub-pixel offsets (up to 4x).");
 	}
 	if (warn.is_empty()) {
 		label_warn->set_text("");
@@ -881,7 +894,7 @@ void DynamicFontImportSettings::_re_import() {
 	HashMap<StringName, Variant> main_settings;
 
 	main_settings["face_index"] = import_settings_data->get("face_index");
-	main_settings["antialiased"] = import_settings_data->get("antialiased");
+	main_settings["antialiasing"] = import_settings_data->get("antialiasing");
 	main_settings["generate_mipmaps"] = import_settings_data->get("generate_mipmaps");
 	main_settings["multichannel_signed_distance_field"] = import_settings_data->get("multichannel_signed_distance_field");
 	main_settings["msdf_pixel_range"] = import_settings_data->get("msdf_pixel_range");
@@ -996,6 +1009,7 @@ void DynamicFontImportSettings::open_settings(const String &p_path) {
 
 	vars_list_root = vars_list->create_item();
 
+	import_settings_data->settings.clear();
 	import_settings_data->defaults.clear();
 	for (List<ResourceImporter::ImportOption>::Element *E = options_general.front(); E; E = E->next()) {
 		import_settings_data->defaults[E->get().option.name] = E->get().default_value;
@@ -1079,7 +1093,7 @@ void DynamicFontImportSettings::open_settings(const String &p_path) {
 	import_settings_data->notify_property_list_changed();
 
 	if (font_preview.is_valid()) {
-		font_preview->set_antialiased(import_settings_data->get("antialiased"));
+		font_preview->set_antialiasing((TextServer::FontAntialiasing)import_settings_data->get("antialiasing").operator int());
 		font_preview->set_multichannel_signed_distance_field(import_settings_data->get("multichannel_signed_distance_field"));
 		font_preview->set_msdf_pixel_range(import_settings_data->get("msdf_pixel_range"));
 		font_preview->set_msdf_size(import_settings_data->get("msdf_size"));
@@ -1090,7 +1104,7 @@ void DynamicFontImportSettings::open_settings(const String &p_path) {
 	}
 	font_preview_label->add_theme_font_override("font", font_preview);
 	font_preview_label->add_theme_font_size_override("font_size", 200 * EDSCALE);
-	font_preview_label->update();
+	font_preview_label->queue_redraw();
 
 	_variations_validate();
 
@@ -1108,7 +1122,7 @@ DynamicFontImportSettings::DynamicFontImportSettings() {
 
 	options_general.push_back(ResourceImporter::ImportOption(PropertyInfo(Variant::NIL, "Rendering", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_GROUP), Variant()));
 
-	options_general.push_back(ResourceImporter::ImportOption(PropertyInfo(Variant::BOOL, "antialiased"), true));
+	options_general.push_back(ResourceImporter::ImportOption(PropertyInfo(Variant::INT, "antialiasing", PROPERTY_HINT_ENUM, "None,Grayscale,LCD sub-pixel"), 1));
 	options_general.push_back(ResourceImporter::ImportOption(PropertyInfo(Variant::BOOL, "generate_mipmaps"), false));
 	options_general.push_back(ResourceImporter::ImportOption(PropertyInfo(Variant::BOOL, "multichannel_signed_distance_field", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_UPDATE_ALL_IF_MODIFIED), true));
 	options_general.push_back(ResourceImporter::ImportOption(PropertyInfo(Variant::INT, "msdf_pixel_range", PROPERTY_HINT_RANGE, "1,100,1"), 8));
@@ -1233,7 +1247,7 @@ DynamicFontImportSettings::DynamicFontImportSettings() {
 
 	add_var = memnew(Button);
 	page2_hb_vars->add_child(add_var);
-	add_var->set_tooltip(TTR("Add configuration"));
+	add_var->set_tooltip_text(TTR("Add configuration"));
 	add_var->set_icon(add_var->get_theme_icon(SNAME("Add"), SNAME("EditorIcons")));
 	add_var->connect("pressed", callable_mp(this, &DynamicFontImportSettings::_variation_add));
 
@@ -1337,8 +1351,8 @@ DynamicFontImportSettings::DynamicFontImportSettings() {
 	for (int i = 0; i < 16; i++) {
 		glyph_table->set_column_title(i + 1, String::num_int64(i, 16));
 	}
-	glyph_table->add_theme_style_override("selected", glyph_table->get_theme_stylebox(SNAME("bg")));
-	glyph_table->add_theme_style_override("selected_focus", glyph_table->get_theme_stylebox(SNAME("bg")));
+	glyph_table->add_theme_style_override("selected", glyph_table->get_theme_stylebox(SNAME("panel")));
+	glyph_table->add_theme_style_override("selected_focus", glyph_table->get_theme_stylebox(SNAME("panel")));
 	glyph_table->add_theme_constant_override("h_separation", 0);
 	glyph_table->set_h_size_flags(Control::SIZE_EXPAND_FILL);
 	glyph_table->set_v_size_flags(Control::SIZE_EXPAND_FILL);

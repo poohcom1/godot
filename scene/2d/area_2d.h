@@ -135,7 +135,7 @@ private:
 protected:
 	void _notification(int p_what);
 	static void _bind_methods();
-	void _validate_property(PropertyInfo &property) const override;
+	void _validate_property(PropertyInfo &p_property) const;
 
 public:
 	void set_gravity_space_override_mode(SpaceOverride p_mode);
@@ -179,6 +179,9 @@ public:
 
 	TypedArray<Node2D> get_overlapping_bodies() const; //function for script
 	TypedArray<Area2D> get_overlapping_areas() const; //function for script
+
+	bool has_overlapping_bodies() const;
+	bool has_overlapping_areas() const;
 
 	bool overlaps_area(Node *p_area) const;
 	bool overlaps_body(Node *p_body) const;

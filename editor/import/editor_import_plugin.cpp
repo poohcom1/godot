@@ -115,7 +115,7 @@ void EditorImportPlugin::get_import_options(const String &p_path, List<ResourceI
 	Array needed;
 	needed.push_back("name");
 	needed.push_back("default_value");
-	Array options;
+	TypedArray<Dictionary> options;
 	if (GDVIRTUAL_CALL(_get_import_options, p_path, p_preset, options)) {
 		for (int i = 0; i < options.size(); i++) {
 			Dictionary d = options[i];
@@ -164,7 +164,7 @@ bool EditorImportPlugin::get_option_visibility(const String &p_path, const Strin
 
 Error EditorImportPlugin::import(const String &p_source_file, const String &p_save_path, const HashMap<StringName, Variant> &p_options, List<String> *r_platform_variants, List<String> *r_gen_files, Variant *r_metadata) {
 	Dictionary options;
-	Array platform_variants, gen_files;
+	TypedArray<String> platform_variants, gen_files;
 
 	HashMap<StringName, Variant>::ConstIterator E = p_options.begin();
 	while (E) {

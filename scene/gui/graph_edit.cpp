@@ -176,7 +176,7 @@ void GraphEditMinimap::gui_input(const Ref<InputEvent> &p_ev) {
 			new_minimap_size.y = MIN(get_size().y - mm->get_relative().y, ge->get_size().y - 2.0 * minimap_padding.y);
 			ge->set_minimap_size(new_minimap_size);
 
-			update();
+			queue_redraw();
 		} else {
 			Vector2 click_position = _convert_to_graph_position(mm->get_position() - minimap_padding) - graph_padding;
 			_adjust_graph_scroll(click_position);
@@ -190,6 +190,14 @@ void GraphEditMinimap::_adjust_graph_scroll(const Vector2 &p_offset) {
 	ge->set_scroll_ofs(p_offset + graph_offset - camera_size / 2);
 }
 
+PackedStringArray GraphEdit::get_configuration_warnings() const {
+	PackedStringArray warnings = Control::get_configuration_warnings();
+
+	warnings.push_back(RTR("Please be aware that GraphEdit and GraphNode will undergo extensive refactoring in a future beta version involving compatibility-breaking API changes."));
+
+	return warnings;
+}
+
 Error GraphEdit::connect_node(const StringName &p_from, int p_from_port, const StringName &p_to, int p_to_port) {
 	if (is_node_connected(p_from, p_from_port, p_to, p_to_port)) {
 		return OK;
@@ -201,10 +209,10 @@ Error GraphEdit::connect_node(const StringName &p_from, int p_from_port, const S
 	c.to_port = p_to_port;
 	c.activity = 0;
 	connections.push_back(c);
-	top_layer->update();
-	minimap->update();
-	update();
-	connections_layer->update();
+	top_layer->queue_redraw();
+	minimap->queue_redraw();
+	queue_redraw();
+	connections_layer->queue_redraw();
 
 	return OK;
 }
@@ -223,10 +231,10 @@ void GraphEdit::disconnect_node(const StringName &p_from, int p_from_port, const
 	for (const List<Connection>::Element *E = connections.front(); E; E = E->next()) {
 		if (E->get().from == p_from && E->get().from_port == p_from_port && E->get().to == p_to && E->get().to_port == p_to_port) {
 			connections.erase(E);
-			top_layer->update();
-			minimap->update();
-			update();
-			connections_layer->update();
+			top_layer->queue_redraw();
+			minimap->queue_redraw();
+			queue_redraw();
+			connections_layer->queue_redraw();
 			return;
 		}
 	}
@@ -253,9 +261,9 @@ void GraphEdit::_scroll_moved(double) {
 		call_deferred(SNAME("_update_scroll_offset"));
 		awaiting_scroll_offset_update = true;
 	}
-	top_layer->update();
-	minimap->update();
-	update();
+	top_layer->queue_redraw();
+	minimap->queue_redraw();
+	queue_redraw();
 
 	if (!setting_scroll_ofs) { //in godot, signals on change value are avoided as a convention
 		emit_signal(SNAME("scroll_offset_changed"), get_scroll_ofs());
@@ -351,27 +359,40 @@ void GraphEdit::_graph_node_raised(Node *p_gn) {
 	if (gn->is_comment()) {
 		move_child(gn, 0);
 	} else {
-		gn->raise();
+		gn->move_to_front();
 	}
-	emit_signal(SNAME("node_selected"), p_gn);
+}
+
+void GraphEdit::_graph_node_selected(Node *p_gn) {
+	GraphNode *gn = Object::cast_to<GraphNode>(p_gn);
+	ERR_FAIL_COND(!gn);
+
+	emit_signal(SNAME("node_selected"), gn);
+}
+
+void GraphEdit::_graph_node_deselected(Node *p_gn) {
+	GraphNode *gn = Object::cast_to<GraphNode>(p_gn);
+	ERR_FAIL_COND(!gn);
+
+	emit_signal(SNAME("node_deselected"), gn);
 }
 
 void GraphEdit::_graph_node_moved(Node *p_gn) {
 	GraphNode *gn = Object::cast_to<GraphNode>(p_gn);
 	ERR_FAIL_COND(!gn);
-	top_layer->update();
-	minimap->update();
-	update();
-	connections_layer->update();
+	top_layer->queue_redraw();
+	minimap->queue_redraw();
+	queue_redraw();
+	connections_layer->queue_redraw();
 }
 
 void GraphEdit::_graph_node_slot_updated(int p_index, Node *p_gn) {
 	GraphNode *gn = Object::cast_to<GraphNode>(p_gn);
 	ERR_FAIL_COND(!gn);
-	top_layer->update();
-	minimap->update();
-	update();
-	connections_layer->update();
+	top_layer->queue_redraw();
+	minimap->queue_redraw();
+	queue_redraw();
+	connections_layer->queue_redraw();
 }
 
 void GraphEdit::add_child_notify(Node *p_child) {
@@ -383,10 +404,12 @@ void GraphEdit::add_child_notify(Node *p_child) {
 	if (gn) {
 		gn->set_scale(Vector2(zoom, zoom));
 		gn->connect("position_offset_changed", callable_mp(this, &GraphEdit::_graph_node_moved).bind(gn));
+		gn->connect("selected", callable_mp(this, &GraphEdit::_graph_node_selected).bind(gn));
+		gn->connect("deselected", callable_mp(this, &GraphEdit::_graph_node_deselected).bind(gn));
 		gn->connect("slot_updated", callable_mp(this, &GraphEdit::_graph_node_slot_updated).bind(gn));
 		gn->connect("raise_request", callable_mp(this, &GraphEdit::_graph_node_raised).bind(gn));
-		gn->connect("item_rect_changed", callable_mp((CanvasItem *)connections_layer, &CanvasItem::update));
-		gn->connect("item_rect_changed", callable_mp((CanvasItem *)minimap, &GraphEditMinimap::update));
+		gn->connect("item_rect_changed", callable_mp((CanvasItem *)connections_layer, &CanvasItem::queue_redraw));
+		gn->connect("item_rect_changed", callable_mp((CanvasItem *)minimap, &GraphEditMinimap::queue_redraw));
 		_graph_node_moved(gn);
 		gn->set_mouse_filter(MOUSE_FILTER_PASS);
 	}
@@ -409,15 +432,17 @@ void GraphEdit::remove_child_notify(Node *p_child) {
 	GraphNode *gn = Object::cast_to<GraphNode>(p_child);
 	if (gn) {
 		gn->disconnect("position_offset_changed", callable_mp(this, &GraphEdit::_graph_node_moved));
+		gn->disconnect("selected", callable_mp(this, &GraphEdit::_graph_node_selected));
+		gn->disconnect("deselected", callable_mp(this, &GraphEdit::_graph_node_deselected));
 		gn->disconnect("slot_updated", callable_mp(this, &GraphEdit::_graph_node_slot_updated));
 		gn->disconnect("raise_request", callable_mp(this, &GraphEdit::_graph_node_raised));
 
 		// In case of the whole GraphEdit being destroyed these references can already be freed.
 		if (connections_layer != nullptr && connections_layer->is_inside_tree()) {
-			gn->disconnect("item_rect_changed", callable_mp((CanvasItem *)connections_layer, &CanvasItem::update));
+			gn->disconnect("item_rect_changed", callable_mp((CanvasItem *)connections_layer, &CanvasItem::queue_redraw));
 		}
 		if (minimap != nullptr && minimap->is_inside_tree()) {
-			gn->disconnect("item_rect_changed", callable_mp((CanvasItem *)minimap, &GraphEditMinimap::update));
+			gn->disconnect("item_rect_changed", callable_mp((CanvasItem *)minimap, &GraphEditMinimap::queue_redraw));
 		}
 	}
 }
@@ -500,8 +525,8 @@ void GraphEdit::_notification(int p_what) {
 
 		case NOTIFICATION_RESIZED: {
 			_update_scroll();
-			top_layer->update();
-			minimap->update();
+			top_layer->queue_redraw();
+			minimap->queue_redraw();
 		} break;
 	}
 }
@@ -607,13 +632,16 @@ void GraphEdit::_top_layer_input(const Ref<InputEvent> &p_ev) {
 									connecting_color = Object::cast_to<GraphNode>(to)->get_connection_input_color(E.to_port);
 									connecting_target = false;
 									connecting_to = pos;
-									just_disconnected = true;
 
-									emit_signal(SNAME("disconnection_request"), E.from, E.from_port, E.to, E.to_port);
-									to = get_node(String(connecting_from)); //maybe it was erased
-									if (Object::cast_to<GraphNode>(to)) {
-										connecting = true;
-										emit_signal(SNAME("connection_drag_started"), connecting_from, connecting_index, false);
+									if (connecting_type >= 0) {
+										just_disconnected = true;
+
+										emit_signal(SNAME("disconnection_request"), E.from, E.from_port, E.to, E.to_port);
+										to = get_node(String(connecting_from)); //maybe it was erased
+										if (Object::cast_to<GraphNode>(to)) {
+											connecting = true;
+											emit_signal(SNAME("connection_drag_started"), connecting_from, connecting_index, false);
+										}
 									}
 									return;
 								}
@@ -621,7 +649,6 @@ void GraphEdit::_top_layer_input(const Ref<InputEvent> &p_ev) {
 						}
 					}
 
-					connecting = true;
 					connecting_from = gn->get_name();
 					connecting_index = j;
 					connecting_out = true;
@@ -629,8 +656,11 @@ void GraphEdit::_top_layer_input(const Ref<InputEvent> &p_ev) {
 					connecting_color = gn->get_connection_output_color(j);
 					connecting_target = false;
 					connecting_to = pos;
-					just_disconnected = false;
-					emit_signal(SNAME("connection_drag_started"), connecting_from, connecting_index, true);
+					if (connecting_type >= 0) {
+						connecting = true;
+						just_disconnected = false;
+						emit_signal(SNAME("connection_drag_started"), connecting_from, connecting_index, true);
+					}
 					return;
 				}
 			}
@@ -657,11 +687,13 @@ void GraphEdit::_top_layer_input(const Ref<InputEvent> &p_ev) {
 									connecting_to = pos;
 									just_disconnected = true;
 
-									emit_signal(SNAME("disconnection_request"), E.from, E.from_port, E.to, E.to_port);
-									fr = get_node(String(connecting_from)); //maybe it was erased
-									if (Object::cast_to<GraphNode>(fr)) {
-										connecting = true;
-										emit_signal(SNAME("connection_drag_started"), connecting_from, connecting_index, true);
+									if (connecting_type >= 0) {
+										emit_signal(SNAME("disconnection_request"), E.from, E.from_port, E.to, E.to_port);
+										fr = get_node(String(connecting_from)); //maybe it was erased
+										if (Object::cast_to<GraphNode>(fr)) {
+											connecting = true;
+											emit_signal(SNAME("connection_drag_started"), connecting_from, connecting_index, true);
+										}
 									}
 									return;
 								}
@@ -669,7 +701,6 @@ void GraphEdit::_top_layer_input(const Ref<InputEvent> &p_ev) {
 						}
 					}
 
-					connecting = true;
 					connecting_from = gn->get_name();
 					connecting_index = j;
 					connecting_out = false;
@@ -677,8 +708,11 @@ void GraphEdit::_top_layer_input(const Ref<InputEvent> &p_ev) {
 					connecting_color = gn->get_connection_input_color(j);
 					connecting_target = false;
 					connecting_to = pos;
-					just_disconnected = false;
-					emit_signal(SNAME("connection_drag_started"), connecting_from, connecting_index, false);
+					if (connecting_type >= 0) {
+						connecting = true;
+						just_disconnected = false;
+						emit_signal(SNAME("connection_drag_started"), connecting_from, connecting_index, false);
+					}
 					return;
 				}
 			}
@@ -689,8 +723,8 @@ void GraphEdit::_top_layer_input(const Ref<InputEvent> &p_ev) {
 	if (mm.is_valid() && connecting) {
 		connecting_to = mm->get_position();
 		connecting_target = false;
-		top_layer->update();
-		minimap->update();
+		top_layer->queue_redraw();
+		minimap->queue_redraw();
 		connecting_valid = just_disconnected || click_pos.distance_to(connecting_to / zoom) > 20.0;
 
 		if (connecting_valid) {
@@ -747,25 +781,25 @@ void GraphEdit::_top_layer_input(const Ref<InputEvent> &p_ev) {
 		if (connecting_valid) {
 			if (connecting && connecting_target) {
 				String from = connecting_from;
-				int from_slot = connecting_index;
+				int from_port = connecting_index;
 				String to = connecting_target_to;
-				int to_slot = connecting_target_index;
+				int to_port = connecting_target_index;
 
 				if (!connecting_out) {
 					SWAP(from, to);
-					SWAP(from_slot, to_slot);
+					SWAP(from_port, to_port);
 				}
-				emit_signal(SNAME("connection_request"), from, from_slot, to, to_slot);
+				emit_signal(SNAME("connection_request"), from, from_port, to, to_port);
 
 			} else if (!just_disconnected) {
 				String from = connecting_from;
-				int from_slot = connecting_index;
+				int from_port = connecting_index;
 				Vector2 ofs = mb->get_position();
 
 				if (!connecting_out) {
-					emit_signal(SNAME("connection_from_empty"), from, from_slot, ofs);
+					emit_signal(SNAME("connection_from_empty"), from, from_port, ofs);
 				} else {
-					emit_signal(SNAME("connection_to_empty"), from, from_slot, ofs);
+					emit_signal(SNAME("connection_to_empty"), from, from_port, ofs);
 				}
 			}
 		}
@@ -804,22 +838,22 @@ bool GraphEdit::_check_clickable_control(Control *p_control, const Vector2 &mpos
 	}
 }
 
-bool GraphEdit::is_in_input_hotzone(GraphNode *p_graph_node, int p_slot_index, const Vector2 &p_mouse_pos, const Vector2i &p_port_size) {
+bool GraphEdit::is_in_input_hotzone(GraphNode *p_node, int p_port, const Vector2 &p_mouse_pos, const Vector2i &p_port_size) {
 	bool success;
-	if (GDVIRTUAL_CALL(_is_in_input_hotzone, p_graph_node, p_slot_index, p_mouse_pos, success)) {
+	if (GDVIRTUAL_CALL(_is_in_input_hotzone, p_node, p_port, p_mouse_pos, success)) {
 		return success;
 	} else {
-		Vector2 pos = p_graph_node->get_connection_input_position(p_slot_index) + p_graph_node->get_position();
+		Vector2 pos = p_node->get_connection_input_position(p_port) + p_node->get_position();
 		return is_in_port_hotzone(pos / zoom, p_mouse_pos, p_port_size, true);
 	}
 }
 
-bool GraphEdit::is_in_output_hotzone(GraphNode *p_graph_node, int p_slot_index, const Vector2 &p_mouse_pos, const Vector2i &p_port_size) {
+bool GraphEdit::is_in_output_hotzone(GraphNode *p_node, int p_port, const Vector2 &p_mouse_pos, const Vector2i &p_port_size) {
 	bool success;
-	if (GDVIRTUAL_CALL(_is_in_output_hotzone, p_graph_node, p_slot_index, p_mouse_pos, success)) {
+	if (GDVIRTUAL_CALL(_is_in_output_hotzone, p_node, p_port, p_mouse_pos, success)) {
 		return success;
 	} else {
-		Vector2 pos = p_graph_node->get_connection_output_position(p_slot_index) + p_graph_node->get_position();
+		Vector2 pos = p_node->get_connection_output_position(p_port) + p_node->get_position();
 		return is_in_port_hotzone(pos / zoom, p_mouse_pos, p_port_size, false);
 	}
 }
@@ -1074,11 +1108,11 @@ void GraphEdit::_minimap_draw() {
 			continue;
 		}
 
-		Vector2 from_slot_position = gfrom->get_position_offset() * zoom + gfrom->get_connection_output_position(E.from_port);
-		Vector2 from_position = minimap->_convert_from_graph_position(from_slot_position - graph_offset) + minimap_offset;
+		Vector2 from_port_position = gfrom->get_position_offset() * zoom + gfrom->get_connection_output_position(E.from_port);
+		Vector2 from_position = minimap->_convert_from_graph_position(from_port_position - graph_offset) + minimap_offset;
 		Color from_color = gfrom->get_connection_output_color(E.from_port);
-		Vector2 to_slot_position = gto->get_position_offset() * zoom + gto->get_connection_input_position(E.to_port);
-		Vector2 to_position = minimap->_convert_from_graph_position(to_slot_position - graph_offset) + minimap_offset;
+		Vector2 to_port_position = gto->get_position_offset() * zoom + gto->get_connection_input_position(E.to_port);
+		Vector2 to_position = minimap->_convert_from_graph_position(to_port_position - graph_offset) + minimap_offset;
 		Color to_color = gto->get_connection_input_color(E.to_port);
 
 		if (E.activity > 0) {
@@ -1127,7 +1161,7 @@ void GraphEdit::gui_input(const Ref<InputEvent> &p_ev) {
 		drag_accum += mm->get_relative();
 		for (int i = get_child_count() - 1; i >= 0; i--) {
 			GraphNode *gn = Object::cast_to<GraphNode>(get_child(i));
-			if (gn && gn->is_selected()) {
+			if (gn && gn->is_selected() && gn->is_draggable()) {
 				Vector2 pos = (gn->get_drag_from() * zoom + drag_accum) / zoom;
 
 				// Snapping can be toggled temporarily by holding down Ctrl.
@@ -1161,25 +1195,14 @@ void GraphEdit::gui_input(const Ref<InputEvent> &p_ev) {
 			bool in_box = r.intersects(box_selecting_rect);
 
 			if (in_box) {
-				if (!gn->is_selected() && box_selection_mode_additive) {
-					emit_signal(SNAME("node_selected"), gn);
-				} else if (gn->is_selected() && !box_selection_mode_additive) {
-					emit_signal(SNAME("node_deselected"), gn);
-				}
 				gn->set_selected(box_selection_mode_additive);
 			} else {
-				bool select = (previous_selected.find(gn) != nullptr);
-				if (gn->is_selected() && !select) {
-					emit_signal(SNAME("node_deselected"), gn);
-				} else if (!gn->is_selected() && select) {
-					emit_signal(SNAME("node_selected"), gn);
-				}
-				gn->set_selected(select);
+				gn->set_selected(previous_selected.find(gn) != nullptr);
 			}
 		}
 
-		top_layer->update();
-		minimap->update();
+		top_layer->queue_redraw();
+		minimap->queue_redraw();
 	}
 
 	Ref<InputEventMouseButton> b = p_ev;
@@ -1193,16 +1216,10 @@ void GraphEdit::gui_input(const Ref<InputEvent> &p_ev) {
 						continue;
 					}
 
-					bool select = (previous_selected.find(gn) != nullptr);
-					if (gn->is_selected() && !select) {
-						emit_signal(SNAME("node_deselected"), gn);
-					} else if (!gn->is_selected() && select) {
-						emit_signal(SNAME("node_selected"), gn);
-					}
-					gn->set_selected(select);
+					gn->set_selected(previous_selected.find(gn) != nullptr);
 				}
-				top_layer->update();
-				minimap->update();
+				top_layer->queue_redraw();
+				minimap->queue_redraw();
 			} else {
 				if (connecting) {
 					force_connection_drag_end();
@@ -1222,7 +1239,6 @@ void GraphEdit::gui_input(const Ref<InputEvent> &p_ev) {
 						Rect2 r = gn->get_rect();
 						r.size *= zoom;
 						if (r.has_point(b->get_position())) {
-							emit_signal(SNAME("node_deselected"), gn);
 							gn->set_selected(false);
 						}
 					}
@@ -1248,27 +1264,30 @@ void GraphEdit::gui_input(const Ref<InputEvent> &p_ev) {
 
 			dragging = false;
 
-			top_layer->update();
-			minimap->update();
-			update();
-			connections_layer->update();
+			top_layer->queue_redraw();
+			minimap->queue_redraw();
+			queue_redraw();
+			connections_layer->queue_redraw();
 		}
 
 		if (b->get_button_index() == MouseButton::LEFT && b->is_pressed()) {
 			GraphNode *gn = nullptr;
 
+			// Find node which was clicked on.
 			for (int i = get_child_count() - 1; i >= 0; i--) {
 				GraphNode *gn_selected = Object::cast_to<GraphNode>(get_child(i));
 
-				if (gn_selected) {
-					if (gn_selected->is_resizing()) {
-						continue;
-					}
+				if (!gn_selected) {
+					continue;
+				}
 
-					if (gn_selected->has_point((b->get_position() - gn_selected->get_position()) / zoom)) {
-						gn = gn_selected;
-						break;
-					}
+				if (gn_selected->is_resizing()) {
+					continue;
+				}
+
+				if (gn_selected->has_point((b->get_position() - gn_selected->get_position()) / zoom)) {
+					gn = gn_selected;
+					break;
 				}
 			}
 
@@ -1277,22 +1296,18 @@ void GraphEdit::gui_input(const Ref<InputEvent> &p_ev) {
 					return;
 				}
 
+				// Left-clicked on a node, select it.
 				dragging = true;
 				drag_accum = Vector2();
 				just_selected = !gn->is_selected();
 				if (!gn->is_selected() && !Input::get_singleton()->is_key_pressed(Key::CTRL)) {
 					for (int i = 0; i < get_child_count(); i++) {
 						GraphNode *o_gn = Object::cast_to<GraphNode>(get_child(i));
-						if (o_gn) {
-							if (o_gn == gn) {
-								o_gn->set_selected(true);
-							} else {
-								if (o_gn->is_selected()) {
-									emit_signal(SNAME("node_deselected"), o_gn);
-								}
-								o_gn->set_selected(false);
-							}
+						if (!o_gn) {
+							continue;
 						}
+
+						o_gn->set_selected(o_gn == gn);
 					}
 				}
 
@@ -1319,6 +1334,7 @@ void GraphEdit::gui_input(const Ref<InputEvent> &p_ev) {
 					return;
 				}
 
+				// Left-clicked on empty space, start box select.
 				box_selecting = true;
 				box_selecting_from = b->get_position();
 				if (b->is_ctrl_pressed()) {
@@ -1351,9 +1367,7 @@ void GraphEdit::gui_input(const Ref<InputEvent> &p_ev) {
 						if (!gn2) {
 							continue;
 						}
-						if (gn2->is_selected()) {
-							emit_signal(SNAME("node_deselected"), gn2);
-						}
+
 						gn2->set_selected(false);
 					}
 				}
@@ -1361,11 +1375,12 @@ void GraphEdit::gui_input(const Ref<InputEvent> &p_ev) {
 		}
 
 		if (b->get_button_index() == MouseButton::LEFT && !b->is_pressed() && box_selecting) {
+			// Box selection ended. Nodes were selected during mouse movement.
 			box_selecting = false;
 			box_selecting_rect = Rect2();
 			previous_selected.clear();
-			top_layer->update();
-			minimap->update();
+			top_layer->queue_redraw();
+			minimap->queue_redraw();
 		}
 	}
 
@@ -1431,9 +1446,9 @@ void GraphEdit::set_connection_activity(const StringName &p_from, int p_from_por
 		if (E.from == p_from && E.from_port == p_from_port && E.to == p_to && E.to_port == p_to_port) {
 			if (Math::is_equal_approx(E.activity, p_activity)) {
 				//update only if changed
-				top_layer->update();
-				minimap->update();
-				connections_layer->update();
+				top_layer->queue_redraw();
+				minimap->queue_redraw();
+				connections_layer->queue_redraw();
 			}
 			E.activity = p_activity;
 			return;
@@ -1443,19 +1458,19 @@ void GraphEdit::set_connection_activity(const StringName &p_from, int p_from_por
 
 void GraphEdit::clear_connections() {
 	connections.clear();
-	minimap->update();
-	update();
-	connections_layer->update();
+	minimap->queue_redraw();
+	queue_redraw();
+	connections_layer->queue_redraw();
 }
 
 void GraphEdit::force_connection_drag_end() {
 	ERR_FAIL_COND_MSG(!connecting, "Drag end requested without active drag!");
 	connecting = false;
 	connecting_valid = false;
-	top_layer->update();
-	minimap->update();
-	update();
-	connections_layer->update();
+	top_layer->queue_redraw();
+	minimap->queue_redraw();
+	queue_redraw();
+	connections_layer->queue_redraw();
 	emit_signal(SNAME("connection_drag_ended"));
 }
 
@@ -1489,14 +1504,14 @@ void GraphEdit::set_zoom_custom(float p_zoom, const Vector2 &p_center) {
 	Vector2 sbofs = (Vector2(h_scroll->get_value(), v_scroll->get_value()) + p_center) / zoom;
 
 	zoom = p_zoom;
-	top_layer->update();
+	top_layer->queue_redraw();
 
 	zoom_minus->set_disabled(zoom == zoom_min);
 	zoom_plus->set_disabled(zoom == zoom_max);
 
 	_update_scroll();
-	minimap->update();
-	connections_layer->update();
+	minimap->queue_redraw();
+	connections_layer->queue_redraw();
 
 	if (is_visible_in_tree()) {
 		Vector2 ofs = sbofs * zoom - p_center;
@@ -1505,7 +1520,7 @@ void GraphEdit::set_zoom_custom(float p_zoom, const Vector2 &p_center) {
 	}
 
 	_update_zoom_label();
-	update();
+	queue_redraw();
 }
 
 float GraphEdit::get_zoom() const {
@@ -1591,10 +1606,10 @@ void GraphEdit::remove_valid_left_disconnect_type(int p_type) {
 	valid_left_disconnect_types.erase(p_type);
 }
 
-Array GraphEdit::_get_connection_list() const {
+TypedArray<Dictionary> GraphEdit::_get_connection_list() const {
 	List<Connection> conns;
 	get_connection_list(&conns);
-	Array arr;
+	TypedArray<Dictionary> arr;
 	for (const Connection &E : conns) {
 		Dictionary d;
 		d["from"] = E.from;
@@ -1640,8 +1655,11 @@ bool GraphEdit::is_valid_connection_type(int p_type, int p_with_type) const {
 }
 
 void GraphEdit::set_use_snap(bool p_enable) {
+	if (snap_button->is_pressed() == p_enable) {
+		return;
+	}
 	snap_button->set_pressed(p_enable);
-	update();
+	queue_redraw();
 }
 
 bool GraphEdit::is_using_snap() const {
@@ -1655,15 +1673,15 @@ int GraphEdit::get_snap() const {
 void GraphEdit::set_snap(int p_snap) {
 	ERR_FAIL_COND(p_snap < 5);
 	snap_amount->set_value(p_snap);
-	update();
+	queue_redraw();
 }
 
 void GraphEdit::_snap_toggled() {
-	update();
+	queue_redraw();
 }
 
 void GraphEdit::_snap_value_changed(double) {
-	update();
+	queue_redraw();
 }
 
 void GraphEdit::set_minimap_size(Vector2 p_size) {
@@ -1675,7 +1693,7 @@ void GraphEdit::set_minimap_size(Vector2 p_size) {
 	minimap->set_offset(Side::SIDE_TOP, -minimap_size.y - MINIMAP_OFFSET);
 	minimap->set_offset(Side::SIDE_RIGHT, -MINIMAP_OFFSET);
 	minimap->set_offset(Side::SIDE_BOTTOM, -MINIMAP_OFFSET);
-	minimap->update();
+	minimap->queue_redraw();
 }
 
 Vector2 GraphEdit::get_minimap_size() const {
@@ -1683,8 +1701,11 @@ Vector2 GraphEdit::get_minimap_size() const {
 }
 
 void GraphEdit::set_minimap_opacity(float p_opacity) {
+	if (minimap->get_modulate().a == p_opacity) {
+		return;
+	}
 	minimap->set_modulate(Color(1, 1, 1, p_opacity));
-	minimap->update();
+	minimap->queue_redraw();
 }
 
 float GraphEdit::get_minimap_opacity() const {
@@ -1693,19 +1714,35 @@ float GraphEdit::get_minimap_opacity() const {
 }
 
 void GraphEdit::set_minimap_enabled(bool p_enable) {
+	if (minimap_button->is_pressed() == p_enable) {
+		return;
+	}
 	minimap_button->set_pressed(p_enable);
 	_minimap_toggled();
-	minimap->update();
+	minimap->queue_redraw();
 }
 
 bool GraphEdit::is_minimap_enabled() const {
 	return minimap_button->is_pressed();
 }
 
+void GraphEdit::set_arrange_nodes_button_hidden(bool p_enable) {
+	arrange_nodes_button_hidden = p_enable;
+	if (arrange_nodes_button_hidden) {
+		layout_button->hide();
+	} else {
+		layout_button->show();
+	}
+}
+
+bool GraphEdit::is_arrange_nodes_button_hidden() const {
+	return arrange_nodes_button_hidden;
+}
+
 void GraphEdit::_minimap_toggled() {
 	if (is_minimap_enabled()) {
 		minimap->set_visible(true);
-		minimap->update();
+		minimap->queue_redraw();
 	} else {
 		minimap->set_visible(false);
 	}
@@ -1713,7 +1750,7 @@ void GraphEdit::_minimap_toggled() {
 
 void GraphEdit::set_connection_lines_curvature(float p_curvature) {
 	lines_curvature = p_curvature;
-	update();
+	queue_redraw();
 }
 
 float GraphEdit::get_connection_lines_curvature() const {
@@ -1721,8 +1758,11 @@ float GraphEdit::get_connection_lines_curvature() const {
 }
 
 void GraphEdit::set_connection_lines_thickness(float p_thickness) {
+	if (lines_thickness == p_thickness) {
+		return;
+	}
 	lines_thickness = p_thickness;
-	update();
+	queue_redraw();
 }
 
 float GraphEdit::get_connection_lines_thickness() const {
@@ -1730,8 +1770,11 @@ float GraphEdit::get_connection_lines_thickness() const {
 }
 
 void GraphEdit::set_connection_lines_antialiased(bool p_antialiased) {
+	if (lines_antialiased == p_antialiased) {
+		return;
+	}
 	lines_antialiased = p_antialiased;
-	update();
+	queue_redraw();
 }
 
 bool GraphEdit::is_connection_lines_antialiased() const {
@@ -2268,10 +2311,10 @@ void GraphEdit::arrange_nodes() {
 }
 
 void GraphEdit::_bind_methods() {
-	ClassDB::bind_method(D_METHOD("connect_node", "from", "from_port", "to", "to_port"), &GraphEdit::connect_node);
-	ClassDB::bind_method(D_METHOD("is_node_connected", "from", "from_port", "to", "to_port"), &GraphEdit::is_node_connected);
-	ClassDB::bind_method(D_METHOD("disconnect_node", "from", "from_port", "to", "to_port"), &GraphEdit::disconnect_node);
-	ClassDB::bind_method(D_METHOD("set_connection_activity", "from", "from_port", "to", "to_port", "amount"), &GraphEdit::set_connection_activity);
+	ClassDB::bind_method(D_METHOD("connect_node", "from_node", "from_port", "to_node", "to_port"), &GraphEdit::connect_node);
+	ClassDB::bind_method(D_METHOD("is_node_connected", "from_node", "from_port", "to_node", "to_port"), &GraphEdit::is_node_connected);
+	ClassDB::bind_method(D_METHOD("disconnect_node", "from_node", "from_port", "to_node", "to_port"), &GraphEdit::disconnect_node);
+	ClassDB::bind_method(D_METHOD("set_connection_activity", "from_node", "from_port", "to_node", "to_port", "amount"), &GraphEdit::set_connection_activity);
 	ClassDB::bind_method(D_METHOD("get_connection_list"), &GraphEdit::_get_connection_list);
 	ClassDB::bind_method(D_METHOD("clear_connections"), &GraphEdit::clear_connections);
 	ClassDB::bind_method(D_METHOD("force_connection_drag_end"), &GraphEdit::force_connection_drag_end);
@@ -2285,7 +2328,7 @@ void GraphEdit::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("add_valid_connection_type", "from_type", "to_type"), &GraphEdit::add_valid_connection_type);
 	ClassDB::bind_method(D_METHOD("remove_valid_connection_type", "from_type", "to_type"), &GraphEdit::remove_valid_connection_type);
 	ClassDB::bind_method(D_METHOD("is_valid_connection_type", "from_type", "to_type"), &GraphEdit::is_valid_connection_type);
-	ClassDB::bind_method(D_METHOD("get_connection_line", "from", "to"), &GraphEdit::get_connection_line);
+	ClassDB::bind_method(D_METHOD("get_connection_line", "from_node", "to_node"), &GraphEdit::get_connection_line);
 
 	ClassDB::bind_method(D_METHOD("set_panning_scheme", "scheme"), &GraphEdit::set_panning_scheme);
 	ClassDB::bind_method(D_METHOD("get_panning_scheme"), &GraphEdit::get_panning_scheme);
@@ -2328,12 +2371,15 @@ void GraphEdit::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_minimap_enabled", "enable"), &GraphEdit::set_minimap_enabled);
 	ClassDB::bind_method(D_METHOD("is_minimap_enabled"), &GraphEdit::is_minimap_enabled);
 
+	ClassDB::bind_method(D_METHOD("set_arrange_nodes_button_hidden", "enable"), &GraphEdit::set_arrange_nodes_button_hidden);
+	ClassDB::bind_method(D_METHOD("is_arrange_nodes_button_hidden"), &GraphEdit::is_arrange_nodes_button_hidden);
+
 	ClassDB::bind_method(D_METHOD("set_right_disconnects", "enable"), &GraphEdit::set_right_disconnects);
 	ClassDB::bind_method(D_METHOD("is_right_disconnects_enabled"), &GraphEdit::is_right_disconnects_enabled);
 
 	ClassDB::bind_method(D_METHOD("_update_scroll_offset"), &GraphEdit::_update_scroll_offset);
-	GDVIRTUAL_BIND(_is_in_input_hotzone, "graph_node", "slot_index", "mouse_position");
-	GDVIRTUAL_BIND(_is_in_output_hotzone, "graph_node", "slot_index", "mouse_position");
+	GDVIRTUAL_BIND(_is_in_input_hotzone, "in_node", "in_port", "mouse_position");
+	GDVIRTUAL_BIND(_is_in_output_hotzone, "in_node", "in_port", "mouse_position");
 
 	ClassDB::bind_method(D_METHOD("get_zoom_hbox"), &GraphEdit::get_zoom_hbox);
 
@@ -2341,8 +2387,8 @@ void GraphEdit::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("set_selected", "node"), &GraphEdit::set_selected);
 
-	GDVIRTUAL_BIND(_get_connection_line, "from", "to")
-	GDVIRTUAL_BIND(_is_node_hover_valid, "from", "from_slot", "to", "to_slot");
+	GDVIRTUAL_BIND(_get_connection_line, "from_position", "to_position")
+	GDVIRTUAL_BIND(_is_node_hover_valid, "from_node", "from_port", "to_node", "to_port");
 
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "right_disconnects"), "set_right_disconnects", "is_right_disconnects_enabled");
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "scroll_offset", PROPERTY_HINT_NONE, "suffix:px"), "set_scroll_ofs", "get_scroll_ofs");
@@ -2367,21 +2413,24 @@ void GraphEdit::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "minimap_size", PROPERTY_HINT_NONE, "suffix:px"), "set_minimap_size", "get_minimap_size");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "minimap_opacity"), "set_minimap_opacity", "get_minimap_opacity");
 
-	ADD_SIGNAL(MethodInfo("connection_request", PropertyInfo(Variant::STRING_NAME, "from"), PropertyInfo(Variant::INT, "from_slot"), PropertyInfo(Variant::STRING_NAME, "to"), PropertyInfo(Variant::INT, "to_slot")));
-	ADD_SIGNAL(MethodInfo("disconnection_request", PropertyInfo(Variant::STRING_NAME, "from"), PropertyInfo(Variant::INT, "from_slot"), PropertyInfo(Variant::STRING_NAME, "to"), PropertyInfo(Variant::INT, "to_slot")));
+	ADD_GROUP("UI", "");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "arrange_nodes_button_hidden"), "set_arrange_nodes_button_hidden", "is_arrange_nodes_button_hidden");
+
+	ADD_SIGNAL(MethodInfo("connection_request", PropertyInfo(Variant::STRING_NAME, "from_node"), PropertyInfo(Variant::INT, "from_port"), PropertyInfo(Variant::STRING_NAME, "to_node"), PropertyInfo(Variant::INT, "to_port")));
+	ADD_SIGNAL(MethodInfo("disconnection_request", PropertyInfo(Variant::STRING_NAME, "from_node"), PropertyInfo(Variant::INT, "from_port"), PropertyInfo(Variant::STRING_NAME, "to_node"), PropertyInfo(Variant::INT, "to_port")));
 	ADD_SIGNAL(MethodInfo("popup_request", PropertyInfo(Variant::VECTOR2, "position")));
 	ADD_SIGNAL(MethodInfo("duplicate_nodes_request"));
 	ADD_SIGNAL(MethodInfo("copy_nodes_request"));
 	ADD_SIGNAL(MethodInfo("paste_nodes_request"));
 	ADD_SIGNAL(MethodInfo("node_selected", PropertyInfo(Variant::OBJECT, "node", PROPERTY_HINT_RESOURCE_TYPE, "Node")));
 	ADD_SIGNAL(MethodInfo("node_deselected", PropertyInfo(Variant::OBJECT, "node", PROPERTY_HINT_RESOURCE_TYPE, "Node")));
-	ADD_SIGNAL(MethodInfo("connection_to_empty", PropertyInfo(Variant::STRING_NAME, "from"), PropertyInfo(Variant::INT, "from_slot"), PropertyInfo(Variant::VECTOR2, "release_position")));
-	ADD_SIGNAL(MethodInfo("connection_from_empty", PropertyInfo(Variant::STRING_NAME, "to"), PropertyInfo(Variant::INT, "to_slot"), PropertyInfo(Variant::VECTOR2, "release_position")));
+	ADD_SIGNAL(MethodInfo("connection_to_empty", PropertyInfo(Variant::STRING_NAME, "from_node"), PropertyInfo(Variant::INT, "from_port"), PropertyInfo(Variant::VECTOR2, "release_position")));
+	ADD_SIGNAL(MethodInfo("connection_from_empty", PropertyInfo(Variant::STRING_NAME, "to_node"), PropertyInfo(Variant::INT, "to_port"), PropertyInfo(Variant::VECTOR2, "release_position")));
 	ADD_SIGNAL(MethodInfo("delete_nodes_request", PropertyInfo(Variant::ARRAY, "nodes", PROPERTY_HINT_ARRAY_TYPE, "StringName")));
 	ADD_SIGNAL(MethodInfo("begin_node_move"));
 	ADD_SIGNAL(MethodInfo("end_node_move"));
 	ADD_SIGNAL(MethodInfo("scroll_offset_changed", PropertyInfo(Variant::VECTOR2, "offset")));
-	ADD_SIGNAL(MethodInfo("connection_drag_started", PropertyInfo(Variant::STRING, "from"), PropertyInfo(Variant::STRING, "slot"), PropertyInfo(Variant::BOOL, "is_output")));
+	ADD_SIGNAL(MethodInfo("connection_drag_started", PropertyInfo(Variant::STRING, "from_node"), PropertyInfo(Variant::INT, "from_port"), PropertyInfo(Variant::BOOL, "is_output")));
 	ADD_SIGNAL(MethodInfo("connection_drag_ended"));
 
 	BIND_ENUM_CONSTANT(SCROLL_ZOOMS);
@@ -2449,28 +2498,28 @@ GraphEdit::GraphEdit() {
 	zoom_minus = memnew(Button);
 	zoom_minus->set_flat(true);
 	zoom_hb->add_child(zoom_minus);
-	zoom_minus->set_tooltip(RTR("Zoom Out"));
+	zoom_minus->set_tooltip_text(RTR("Zoom Out"));
 	zoom_minus->connect("pressed", callable_mp(this, &GraphEdit::_zoom_minus));
 	zoom_minus->set_focus_mode(FOCUS_NONE);
 
 	zoom_reset = memnew(Button);
 	zoom_reset->set_flat(true);
 	zoom_hb->add_child(zoom_reset);
-	zoom_reset->set_tooltip(RTR("Zoom Reset"));
+	zoom_reset->set_tooltip_text(RTR("Zoom Reset"));
 	zoom_reset->connect("pressed", callable_mp(this, &GraphEdit::_zoom_reset));
 	zoom_reset->set_focus_mode(FOCUS_NONE);
 
 	zoom_plus = memnew(Button);
 	zoom_plus->set_flat(true);
 	zoom_hb->add_child(zoom_plus);
-	zoom_plus->set_tooltip(RTR("Zoom In"));
+	zoom_plus->set_tooltip_text(RTR("Zoom In"));
 	zoom_plus->connect("pressed", callable_mp(this, &GraphEdit::_zoom_plus));
 	zoom_plus->set_focus_mode(FOCUS_NONE);
 
 	snap_button = memnew(Button);
 	snap_button->set_flat(true);
 	snap_button->set_toggle_mode(true);
-	snap_button->set_tooltip(RTR("Enable snap and show grid."));
+	snap_button->set_tooltip_text(RTR("Enable snap and show grid."));
 	snap_button->connect("pressed", callable_mp(this, &GraphEdit::_snap_toggled));
 	snap_button->set_pressed(true);
 	snap_button->set_focus_mode(FOCUS_NONE);
@@ -2487,7 +2536,7 @@ GraphEdit::GraphEdit() {
 	minimap_button = memnew(Button);
 	minimap_button->set_flat(true);
 	minimap_button->set_toggle_mode(true);
-	minimap_button->set_tooltip(RTR("Enable grid minimap."));
+	minimap_button->set_tooltip_text(RTR("Enable grid minimap."));
 	minimap_button->connect("pressed", callable_mp(this, &GraphEdit::_minimap_toggled));
 	minimap_button->set_pressed(true);
 	minimap_button->set_focus_mode(FOCUS_NONE);
@@ -2496,7 +2545,7 @@ GraphEdit::GraphEdit() {
 	layout_button = memnew(Button);
 	layout_button->set_flat(true);
 	zoom_hb->add_child(layout_button);
-	layout_button->set_tooltip(RTR("Arrange nodes."));
+	layout_button->set_tooltip_text(RTR("Arrange nodes."));
 	layout_button->connect("pressed", callable_mp(this, &GraphEdit::arrange_nodes));
 	layout_button->set_focus_mode(FOCUS_NONE);
 

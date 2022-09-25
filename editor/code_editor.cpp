@@ -800,7 +800,7 @@ void CodeTextEditor::_text_editor_gui_input(const Ref<InputEvent> &p_event) {
 	Ref<InputEventMouseButton> mb = p_event;
 
 	if (mb.is_valid()) {
-		if (mb->is_pressed() && mb->is_command_pressed()) {
+		if (mb->is_pressed() && mb->is_command_or_control_pressed()) {
 			if (mb->get_button_index() == MouseButton::WHEEL_UP) {
 				_zoom_in();
 			} else if (mb->get_button_index() == MouseButton::WHEEL_DOWN) {
@@ -1001,7 +1001,7 @@ void CodeTextEditor::update_editor_settings() {
 	// Appearance: Caret
 	text_editor->set_caret_type((TextEdit::CaretType)EditorSettings::get_singleton()->get("text_editor/appearance/caret/type").operator int());
 	text_editor->set_caret_blink_enabled(EditorSettings::get_singleton()->get("text_editor/appearance/caret/caret_blink"));
-	text_editor->set_caret_blink_speed(EditorSettings::get_singleton()->get("text_editor/appearance/caret/caret_blink_speed"));
+	text_editor->set_caret_blink_interval(EditorSettings::get_singleton()->get("text_editor/appearance/caret/caret_blink_interval"));
 	text_editor->set_highlight_current_line(EditorSettings::get_singleton()->get("text_editor/appearance/caret/highlight_current_line"));
 	text_editor->set_highlight_all_occurrences(EditorSettings::get_singleton()->get("text_editor/appearance/caret/highlight_all_occurrences"));
 
@@ -1092,7 +1092,7 @@ void CodeTextEditor::trim_trailing_whitespace() {
 
 	if (trimed_whitespace) {
 		text_editor->end_complex_operation();
-		text_editor->update();
+		text_editor->queue_redraw();
 	}
 }
 
@@ -1110,7 +1110,7 @@ void CodeTextEditor::insert_final_newline() {
 		text_editor->set_line(final_line, line);
 
 		text_editor->end_complex_operation();
-		text_editor->update();
+		text_editor->queue_redraw();
 	}
 }
 
@@ -1154,7 +1154,7 @@ void CodeTextEditor::convert_indent_to_spaces() {
 	if (changed_indentation) {
 		text_editor->set_caret_column(cursor_column);
 		text_editor->end_complex_operation();
-		text_editor->update();
+		text_editor->queue_redraw();
 	}
 }
 
@@ -1203,7 +1203,7 @@ void CodeTextEditor::convert_indent_to_tabs() {
 	if (changed_indentation) {
 		text_editor->set_caret_column(cursor_column);
 		text_editor->end_complex_operation();
-		text_editor->update();
+		text_editor->queue_redraw();
 	}
 }
 
@@ -1295,7 +1295,7 @@ void CodeTextEditor::move_lines_up() {
 		text_editor->set_caret_line(next_id);
 	}
 	text_editor->end_complex_operation();
-	text_editor->update();
+	text_editor->queue_redraw();
 }
 
 void CodeTextEditor::move_lines_down() {
@@ -1341,7 +1341,7 @@ void CodeTextEditor::move_lines_down() {
 		text_editor->set_caret_line(next_id);
 	}
 	text_editor->end_complex_operation();
-	text_editor->update();
+	text_editor->queue_redraw();
 }
 
 void CodeTextEditor::_delete_line(int p_line) {
@@ -1418,7 +1418,7 @@ void CodeTextEditor::duplicate_selection() {
 	}
 
 	text_editor->end_complex_operation();
-	text_editor->update();
+	text_editor->queue_redraw();
 }
 
 void CodeTextEditor::toggle_inline_comment(const String &delimiter) {
@@ -1495,7 +1495,7 @@ void CodeTextEditor::toggle_inline_comment(const String &delimiter) {
 		text_editor->set_caret_column(col);
 	}
 	text_editor->end_complex_operation();
-	text_editor->update();
+	text_editor->queue_redraw();
 }
 
 void CodeTextEditor::goto_line(int p_line) {
@@ -1789,7 +1789,7 @@ void CodeTextEditor::toggle_bookmark() {
 }
 
 void CodeTextEditor::goto_next_bookmark() {
-	Array bmarks = text_editor->get_bookmarked_lines();
+	PackedInt32Array bmarks = text_editor->get_bookmarked_lines();
 	if (bmarks.size() <= 0) {
 		return;
 	}
@@ -1813,7 +1813,7 @@ void CodeTextEditor::goto_next_bookmark() {
 }
 
 void CodeTextEditor::goto_prev_bookmark() {
-	Array bmarks = text_editor->get_bookmarked_lines();
+	PackedInt32Array bmarks = text_editor->get_bookmarked_lines();
 	if (bmarks.size() <= 0) {
 		return;
 	}
@@ -1862,15 +1862,15 @@ void CodeTextEditor::update_toggle_scripts_button() {
 	} else {
 		toggle_scripts_button->set_icon(get_theme_icon(ScriptEditor::get_singleton()->is_scripts_panel_toggled() ? SNAME("Back") : SNAME("Forward"), SNAME("EditorIcons")));
 	}
-	toggle_scripts_button->set_tooltip(vformat("%s (%s)", TTR("Toggle Scripts Panel"), ED_GET_SHORTCUT("script_editor/toggle_scripts_panel")->get_as_text()));
+	toggle_scripts_button->set_tooltip_text(vformat("%s (%s)", TTR("Toggle Scripts Panel"), ED_GET_SHORTCUT("script_editor/toggle_scripts_panel")->get_as_text()));
 }
 
 CodeTextEditor::CodeTextEditor() {
 	code_complete_func = nullptr;
-	ED_SHORTCUT("script_editor/zoom_in", TTR("Zoom In"), KeyModifierMask::CMD | Key::EQUAL);
-	ED_SHORTCUT("script_editor/zoom_out", TTR("Zoom Out"), KeyModifierMask::CMD | Key::MINUS);
+	ED_SHORTCUT("script_editor/zoom_in", TTR("Zoom In"), KeyModifierMask::CMD_OR_CTRL | Key::EQUAL);
+	ED_SHORTCUT("script_editor/zoom_out", TTR("Zoom Out"), KeyModifierMask::CMD_OR_CTRL | Key::MINUS);
 	ED_SHORTCUT_ARRAY("script_editor/reset_zoom", TTR("Reset Zoom"),
-			{ int32_t(KeyModifierMask::CMD | Key::KEY_0), int32_t(KeyModifierMask::CMD | Key::KP_0) });
+			{ int32_t(KeyModifierMask::CMD_OR_CTRL | Key::KEY_0), int32_t(KeyModifierMask::CMD_OR_CTRL | Key::KP_0) });
 
 	text_editor = memnew(CodeEdit);
 	add_child(text_editor);
@@ -1955,7 +1955,7 @@ CodeTextEditor::CodeTextEditor() {
 	error_button->set_v_size_flags(SIZE_EXPAND | SIZE_SHRINK_CENTER);
 	error_button->set_default_cursor_shape(CURSOR_POINTING_HAND);
 	error_button->connect("pressed", callable_mp(this, &CodeTextEditor::_error_button_pressed));
-	error_button->set_tooltip(TTR("Errors"));
+	error_button->set_tooltip_text(TTR("Errors"));
 	set_error_count(0);
 
 	// Warnings
@@ -1965,14 +1965,14 @@ CodeTextEditor::CodeTextEditor() {
 	warning_button->set_v_size_flags(SIZE_EXPAND | SIZE_SHRINK_CENTER);
 	warning_button->set_default_cursor_shape(CURSOR_POINTING_HAND);
 	warning_button->connect("pressed", callable_mp(this, &CodeTextEditor::_warning_button_pressed));
-	warning_button->set_tooltip(TTR("Warnings"));
+	warning_button->set_tooltip_text(TTR("Warnings"));
 	set_warning_count(0);
 
 	// Line and column
 	line_and_col_txt = memnew(Label);
 	status_bar->add_child(line_and_col_txt);
 	line_and_col_txt->set_v_size_flags(SIZE_EXPAND | SIZE_SHRINK_CENTER);
-	line_and_col_txt->set_tooltip(TTR("Line and column numbers."));
+	line_and_col_txt->set_tooltip_text(TTR("Line and column numbers."));
 	line_and_col_txt->set_mouse_filter(MOUSE_FILTER_STOP);
 
 	text_editor->connect("gui_input", callable_mp(this, &CodeTextEditor::_text_editor_gui_input));

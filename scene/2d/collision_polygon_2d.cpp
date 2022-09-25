@@ -198,7 +198,7 @@ void CollisionPolygon2D::set_polygon(const Vector<Point2> &p_polygon) {
 		_build_polygon();
 		_update_in_shape_owner();
 	}
-	update();
+	queue_redraw();
 	update_configuration_warnings();
 }
 
@@ -213,7 +213,7 @@ void CollisionPolygon2D::set_build_mode(BuildMode p_mode) {
 		_build_polygon();
 		_update_in_shape_owner();
 	}
-	update();
+	queue_redraw();
 	update_configuration_warnings();
 }
 
@@ -235,11 +235,11 @@ bool CollisionPolygon2D::_edit_is_selected_on_click(const Point2 &p_point, doubl
 }
 #endif
 
-TypedArray<String> CollisionPolygon2D::get_configuration_warnings() const {
-	TypedArray<String> warnings = Node::get_configuration_warnings();
+PackedStringArray CollisionPolygon2D::get_configuration_warnings() const {
+	PackedStringArray warnings = Node::get_configuration_warnings();
 
 	if (!Object::cast_to<CollisionObject2D>(get_parent())) {
-		warnings.push_back(RTR("CollisionPolygon2D only serves to provide a collision shape to a CollisionObject2D derived node. Please only use it as a child of Area2D, StaticBody2D, RigidDynamicBody2D, CharacterBody2D, etc. to give them a shape."));
+		warnings.push_back(RTR("CollisionPolygon2D only serves to provide a collision shape to a CollisionObject2D derived node. Please only use it as a child of Area2D, StaticBody2D, RigidBody2D, CharacterBody2D, etc. to give them a shape."));
 	}
 
 	int polygon_count = polygon.size();
@@ -264,7 +264,7 @@ TypedArray<String> CollisionPolygon2D::get_configuration_warnings() const {
 
 void CollisionPolygon2D::set_disabled(bool p_disabled) {
 	disabled = p_disabled;
-	update();
+	queue_redraw();
 	if (parent) {
 		parent->shape_owner_set_disabled(owner_id, p_disabled);
 	}
@@ -276,7 +276,7 @@ bool CollisionPolygon2D::is_disabled() const {
 
 void CollisionPolygon2D::set_one_way_collision(bool p_enable) {
 	one_way_collision = p_enable;
-	update();
+	queue_redraw();
 	if (parent) {
 		parent->shape_owner_set_one_way_collision(owner_id, p_enable);
 	}

@@ -128,8 +128,8 @@ Control *TextEditor::get_base_editor() const {
 	return code_editor->get_text_editor();
 }
 
-Array TextEditor::get_breakpoints() {
-	return Array();
+PackedInt32Array TextEditor::get_breakpoints() {
+	return PackedInt32Array();
 }
 
 void TextEditor::reload_text() {
@@ -165,7 +165,7 @@ void TextEditor::_update_bookmark_list() {
 	bookmarks_menu->add_shortcut(ED_GET_SHORTCUT("script_text_editor/goto_next_bookmark"), BOOKMARK_GOTO_NEXT);
 	bookmarks_menu->add_shortcut(ED_GET_SHORTCUT("script_text_editor/goto_previous_bookmark"), BOOKMARK_GOTO_PREV);
 
-	Array bookmark_list = code_editor->get_text_editor()->get_bookmarked_lines();
+	PackedInt32Array bookmark_list = code_editor->get_text_editor()->get_bookmarked_lines();
 	if (bookmark_list.size() == 0) {
 		return;
 	}
@@ -339,15 +339,15 @@ void TextEditor::_edit_option(int p_op) {
 		} break;
 		case EDIT_TOGGLE_FOLD_LINE: {
 			tx->toggle_foldable_line(tx->get_caret_line());
-			tx->update();
+			tx->queue_redraw();
 		} break;
 		case EDIT_FOLD_ALL_LINES: {
 			tx->fold_all_lines();
-			tx->update();
+			tx->queue_redraw();
 		} break;
 		case EDIT_UNFOLD_ALL_LINES: {
 			tx->unfold_all_lines();
-			tx->update();
+			tx->queue_redraw();
 		} break;
 		case EDIT_TRIM_TRAILING_WHITESAPCE: {
 			trim_trailing_whitespace();

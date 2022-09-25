@@ -30,7 +30,8 @@
 
 #include "gpu_particles_2d.h"
 
-#include "scene/resources/particles_material.h"
+#include "core/core_string_names.h"
+#include "scene/resources/particle_process_material.h"
 
 #ifdef TOOLS_ENABLED
 #include "core/config/engine.h"
@@ -99,7 +100,7 @@ void GPUParticles2D::set_visibility_rect(const Rect2 &p_visibility_rect) {
 
 	RS::get_singleton()->particles_set_custom_aabb(particles, aabb);
 
-	update();
+	queue_redraw();
 }
 
 void GPUParticles2D::set_use_local_coordinates(bool p_enable) {
@@ -123,10 +124,10 @@ void GPUParticles2D::_update_particle_emission_transform() {
 
 void GPUParticles2D::set_process_material(const Ref<Material> &p_material) {
 	process_material = p_material;
-	Ref<ParticlesMaterial> pm = p_material;
-	if (pm.is_valid() && !pm->get_particle_flag(ParticlesMaterial::PARTICLE_FLAG_DISABLE_Z) && pm->get_gravity() == Vector3(0, -9.8, 0)) {
+	Ref<ParticleProcessMaterial> pm = p_material;
+	if (pm.is_valid() && !pm->get_particle_flag(ParticleProcessMaterial::PARTICLE_FLAG_DISABLE_Z) && pm->get_gravity() == Vector3(0, -9.8, 0)) {
 		// Likely a new (3D) material, modify it to match 2D space
-		pm->set_particle_flag(ParticlesMaterial::PARTICLE_FLAG_DISABLE_Z, true);
+		pm->set_particle_flag(ParticleProcessMaterial::PARTICLE_FLAG_DISABLE_Z, true);
 		pm->set_gravity(Vector3(0, 98, 0));
 	}
 	RID material_rid;
@@ -141,7 +142,7 @@ void GPUParticles2D::set_process_material(const Ref<Material> &p_material) {
 void GPUParticles2D::set_trail_enabled(bool p_enabled) {
 	trail_enabled = p_enabled;
 	RS::get_singleton()->particles_set_trails(particles, trail_enabled, trail_length);
-	update();
+	queue_redraw();
 
 	RS::get_singleton()->particles_set_transform_align(particles, p_enabled ? RS::PARTICLES_TRANSFORM_ALIGN_Y_TO_VELOCITY : RS::PARTICLES_TRANSFORM_ALIGN_DISABLED);
 }
@@ -150,7 +151,7 @@ void GPUParticles2D::set_trail_length(double p_seconds) {
 	ERR_FAIL_COND(p_seconds < 0.001);
 	trail_length = p_seconds;
 	RS::get_singleton()->particles_set_trails(particles, trail_enabled, trail_length);
-	update();
+	queue_redraw();
 }
 
 void GPUParticles2D::set_trail_sections(int p_sections) {
@@ -158,7 +159,7 @@ void GPUParticles2D::set_trail_sections(int p_sections) {
 	ERR_FAIL_COND(p_sections > 128);
 
 	trail_sections = p_sections;
-	update();
+	queue_redraw();
 }
 
 void GPUParticles2D::set_trail_section_subdivisions(int p_subdivisions) {
@@ -166,13 +167,13 @@ void GPUParticles2D::set_trail_section_subdivisions(int p_subdivisions) {
 	ERR_FAIL_COND(p_subdivisions > 1024);
 
 	trail_section_subdivisions = p_subdivisions;
-	update();
+	queue_redraw();
 }
 
 #ifdef TOOLS_ENABLED
 void GPUParticles2D::set_show_visibility_rect(bool p_show_visibility_rect) {
 	show_visibility_rect = p_show_visibility_rect;
-	update();
+	queue_redraw();
 }
 #endif
 
@@ -295,8 +296,8 @@ bool GPUParticles2D::get_interpolate() const {
 	return interpolate;
 }
 
-TypedArray<String> GPUParticles2D::get_configuration_warnings() const {
-	TypedArray<String> warnings = Node2D::get_configuration_warnings();
+PackedStringArray GPUParticles2D::get_configuration_warnings() const {
+	PackedStringArray warnings = Node2D::get_configuration_warnings();
 
 	if (RenderingServer::get_singleton()->is_low_end()) {
 		warnings.push_back(RTR("GPU-based particles are not supported by the OpenGL video driver.\nUse the CPUParticles2D node instead. You can use the \"Convert to CPUParticles2D\" option for this purpose."));
@@ -308,10 +309,10 @@ TypedArray<String> GPUParticles2D::get_configuration_warnings() const {
 		CanvasItemMaterial *mat = Object::cast_to<CanvasItemMaterial>(get_material().ptr());
 
 		if (get_material().is_null() || (mat && !mat->get_particles_animation())) {
-			const ParticlesMaterial *process = Object::cast_to<ParticlesMaterial>(process_material.ptr());
+			const ParticleProcessMaterial *process = Object::cast_to<ParticleProcessMaterial>(process_material.ptr());
 			if (process &&
-					(process->get_param_max(ParticlesMaterial::PARAM_ANIM_SPEED) != 0.0 || process->get_param_max(ParticlesMaterial::PARAM_ANIM_OFFSET) != 0.0 ||
-							process->get_param_texture(ParticlesMaterial::PARAM_ANIM_SPEED).is_valid() || process->get_param_texture(ParticlesMaterial::PARAM_ANIM_OFFSET).is_valid())) {
+					(process->get_param_max(ParticleProcessMaterial::PARAM_ANIM_SPEED) != 0.0 || process->get_param_max(ParticleProcessMaterial::PARAM_ANIM_OFFSET) != 0.0 ||
+							process->get_param_texture(ParticleProcessMaterial::PARAM_ANIM_SPEED).is_valid() || process->get_param_texture(ParticleProcessMaterial::PARAM_ANIM_OFFSET).is_valid())) {
 				warnings.push_back(RTR("Particles2D animation requires the usage of a CanvasItemMaterial with \"Particles Animation\" enabled."));
 			}
 		}
@@ -331,16 +332,24 @@ Rect2 GPUParticles2D::capture_rect() const {
 }
 
 void GPUParticles2D::set_texture(const Ref<Texture2D> &p_texture) {
+	if (texture.is_valid()) {
+		texture->disconnect(CoreStringNames::get_singleton()->changed, callable_mp(this, &GPUParticles2D::_texture_changed));
+	}
+
 	texture = p_texture;
+
+	if (texture.is_valid()) {
+		texture->connect(CoreStringNames::get_singleton()->changed, callable_mp(this, &GPUParticles2D::_texture_changed));
+	}
 	_update_collision_size();
-	update();
+	queue_redraw();
 }
 
 Ref<Texture2D> GPUParticles2D::get_texture() const {
 	return texture;
 }
 
-void GPUParticles2D::_validate_property(PropertyInfo &property) const {
+void GPUParticles2D::_validate_property(PropertyInfo &p_property) const {
 }
 
 void GPUParticles2D::emit_particle(const Transform2D &p_transform2d, const Vector2 &p_velocity2d, const Color &p_color, const Color &p_custom, uint32_t p_emit_flags) {
@@ -360,6 +369,14 @@ void GPUParticles2D::_attach_sub_emitter() {
 		if (sen && sen != this) {
 			RS::get_singleton()->particles_set_subemitter(particles, sen->particles);
 		}
+	}
+}
+
+void GPUParticles2D::_texture_changed() {
+	// Changes to the texture need to trigger an update to make
+	// the editor redraw the sprite with the updated texture.
+	if (texture.is_valid()) {
+		queue_redraw();
 	}
 }
 
@@ -480,12 +497,21 @@ void GPUParticles2D::_notification(int p_what) {
 					Vector2(-size.x / 2.0, size.y / 2.0)
 				};
 
-				Vector<Vector2> uvs = {
-					Vector2(0, 0),
-					Vector2(1, 0),
-					Vector2(1, 1),
-					Vector2(0, 1)
-				};
+				Vector<Vector2> uvs;
+				AtlasTexture *atlas_texure = Object::cast_to<AtlasTexture>(*texture);
+				if (atlas_texure && atlas_texure->get_atlas().is_valid()) {
+					Rect2 region_rect = atlas_texure->get_region();
+					Size2 atlas_size = atlas_texure->get_atlas()->get_size();
+					uvs.push_back(Vector2(region_rect.position.x / atlas_size.x, region_rect.position.y / atlas_size.y));
+					uvs.push_back(Vector2((region_rect.position.x + region_rect.size.x) / atlas_size.x, region_rect.position.y / atlas_size.y));
+					uvs.push_back(Vector2((region_rect.position.x + region_rect.size.x) / atlas_size.x, (region_rect.position.y + region_rect.size.y) / atlas_size.y));
+					uvs.push_back(Vector2(region_rect.position.x / atlas_size.x, (region_rect.position.y + region_rect.size.y) / atlas_size.y));
+				} else {
+					uvs.push_back(Vector2(0, 0));
+					uvs.push_back(Vector2(1, 0));
+					uvs.push_back(Vector2(1, 1));
+					uvs.push_back(Vector2(0, 1));
+				}
 
 				Vector<int> indices = { 0, 1, 2, 0, 2, 3 };
 
@@ -625,7 +651,7 @@ void GPUParticles2D::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "trail_sections", PROPERTY_HINT_RANGE, "2,128,1"), "set_trail_sections", "get_trail_sections");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "trail_section_subdivisions", PROPERTY_HINT_RANGE, "1,1024,1"), "set_trail_section_subdivisions", "get_trail_section_subdivisions");
 	ADD_GROUP("Process Material", "process_");
-	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "process_material", PROPERTY_HINT_RESOURCE_TYPE, "ShaderMaterial,ParticlesMaterial"), "set_process_material", "get_process_material");
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "process_material", PROPERTY_HINT_RESOURCE_TYPE, "ShaderMaterial,ParticleProcessMaterial"), "set_process_material", "get_process_material");
 	ADD_GROUP("Textures", "");
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "texture", PROPERTY_HINT_RESOURCE_TYPE, "Texture2D"), "set_texture", "get_texture");
 

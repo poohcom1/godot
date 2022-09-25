@@ -39,7 +39,7 @@ void Camera2D::_update_scroll() {
 	}
 
 	if (Engine::get_singleton()->is_editor_hint()) {
-		update(); //will just be drawn
+		queue_redraw(); //will just be drawn
 		return;
 	}
 
@@ -172,7 +172,7 @@ Transform2D Camera2D::get_camera_transform() {
 	Point2 screen_offset = (anchor_mode == ANCHOR_MODE_DRAG_CENTER ? (screen_size * 0.5 * zoom_scale) : Point2());
 
 	real_t angle = get_global_rotation();
-	if (rotating) {
+	if (!ignore_rotation) {
 		screen_offset = screen_offset.rotated(angle);
 	}
 
@@ -204,7 +204,7 @@ Transform2D Camera2D::get_camera_transform() {
 
 	Transform2D xform;
 	xform.scale_basis(zoom_scale);
-	if (rotating) {
+	if (!ignore_rotation) {
 		xform.set_rotation(angle);
 	}
 	xform.set_origin(screen_rect.position);
@@ -363,15 +363,15 @@ Camera2D::AnchorMode Camera2D::get_anchor_mode() const {
 	return anchor_mode;
 }
 
-void Camera2D::set_rotating(bool p_rotating) {
-	rotating = p_rotating;
+void Camera2D::set_ignore_rotation(bool p_ignore) {
+	ignore_rotation = p_ignore;
 	Point2 old_smoothed_camera_pos = smoothed_camera_pos;
 	_update_scroll();
 	smoothed_camera_pos = old_smoothed_camera_pos;
 }
 
-bool Camera2D::is_rotating() const {
-	return rotating;
+bool Camera2D::is_ignoring_rotation() const {
+	return ignore_rotation;
 }
 
 void Camera2D::set_process_callback(Camera2DProcessCallback p_mode) {
@@ -392,7 +392,7 @@ void Camera2D::_make_current(Object *p_which) {
 		current = true;
 		if (is_inside_tree()) {
 			get_viewport()->_camera_2d_set(this);
-			update();
+			queue_redraw();
 		}
 	} else {
 		current = false;
@@ -400,7 +400,7 @@ void Camera2D::_make_current(Object *p_which) {
 			if (get_viewport()->get_camera_2d() == this) {
 				get_viewport()->_camera_2d_set(nullptr);
 			}
-			update();
+			queue_redraw();
 		}
 	}
 }
@@ -461,7 +461,7 @@ bool Camera2D::is_limit_smoothing_enabled() const {
 void Camera2D::set_drag_margin(Side p_side, real_t p_drag_margin) {
 	ERR_FAIL_INDEX((int)p_side, 4);
 	drag_margin[p_side] = p_drag_margin;
-	update();
+	queue_redraw();
 }
 
 real_t Camera2D::get_drag_margin(Side p_side) const {
@@ -625,7 +625,7 @@ Node *Camera2D::get_custom_viewport() const {
 void Camera2D::set_screen_drawing_enabled(bool enable) {
 	screen_drawing_enabled = enable;
 #ifdef TOOLS_ENABLED
-	update();
+	queue_redraw();
 #endif
 }
 
@@ -636,7 +636,7 @@ bool Camera2D::is_screen_drawing_enabled() const {
 void Camera2D::set_limit_drawing_enabled(bool enable) {
 	limit_drawing_enabled = enable;
 #ifdef TOOLS_ENABLED
-	update();
+	queue_redraw();
 #endif
 }
 
@@ -647,7 +647,7 @@ bool Camera2D::is_limit_drawing_enabled() const {
 void Camera2D::set_margin_drawing_enabled(bool enable) {
 	margin_drawing_enabled = enable;
 #ifdef TOOLS_ENABLED
-	update();
+	queue_redraw();
 #endif
 }
 
@@ -655,9 +655,9 @@ bool Camera2D::is_margin_drawing_enabled() const {
 	return margin_drawing_enabled;
 }
 
-void Camera2D::_validate_property(PropertyInfo &property) const {
-	if (!smoothing_enabled && property.name == "smoothing_speed") {
-		property.usage = PROPERTY_USAGE_NO_EDITOR;
+void Camera2D::_validate_property(PropertyInfo &p_property) const {
+	if (!smoothing_enabled && p_property.name == "smoothing_speed") {
+		p_property.usage = PROPERTY_USAGE_NO_EDITOR;
 	}
 }
 
@@ -668,8 +668,8 @@ void Camera2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_anchor_mode", "anchor_mode"), &Camera2D::set_anchor_mode);
 	ClassDB::bind_method(D_METHOD("get_anchor_mode"), &Camera2D::get_anchor_mode);
 
-	ClassDB::bind_method(D_METHOD("set_rotating", "rotating"), &Camera2D::set_rotating);
-	ClassDB::bind_method(D_METHOD("is_rotating"), &Camera2D::is_rotating);
+	ClassDB::bind_method(D_METHOD("set_ignore_rotation", "ignore"), &Camera2D::set_ignore_rotation);
+	ClassDB::bind_method(D_METHOD("is_ignoring_rotation"), &Camera2D::is_ignoring_rotation);
 
 	ClassDB::bind_method(D_METHOD("_update_scroll"), &Camera2D::_update_scroll);
 
@@ -701,8 +701,8 @@ void Camera2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_drag_margin", "margin", "drag_margin"), &Camera2D::set_drag_margin);
 	ClassDB::bind_method(D_METHOD("get_drag_margin", "margin"), &Camera2D::get_drag_margin);
 
-	ClassDB::bind_method(D_METHOD("get_camera_position"), &Camera2D::get_camera_position);
-	ClassDB::bind_method(D_METHOD("get_camera_screen_center"), &Camera2D::get_camera_screen_center);
+	ClassDB::bind_method(D_METHOD("get_target_position"), &Camera2D::get_camera_position);
+	ClassDB::bind_method(D_METHOD("get_screen_center_position"), &Camera2D::get_camera_screen_center);
 
 	ClassDB::bind_method(D_METHOD("set_zoom", "zoom"), &Camera2D::set_zoom);
 	ClassDB::bind_method(D_METHOD("get_zoom"), &Camera2D::get_zoom);
@@ -733,7 +733,7 @@ void Camera2D::_bind_methods() {
 
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "offset", PROPERTY_HINT_NONE, "suffix:px"), "set_offset", "get_offset");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "anchor_mode", PROPERTY_HINT_ENUM, "Fixed TopLeft,Drag Center"), "set_anchor_mode", "get_anchor_mode");
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "rotating"), "set_rotating", "is_rotating");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "ignore_rotation"), "set_ignore_rotation", "is_ignoring_rotation");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "current"), "set_current", "is_current");
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "zoom", PROPERTY_HINT_LINK), "set_zoom", "get_zoom");
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "custom_viewport", PROPERTY_HINT_RESOURCE_TYPE, "Viewport", PROPERTY_USAGE_NONE), "set_custom_viewport", "get_custom_viewport");

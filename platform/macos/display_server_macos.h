@@ -76,6 +76,7 @@ public:
 		id window_delegate;
 		id window_object;
 		id window_view;
+		id window_button_view;
 
 		Vector<Vector2> mpath;
 
@@ -84,6 +85,9 @@ public:
 		Size2i min_size;
 		Size2i max_size;
 		Size2i size;
+		Vector2i wb_offset = Vector2i(14, 14);
+
+		NSRect last_frame_rect;
 
 		bool im_active = false;
 		Size2i im_position;
@@ -140,6 +144,7 @@ private:
 	int key_event_pos = 0;
 
 	id tts = nullptr;
+	id menu_delegate = nullptr;
 
 	Point2i im_selection;
 	String im_text;
@@ -174,6 +179,12 @@ private:
 
 	IOPMAssertionID screen_keep_on_assertion = kIOPMNullAssertionID;
 
+	struct MenuCall {
+		Variant tag;
+		Callable callback;
+	};
+	Vector<MenuCall> deferred_menu_calls;
+
 	const NSMenu *_get_menu_root(const String &p_menu_root) const;
 	NSMenu *_get_menu_root(const String &p_menu_root);
 
@@ -186,6 +197,8 @@ private:
 	Point2i _get_native_screen_position(int p_screen) const;
 	static void _displays_arrangement_changed(CGDirectDisplayID display_id, CGDisplayChangeSummaryFlags flags, void *user_info);
 
+	WindowID _get_focused_window_or_popup() const;
+
 	static void _dispatch_input_events(const Ref<InputEvent> &p_event);
 	void _dispatch_input_event(const Ref<InputEvent> &p_event);
 	void _push_input(const Ref<InputEvent> &p_event);
@@ -195,6 +208,9 @@ private:
 	NSImage *_convert_to_nsimg(Ref<Image> &p_image) const;
 
 	static NSCursor *_cursor_from_selector(SEL p_selector, SEL p_fallback = nil);
+
+	bool _has_help_menu() const;
+	NSMenuItem *_menu_add_item(const String &p_menu_root, const String &p_label, Key p_accel, int p_index, int *r_out);
 
 public:
 	NSMenu *get_dock_menu() const;
@@ -220,19 +236,20 @@ public:
 	void window_update(WindowID p_window);
 	void window_destroy(WindowID p_window);
 	void window_resize(WindowID p_window, int p_width, int p_height);
+	void window_set_custom_window_buttons(WindowData &p_wd, bool p_enabled);
 
 	virtual bool has_feature(Feature p_feature) const override;
 	virtual String get_name() const override;
 
-	virtual void global_menu_add_item(const String &p_menu_root, const String &p_label, const Callable &p_callback = Callable(), const Variant &p_tag = Variant(), Key p_accel = Key::NONE, int p_index = -1) override;
-	virtual void global_menu_add_check_item(const String &p_menu_root, const String &p_label, const Callable &p_callback = Callable(), const Variant &p_tag = Variant(), Key p_accel = Key::NONE, int p_index = -1) override;
-	virtual void global_menu_add_icon_item(const String &p_menu_root, const Ref<Texture2D> &p_icon, const String &p_label, const Callable &p_callback = Callable(), const Variant &p_tag = Variant(), Key p_accel = Key::NONE, int p_index = -1) override;
-	virtual void global_menu_add_icon_check_item(const String &p_menu_root, const Ref<Texture2D> &p_icon, const String &p_label, const Callable &p_callback = Callable(), const Variant &p_tag = Variant(), Key p_accel = Key::NONE, int p_index = -1) override;
-	virtual void global_menu_add_radio_check_item(const String &p_menu_root, const String &p_label, const Callable &p_callback = Callable(), const Variant &p_tag = Variant(), Key p_accel = Key::NONE, int p_index = -1) override;
-	virtual void global_menu_add_icon_radio_check_item(const String &p_menu_root, const Ref<Texture2D> &p_icon, const String &p_label, const Callable &p_callback = Callable(), const Variant &p_tag = Variant(), Key p_accel = Key::NONE, int p_index = -1) override;
-	virtual void global_menu_add_multistate_item(const String &p_menu_root, const String &p_label, int p_max_states, int p_default_state, const Callable &p_callback = Callable(), const Variant &p_tag = Variant(), Key p_accel = Key::NONE, int p_index = -1) override;
-	virtual void global_menu_add_submenu_item(const String &p_menu_root, const String &p_label, const String &p_submenu, int p_index = -1) override;
-	virtual void global_menu_add_separator(const String &p_menu_root, int p_index = -1) override;
+	virtual int global_menu_add_submenu_item(const String &p_menu_root, const String &p_label, const String &p_submenu, int p_index = -1) override;
+	virtual int global_menu_add_item(const String &p_menu_root, const String &p_label, const Callable &p_callback = Callable(), const Callable &p_key_callback = Callable(), const Variant &p_tag = Variant(), Key p_accel = Key::NONE, int p_index = -1) override;
+	virtual int global_menu_add_check_item(const String &p_menu_root, const String &p_label, const Callable &p_callback = Callable(), const Callable &p_key_callback = Callable(), const Variant &p_tag = Variant(), Key p_accel = Key::NONE, int p_index = -1) override;
+	virtual int global_menu_add_icon_item(const String &p_menu_root, const Ref<Texture2D> &p_icon, const String &p_label, const Callable &p_callback = Callable(), const Callable &p_key_callback = Callable(), const Variant &p_tag = Variant(), Key p_accel = Key::NONE, int p_index = -1) override;
+	virtual int global_menu_add_icon_check_item(const String &p_menu_root, const Ref<Texture2D> &p_icon, const String &p_label, const Callable &p_callback = Callable(), const Callable &p_key_callback = Callable(), const Variant &p_tag = Variant(), Key p_accel = Key::NONE, int p_index = -1) override;
+	virtual int global_menu_add_radio_check_item(const String &p_menu_root, const String &p_label, const Callable &p_callback = Callable(), const Callable &p_key_callback = Callable(), const Variant &p_tag = Variant(), Key p_accel = Key::NONE, int p_index = -1) override;
+	virtual int global_menu_add_icon_radio_check_item(const String &p_menu_root, const Ref<Texture2D> &p_icon, const String &p_label, const Callable &p_callback = Callable(), const Callable &p_key_callback = Callable(), const Variant &p_tag = Variant(), Key p_accel = Key::NONE, int p_index = -1) override;
+	virtual int global_menu_add_multistate_item(const String &p_menu_root, const String &p_label, int p_max_states, int p_default_state, const Callable &p_callback = Callable(), const Callable &p_key_callback = Callable(), const Variant &p_tag = Variant(), Key p_accel = Key::NONE, int p_index = -1) override;
+	virtual int global_menu_add_separator(const String &p_menu_root, int p_index = -1) override;
 
 	virtual int global_menu_get_item_index_from_text(const String &p_menu_root, const String &p_text) const override;
 	virtual int global_menu_get_item_index_from_tag(const String &p_menu_root, const Variant &p_tag) const override;
@@ -241,6 +258,7 @@ public:
 	virtual bool global_menu_is_item_checkable(const String &p_menu_root, int p_idx) const override;
 	virtual bool global_menu_is_item_radio_checkable(const String &p_menu_root, int p_idx) const override;
 	virtual Callable global_menu_get_item_callback(const String &p_menu_root, int p_idx) const override;
+	virtual Callable global_menu_get_item_key_callback(const String &p_menu_root, int p_idx) const override;
 	virtual Variant global_menu_get_item_tag(const String &p_menu_root, int p_idx) const override;
 	virtual String global_menu_get_item_text(const String &p_menu_root, int p_idx) const override;
 	virtual String global_menu_get_item_submenu(const String &p_menu_root, int p_idx) const override;
@@ -250,11 +268,13 @@ public:
 	virtual int global_menu_get_item_state(const String &p_menu_root, int p_idx) const override;
 	virtual int global_menu_get_item_max_states(const String &p_menu_root, int p_idx) const override;
 	virtual Ref<Texture2D> global_menu_get_item_icon(const String &p_menu_root, int p_idx) const override;
+	virtual int global_menu_get_item_indentation_level(const String &p_menu_root, int p_idx) const override;
 
 	virtual void global_menu_set_item_checked(const String &p_menu_root, int p_idx, bool p_checked) override;
 	virtual void global_menu_set_item_checkable(const String &p_menu_root, int p_idx, bool p_checkable) override;
 	virtual void global_menu_set_item_radio_checkable(const String &p_menu_root, int p_idx, bool p_checkable) override;
 	virtual void global_menu_set_item_callback(const String &p_menu_root, int p_idx, const Callable &p_callback) override;
+	virtual void global_menu_set_item_key_callback(const String &p_menu_root, int p_idx, const Callable &p_key_callback) override;
 	virtual void global_menu_set_item_tag(const String &p_menu_root, int p_idx, const Variant &p_tag) override;
 	virtual void global_menu_set_item_text(const String &p_menu_root, int p_idx, const String &p_text) override;
 	virtual void global_menu_set_item_submenu(const String &p_menu_root, int p_idx, const String &p_submenu) override;
@@ -264,6 +284,7 @@ public:
 	virtual void global_menu_set_item_state(const String &p_menu_root, int p_idx, int p_state) override;
 	virtual void global_menu_set_item_max_states(const String &p_menu_root, int p_idx, int p_max_states) override;
 	virtual void global_menu_set_item_icon(const String &p_menu_root, int p_idx, const Ref<Texture2D> &p_icon) override;
+	virtual void global_menu_set_item_indentation_level(const String &p_menu_root, int p_idx, int p_level) override;
 
 	virtual int global_menu_get_item_count(const String &p_menu_root) const override;
 
@@ -272,12 +293,16 @@ public:
 
 	virtual bool tts_is_speaking() const override;
 	virtual bool tts_is_paused() const override;
-	virtual Array tts_get_voices() const override;
+	virtual TypedArray<Dictionary> tts_get_voices() const override;
 
 	virtual void tts_speak(const String &p_text, const String &p_voice, int p_volume = 50, float p_pitch = 1.f, float p_rate = 1.f, int p_utterance_id = 0, bool p_interrupt = false) override;
 	virtual void tts_pause() override;
 	virtual void tts_resume() override;
 	virtual void tts_stop() override;
+
+	virtual bool is_dark_mode_supported() const override;
+	virtual bool is_dark_mode() const override;
+	virtual Color get_accent_color() const override;
 
 	virtual Error dialog_show(String p_title, String p_description, Vector<String> p_buttons, const Callable &p_callback) override;
 	virtual Error dialog_input_text(String p_title, String p_description, String p_partial, const Callable &p_callback) override;
@@ -371,6 +396,12 @@ public:
 
 	virtual void window_set_vsync_mode(DisplayServer::VSyncMode p_vsync_mode, WindowID p_window = MAIN_WINDOW_ID) override;
 	virtual DisplayServer::VSyncMode window_get_vsync_mode(WindowID p_vsync_mode) const override;
+
+	virtual bool window_maximize_on_title_dbl_click() const override;
+	virtual bool window_minimize_on_title_dbl_click() const override;
+
+	virtual void window_set_window_buttons_offset(const Vector2i &p_offset, WindowID p_window = MAIN_WINDOW_ID) override;
+	virtual Vector2i window_get_safe_title_margins(WindowID p_window = MAIN_WINDOW_ID) const override;
 
 	virtual Point2i ime_get_selection() const override;
 	virtual String ime_get_text() const override;

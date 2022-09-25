@@ -40,7 +40,7 @@ class GodotConstraint3D;
 class GodotPhysicsDirectBodyState3D;
 
 class GodotBody3D : public GodotCollisionObject3D {
-	PhysicsServer3D::BodyMode mode = PhysicsServer3D::BODY_MODE_DYNAMIC;
+	PhysicsServer3D::BodyMode mode = PhysicsServer3D::BODY_MODE_RIGID;
 
 	Vector3 linear_velocity;
 	Vector3 angular_velocity;
@@ -131,8 +131,7 @@ class GodotBody3D : public GodotCollisionObject3D {
 	Vector<Contact> contacts; //no contacts by default
 	int contact_count = 0;
 
-	void *body_state_callback_instance = nullptr;
-	PhysicsServer3D::BodyStateCallback body_state_callback = nullptr;
+	Callable body_state_callback;
 
 	struct ForceIntegrationCallbackData {
 		Callable callable;
@@ -150,7 +149,7 @@ class GodotBody3D : public GodotCollisionObject3D {
 	friend class GodotPhysicsDirectBodyState3D; // i give up, too many functions to expose
 
 public:
-	void set_state_sync_callback(void *p_instance, PhysicsServer3D::BodyStateCallback p_callback);
+	void set_state_sync_callback(const Callable &p_callable);
 	void set_force_integration_callback(const Callable &p_callable, const Variant &p_udata = Variant());
 
 	GodotPhysicsDirectBodyState3D *get_direct_state();

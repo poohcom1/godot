@@ -36,9 +36,22 @@
 class ProgressBar : public Range {
 	GDCLASS(ProgressBar, Range);
 
-	bool percent_visible = true;
+	bool show_percentage = true;
+
+	struct ThemeCache {
+		Ref<StyleBox> background_style;
+		Ref<StyleBox> fill_style;
+
+		Ref<Font> font;
+		int font_size = 0;
+		Color font_color;
+		int font_outline_size = 0;
+		Color font_outline_color;
+	} theme_cache;
 
 protected:
+	virtual void _update_theme_item_cache() override;
+
 	void _notification(int p_what);
 	static void _bind_methods();
 
@@ -54,8 +67,8 @@ public:
 	void set_fill_mode(int p_fill);
 	int get_fill_mode();
 
-	void set_percent_visible(bool p_visible);
-	bool is_percent_visible() const;
+	void set_show_percentage(bool p_visible);
+	bool is_percentage_shown() const;
 
 	Size2 get_minimum_size() const override;
 	ProgressBar();

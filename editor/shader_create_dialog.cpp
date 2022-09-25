@@ -37,6 +37,13 @@
 #include "scene/resources/visual_shader.h"
 #include "servers/rendering/shader_types.h"
 
+enum ShaderType {
+	SHADER_TYPE_TEXT,
+	SHADER_TYPE_VISUAL,
+	SHADER_TYPE_INC,
+	SHADER_TYPE_MAX,
+};
+
 void ShaderCreateDialog::_notification(int p_what) {
 	switch (p_what) {
 		case NOTIFICATION_ENTER_TREE: {
@@ -82,7 +89,7 @@ void ShaderCreateDialog::_update_theme() {
 	}
 
 	path_button->set_icon(get_theme_icon(SNAME("Folder"), SNAME("EditorIcons")));
-	status_panel->add_theme_style_override("panel", get_theme_stylebox(SNAME("bg"), SNAME("Tree")));
+	status_panel->add_theme_style_override("panel", get_theme_stylebox(SNAME("panel"), SNAME("Tree")));
 }
 
 void ShaderCreateDialog::_update_language_info() {
@@ -154,7 +161,7 @@ void ShaderCreateDialog::_create_new() {
 			shader = text_shader;
 
 			StringBuilder code;
-			code += vformat("shader_type %s;\n", mode_menu->get_text().replace(" ", "").camelcase_to_underscore());
+			code += vformat("shader_type %s;\n", mode_menu->get_text().to_snake_case());
 
 			if (current_template == 0) { // Default template.
 				code += "\n";

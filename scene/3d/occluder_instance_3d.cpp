@@ -186,21 +186,21 @@ ArrayOccluder3D::~ArrayOccluder3D() {
 
 /////////////////////////////////////////////////
 
-void QuadOccluder3D::set_size(const Vector2 &p_size) {
+void QuadOccluder3D::set_size(const Size2 &p_size) {
 	if (size == p_size) {
 		return;
 	}
 
-	size = p_size.max(Vector2());
+	size = p_size.max(Size2());
 	_update();
 }
 
-Vector2 QuadOccluder3D::get_size() const {
+Size2 QuadOccluder3D::get_size() const {
 	return size;
 }
 
 void QuadOccluder3D::_update_arrays(PackedVector3Array &r_vertices, PackedInt32Array &r_indices) {
-	Vector2 _size = Vector2(size.x / 2.0f, size.y / 2.0f);
+	Size2 _size = Size2(size.x / 2.0f, size.y / 2.0f);
 
 	r_vertices = {
 		Vector3(-_size.x, -_size.y, 0),
@@ -682,8 +682,8 @@ OccluderInstance3D::BakeError OccluderInstance3D::bake_scene(Node *p_from_node, 
 	return BAKE_ERROR_OK;
 }
 
-TypedArray<String> OccluderInstance3D::get_configuration_warnings() const {
-	TypedArray<String> warnings = Node::get_configuration_warnings();
+PackedStringArray OccluderInstance3D::get_configuration_warnings() const {
+	PackedStringArray warnings = Node::get_configuration_warnings();
 
 	if (!bool(GLOBAL_GET("rendering/occlusion_culling/use_occlusion_culling"))) {
 		warnings.push_back(RTR("Occlusion culling is disabled in the Project Settings, which means occlusion culling won't be performed in the root viewport.\nTo resolve this, open the Project Settings and enable Rendering > Occlusion Culling > Use Occlusion Culling."));

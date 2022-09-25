@@ -46,8 +46,12 @@ void ReferenceRect::_notification(int p_what) {
 }
 
 void ReferenceRect::set_border_color(const Color &p_color) {
+	if (border_color == p_color) {
+		return;
+	}
+
 	border_color = p_color;
-	update();
+	queue_redraw();
 }
 
 Color ReferenceRect::get_border_color() const {
@@ -55,8 +59,13 @@ Color ReferenceRect::get_border_color() const {
 }
 
 void ReferenceRect::set_border_width(float p_width) {
-	border_width = MAX(0.0, p_width);
-	update();
+	float width_max = MAX(0.0, p_width);
+	if (border_width == width_max) {
+		return;
+	}
+
+	border_width = width_max;
+	queue_redraw();
 }
 
 float ReferenceRect::get_border_width() const {
@@ -64,8 +73,12 @@ float ReferenceRect::get_border_width() const {
 }
 
 void ReferenceRect::set_editor_only(const bool &p_enabled) {
+	if (editor_only == p_enabled) {
+		return;
+	}
+
 	editor_only = p_enabled;
-	update();
+	queue_redraw();
 }
 
 bool ReferenceRect::get_editor_only() const {

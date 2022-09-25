@@ -167,8 +167,8 @@ void ShapeCast3D::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::COLOR, "debug_shape_custom_color"), "set_debug_shape_custom_color", "get_debug_shape_custom_color");
 }
 
-TypedArray<String> ShapeCast3D::get_configuration_warnings() const {
-	TypedArray<String> warnings = Node3D::get_configuration_warnings();
+PackedStringArray ShapeCast3D::get_configuration_warnings() const {
+	PackedStringArray warnings = Node3D::get_configuration_warnings();
 
 	if (shape.is_null()) {
 		warnings.push_back(RTR("This node cannot interact with other objects unless a Shape3D is assigned."));
@@ -205,7 +205,7 @@ bool ShapeCast3D::is_enabled() const {
 
 void ShapeCast3D::set_target_position(const Vector3 &p_point) {
 	target_position = p_point;
-	if (is_inside_tree()) {
+	if (is_inside_tree() && get_tree()->is_debugging_collisions_hint()) {
 		_update_debug_shape();
 	}
 	update_gizmos();
@@ -306,7 +306,7 @@ real_t ShapeCast3D::get_closest_collision_unsafe_fraction() const {
 }
 
 void ShapeCast3D::resource_changed(Ref<Resource> p_res) {
-	if (is_inside_tree()) {
+	if (is_inside_tree() && get_tree()->is_debugging_collisions_hint()) {
 		_update_debug_shape();
 	}
 	update_gizmos();
@@ -327,7 +327,7 @@ void ShapeCast3D::set_shape(const Ref<Shape3D> &p_shape) {
 		shape_rid = shape->get_rid();
 	}
 
-	if (is_inside_tree()) {
+	if (is_inside_tree() && get_tree()->is_debugging_collisions_hint()) {
 		_update_debug_shape();
 	}
 

@@ -37,6 +37,8 @@
 #include "servers/rendering/renderer_rd/renderer_scene_render_rd.h"
 #include "servers/rendering/renderer_rd/storage_rd/utilities.h"
 
+#define RB_SCOPE_MOBILE SNAME("mobile")
+
 namespace RendererSceneRenderImplementation {
 
 class RenderForwardMobile : public RendererSceneRenderRD {
@@ -107,43 +109,38 @@ protected:
 
 	/* Render Buffer */
 
-	// We can have:
-	// - 4 subpasses combining the full render cycle
-	// - 3 subpasses + 1 normal pass for tonemapping/glow/dof/etc (using fb for 2D buffer)
-	// - 2 subpasses + 1 normal pass for transparent + 1 normal pass for tonemapping/glow/dof/etc (using fb for 2D buffer)
-	enum RenderBufferMobileFramebufferConfigType {
-		FB_CONFIG_ONE_PASS, // Single pass frame buffer for alpha pass
-		FB_CONFIG_TWO_SUBPASSES, // Opaque + Sky sub pass
-		FB_CONFIG_THREE_SUBPASSES, // Opaque + Sky + Alpha sub pass
-		FB_CONFIG_FOUR_SUBPASSES, // Opaque + Sky + Alpha sub pass + Tonemap pass
-		FB_CONFIG_MAX
+	class RenderBufferDataForwardMobile : public RenderBufferCustomDataRD {
+		GDCLASS(RenderBufferDataForwardMobile, RenderBufferCustomDataRD);
+
+	public:
+		// We can have:
+		// - 4 subpasses combining the full render cycle
+		// - 3 subpasses + 1 normal pass for tonemapping/glow/dof/etc (using fb for 2D buffer)
+		// - 2 subpasses + 1 normal pass for transparent + 1 normal pass for tonemapping/glow/dof/etc (using fb for 2D buffer)
+		enum FramebufferConfigType {
+			FB_CONFIG_ONE_PASS, // Single pass frame buffer for alpha pass
+			FB_CONFIG_TWO_SUBPASSES, // Opaque + Sky sub pass
+			FB_CONFIG_THREE_SUBPASSES, // Opaque + Sky + Alpha sub pass
+			FB_CONFIG_FOUR_SUBPASSES, // Opaque + Sky + Alpha sub pass + Tonemap pass
+			FB_CONFIG_MAX
+		};
+
+		RID get_color_msaa() const { return render_buffers->get_texture(RB_SCOPE_MOBILE, RB_TEX_COLOR_MSAA); }
+		RID get_color_msaa(uint32_t p_layer) { return render_buffers->get_texture_slice(RB_SCOPE_MOBILE, RB_TEX_COLOR_MSAA, p_layer, 0); }
+
+		RID get_depth_msaa() const { return render_buffers->get_texture(RB_SCOPE_MOBILE, RB_TEX_DEPTH_MSAA); }
+		RID get_depth_msaa(uint32_t p_layer) { return render_buffers->get_texture_slice(RB_SCOPE_MOBILE, RB_TEX_DEPTH_MSAA, p_layer, 0); }
+
+		RID get_color_fbs(FramebufferConfigType p_config_type);
+		virtual void free_data() override;
+		virtual void configure(RenderSceneBuffersRD *p_render_buffers) override;
+
+	private:
+		RenderSceneBuffersRD *render_buffers = nullptr;
+		RD::TextureSamples texture_samples = RD::TEXTURE_SAMPLES_1;
 	};
 
-	struct RenderBufferDataForwardMobile : public RenderBufferData {
-		RID color;
-		RID depth;
-		// RID normal_roughness_buffer;
-
-		RS::ViewportMSAA msaa;
-		RD::TextureSamples texture_samples;
-
-		RID color_msaa;
-		RID depth_msaa;
-		// RID normal_roughness_buffer_msaa;
-
-		RID vrs;
-
-		RID color_fbs[FB_CONFIG_MAX];
-		int width, height;
-		uint32_t view_count;
-
-		void clear();
-		virtual void configure(RID p_color_buffer, RID p_depth_buffer, RID p_target_buffer, int p_width, int p_height, RS::ViewportMSAA p_msaa, bool p_use_taa, uint32_t p_view_count, RID p_vrs_texture);
-
-		~RenderBufferDataForwardMobile();
-	};
-
-	virtual RenderBufferData *_create_render_buffer_data() override;
+	virtual void setup_render_buffer_data(Ref<RenderSceneBuffersRD> p_render_buffers) override;
 
 	/* Rendering */
 
@@ -212,21 +209,21 @@ protected:
 	virtual void _render_scene(RenderDataRD *p_render_data, const Color &p_default_bg_color) override;
 
 	virtual void _render_shadow_begin() override;
-	virtual void _render_shadow_append(RID p_framebuffer, const PagedArray<RenderGeometryInstance *> &p_instances, const Projection &p_projection, const Transform3D &p_transform, float p_zfar, float p_bias, float p_normal_bias, bool p_use_dp, bool p_use_dp_flip, bool p_use_pancake, const Plane &p_camera_plane = Plane(), float p_lod_distance_multiplier = 0.0, float p_screen_mesh_lod_threshold = 0.0, const Rect2i &p_rect = Rect2i(), bool p_flip_y = false, bool p_clear_region = true, bool p_begin = true, bool p_end = true, RendererScene::RenderInfo *p_render_info = nullptr) override;
+	virtual void _render_shadow_append(RID p_framebuffer, const PagedArray<RenderGeometryInstance *> &p_instances, const Projection &p_projection, const Transform3D &p_transform, float p_zfar, float p_bias, float p_normal_bias, bool p_use_dp, bool p_use_dp_flip, bool p_use_pancake, const Plane &p_camera_plane = Plane(), float p_lod_distance_multiplier = 0.0, float p_screen_mesh_lod_threshold = 0.0, const Rect2i &p_rect = Rect2i(), bool p_flip_y = false, bool p_clear_region = true, bool p_begin = true, bool p_end = true, RenderingMethod::RenderInfo *p_render_info = nullptr) override;
 	virtual void _render_shadow_process() override;
 	virtual void _render_shadow_end(uint32_t p_barrier = RD::BARRIER_MASK_ALL) override;
 
-	virtual void _render_material(const Transform3D &p_cam_transform, const Projection &p_cam_projection, bool p_cam_orthogonal, const PagedArray<RenderGeometryInstance *> &p_instances, RID p_framebuffer, const Rect2i &p_region) override;
+	virtual void _render_material(const Transform3D &p_cam_transform, const Projection &p_cam_projection, bool p_cam_orthogonal, const PagedArray<RenderGeometryInstance *> &p_instances, RID p_framebuffer, const Rect2i &p_region, float p_exposure_normalization) override;
 	virtual void _render_uv2(const PagedArray<RenderGeometryInstance *> &p_instances, RID p_framebuffer, const Rect2i &p_region) override;
-	virtual void _render_sdfgi(RID p_render_buffers, const Vector3i &p_from, const Vector3i &p_size, const AABB &p_bounds, const PagedArray<RenderGeometryInstance *> &p_instances, const RID &p_albedo_texture, const RID &p_emission_texture, const RID &p_emission_aniso_texture, const RID &p_geom_facing_texture) override;
+	virtual void _render_sdfgi(Ref<RenderSceneBuffersRD> p_render_buffers, const Vector3i &p_from, const Vector3i &p_size, const AABB &p_bounds, const PagedArray<RenderGeometryInstance *> &p_instances, const RID &p_albedo_texture, const RID &p_emission_texture, const RID &p_emission_aniso_texture, const RID &p_geom_facing_texture, float p_exposure_normalization) override;
 	virtual void _render_particle_collider_heightfield(RID p_fb, const Transform3D &p_cam_transform, const Projection &p_cam_projection, const PagedArray<RenderGeometryInstance *> &p_instances) override;
 
 	uint64_t lightmap_texture_array_version = 0xFFFFFFFF;
 
 	virtual void _base_uniforms_changed() override;
 	void _update_render_base_uniform_set();
-	virtual RID _render_buffers_get_normal_texture(RID p_render_buffers) override;
-	virtual RID _render_buffers_get_velocity_texture(RID p_render_buffers) override;
+	virtual RID _render_buffers_get_normal_texture(Ref<RenderSceneBuffersRD> p_render_buffers) override;
+	virtual RID _render_buffers_get_velocity_texture(Ref<RenderSceneBuffersRD> p_render_buffers) override;
 
 	void _fill_render_list(RenderListType p_render_list, const RenderDataRD *p_render_data, PassMode p_pass_mode, bool p_append = false);
 	void _fill_element_info(RenderListType p_render_list, uint32_t p_offset = 0, int32_t p_max_elements = -1);
@@ -235,7 +232,7 @@ protected:
 	static RenderForwardMobile *singleton;
 
 	void _setup_environment(const RenderDataRD *p_render_data, bool p_no_fog, const Size2i &p_screen_size, bool p_flip_y, const Color &p_default_bg_color, bool p_opaque_render_buffers = false, bool p_pancake_shadows = false, int p_index = 0);
-	void _setup_lightmaps(const PagedArray<RID> &p_lightmaps, const Transform3D &p_cam_transform);
+	void _setup_lightmaps(const RenderDataRD *p_render_data, const PagedArray<RID> &p_lightmaps, const Transform3D &p_cam_transform);
 
 	RID render_base_uniform_set;
 	LocalVector<RID> render_pass_uniform_sets;
@@ -244,6 +241,8 @@ protected:
 
 	struct LightmapData {
 		float normal_xform[12];
+		float pad[3];
+		float exposure_normalization;
 	};
 
 	struct LightmapCaptureData {
@@ -253,75 +252,6 @@ protected:
 	/* Scene state */
 
 	struct SceneState {
-		// This struct is loaded into Set 1 - Binding 0, populated at start of rendering a frame, must match with shader code
-		struct UBO {
-			float projection_matrix[16];
-			float inv_projection_matrix[16];
-			float inv_view_matrix[16];
-			float view_matrix[16];
-
-			float projection_matrix_view[RendererSceneRender::MAX_RENDER_VIEWS][16];
-			float inv_projection_matrix_view[RendererSceneRender::MAX_RENDER_VIEWS][16];
-			float eye_offset[RendererSceneRender::MAX_RENDER_VIEWS][4];
-
-			float viewport_size[2];
-			float screen_pixel_size[2];
-
-			float directional_penumbra_shadow_kernel[128]; //32 vec4s
-			float directional_soft_shadow_kernel[128];
-			float penumbra_shadow_kernel[128];
-			float soft_shadow_kernel[128];
-
-			float ambient_light_color_energy[4];
-
-			float ambient_color_sky_mix;
-			uint32_t use_ambient_light;
-			uint32_t use_ambient_cubemap;
-			uint32_t use_reflection_cubemap;
-
-			float radiance_inverse_xform[12];
-
-			float shadow_atlas_pixel_size[2];
-			float directional_shadow_pixel_size[2];
-
-			uint32_t directional_light_count;
-			float dual_paraboloid_side;
-			float z_far;
-			float z_near;
-
-			uint32_t ssao_enabled;
-			float ssao_light_affect;
-			float ssao_ao_affect;
-			uint32_t roughness_limiter_enabled;
-
-			float roughness_limiter_amount;
-			float roughness_limiter_limit;
-			float opaque_prepass_threshold;
-			uint32_t roughness_limiter_pad;
-
-			// Fog
-			uint32_t fog_enabled;
-			float fog_density;
-			float fog_height;
-			float fog_height_density;
-
-			float fog_light_color[3];
-			float fog_sun_scatter;
-
-			float fog_aerial_perspective;
-			uint32_t material_uv2_mode;
-
-			float time;
-			float reflection_multiplier;
-
-			uint32_t pancake_shadows;
-			uint32_t pad1;
-			uint32_t pad2;
-			uint32_t pad3;
-		};
-
-		UBO ubo;
-
 		LocalVector<RID> uniform_buffers;
 
 		// !BAS! We need to change lightmaps, we're not going to do this with a buffer but pushing the used lightmap in
@@ -443,13 +373,14 @@ protected:
 
 	// check which ones of these apply, probably all except GI and SDFGI
 	enum {
-		INSTANCE_DATA_FLAGS_NON_UNIFORM_SCALE = 1 << 5,
-		INSTANCE_DATA_FLAG_USE_GI_BUFFERS = 1 << 6,
-		INSTANCE_DATA_FLAG_USE_SDFGI = 1 << 7,
-		INSTANCE_DATA_FLAG_USE_LIGHTMAP_CAPTURE = 1 << 8,
-		INSTANCE_DATA_FLAG_USE_LIGHTMAP = 1 << 9,
-		INSTANCE_DATA_FLAG_USE_SH_LIGHTMAP = 1 << 10,
-		INSTANCE_DATA_FLAG_USE_VOXEL_GI = 1 << 11,
+		INSTANCE_DATA_FLAGS_NON_UNIFORM_SCALE = 1 << 4,
+		INSTANCE_DATA_FLAG_USE_GI_BUFFERS = 1 << 5,
+		INSTANCE_DATA_FLAG_USE_SDFGI = 1 << 6,
+		INSTANCE_DATA_FLAG_USE_LIGHTMAP_CAPTURE = 1 << 7,
+		INSTANCE_DATA_FLAG_USE_LIGHTMAP = 1 << 8,
+		INSTANCE_DATA_FLAG_USE_SH_LIGHTMAP = 1 << 9,
+		INSTANCE_DATA_FLAG_USE_VOXEL_GI = 1 << 10,
+		INSTANCE_DATA_FLAG_PARTICLES = 1 << 11,
 		INSTANCE_DATA_FLAG_MULTIMESH = 1 << 12,
 		INSTANCE_DATA_FLAG_MULTIMESH_FORMAT_2D = 1 << 13,
 		INSTANCE_DATA_FLAG_MULTIMESH_HAS_COLOR = 1 << 14,

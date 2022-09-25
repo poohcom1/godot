@@ -1733,7 +1733,7 @@ RID RenderingDeviceVulkan::texture_create(const TextureFormat &p_format, const T
 
 	ERR_FAIL_INDEX_V(p_format.samples, TEXTURE_SAMPLES_MAX, RID());
 
-	image_create_info.samples = rasterization_sample_count[p_format.samples];
+	image_create_info.samples = _ensure_supported_sample_count(p_format.samples);
 	image_create_info.tiling = (p_format.usage_bits & TEXTURE_USAGE_CPU_READ_BIT) ? VK_IMAGE_TILING_LINEAR : VK_IMAGE_TILING_OPTIMAL;
 
 	// Usage.
@@ -1884,6 +1884,7 @@ RID RenderingDeviceVulkan::texture_create(const TextureFormat &p_format, const T
 	texture.mipmaps = image_create_info.mipLevels;
 	texture.base_mipmap = 0;
 	texture.base_layer = 0;
+	texture.is_resolve_buffer = p_format.is_resolve_buffer;
 	texture.usage_flags = p_format.usage_bits;
 	texture.samples = p_format.samples;
 	texture.allowed_shared_formats = p_format.shareable_formats;
@@ -3425,7 +3426,7 @@ VkRenderPass RenderingDeviceVulkan::_render_pass_create(const Vector<AttachmentF
 		description.pNext = nullptr;
 		description.flags = 0;
 		description.format = vulkan_formats[p_attachments[i].format];
-		description.samples = rasterization_sample_count[p_attachments[i].samples];
+		description.samples = _ensure_supported_sample_count(p_attachments[i].samples);
 
 		bool is_sampled = p_attachments[i].usage_flags & TEXTURE_USAGE_SAMPLING_BIT;
 		bool is_storage = p_attachments[i].usage_flags & TEXTURE_USAGE_STORAGE_BIT;
@@ -3546,7 +3547,8 @@ VkRenderPass RenderingDeviceVulkan::_render_pass_create(const Vector<AttachmentF
 							break;
 						}
 					}
-				} else {
+				}
+				if (!used_last) {
 					for (int j = 0; j < p_passes[last_pass].color_attachments.size(); j++) {
 						if (p_passes[last_pass].color_attachments[j] == i) {
 							used_last = true;
@@ -4116,7 +4118,11 @@ RID RenderingDeviceVulkan::framebuffer_create(const Vector<RID> &p_texture_attac
 		} else if (texture && texture->usage_flags & TEXTURE_USAGE_VRS_ATTACHMENT_BIT) {
 			pass.vrs_attachment = i;
 		} else {
-			pass.color_attachments.push_back(texture ? i : FramebufferPass::ATTACHMENT_UNUSED);
+			if (texture && texture->is_resolve_buffer) {
+				pass.resolve_attachments.push_back(i);
+			} else {
+				pass.color_attachments.push_back(texture ? i : FramebufferPass::ATTACHMENT_UNUSED);
+			}
 		}
 	}
 
@@ -6567,7 +6573,7 @@ RID RenderingDeviceVulkan::render_pipeline_create(RID p_shader, FramebufferForma
 	multisample_state_create_info.pNext = nullptr;
 	multisample_state_create_info.flags = 0;
 
-	multisample_state_create_info.rasterizationSamples = rasterization_sample_count[p_multisample_state.sample_count];
+	multisample_state_create_info.rasterizationSamples = _ensure_supported_sample_count(p_multisample_state.sample_count);
 	multisample_state_create_info.sampleShadingEnable = p_multisample_state.enable_sample_shading;
 	multisample_state_create_info.minSampleShading = p_multisample_state.min_sample_shading;
 	Vector<VkSampleMask> sample_mask;
@@ -7353,7 +7359,9 @@ RenderingDevice::DrawListID RenderingDeviceVulkan::draw_list_begin(RID p_framebu
 			// If it is the first we're likely populating our VRS texture.
 			// Bit dirty but...
 			if (!texture || (!(texture->usage_flags & TEXTURE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT) && !(i != 0 && texture->usage_flags & TEXTURE_USAGE_VRS_ATTACHMENT_BIT))) {
-				color_count++;
+				if (!texture || !texture->is_resolve_buffer) {
+					color_count++;
+				}
 			}
 		}
 		ERR_FAIL_COND_V_MSG(p_clear_color_values.size() != color_count, INVALID_ID, "Clear color values supplied (" + itos(p_clear_color_values.size()) + ") differ from the amount required for framebuffer color attachments (" + itos(color_count) + ").");
@@ -7541,6 +7549,16 @@ RenderingDeviceVulkan::DrawList *RenderingDeviceVulkan::_get_draw_list_ptr(DrawL
 	} else {
 		return nullptr;
 	}
+}
+
+void RenderingDeviceVulkan::draw_list_set_blend_constants(DrawListID p_list, const Color &p_color) {
+	DrawList *dl = _get_draw_list_ptr(p_list);
+	ERR_FAIL_COND(!dl);
+#ifdef DEBUG_ENABLED
+	ERR_FAIL_COND_MSG(!dl->validation.active, "Submitted Draw Lists can no longer be modified.");
+#endif
+
+	vkCmdSetBlendConstants(dl->command_buffer, p_color.components);
 }
 
 void RenderingDeviceVulkan::draw_list_bind_render_pipeline(DrawListID p_list, RID p_render_pipeline) {
@@ -7804,12 +7822,6 @@ void RenderingDeviceVulkan::draw_list_draw(DrawListID p_list, bool p_use_indices
 
 		ERR_FAIL_COND_MSG(!dl->validation.index_array_size,
 				"Draw command requested indices, but no index buffer was set.");
-
-		if (dl->validation.pipeline_vertex_format != INVALID_ID) {
-			// Uses vertices, do some vertex validations.
-			ERR_FAIL_COND_MSG(dl->validation.vertex_array_size < dl->validation.index_array_max_index,
-					"Index array references (max index: " + itos(dl->validation.index_array_max_index) + ") indices beyond the vertex array size (" + itos(dl->validation.vertex_array_size) + ").");
-		}
 
 		ERR_FAIL_COND_MSG(dl->validation.pipeline_uses_restart_indices != dl->validation.index_buffer_uses_restart_indices,
 				"The usage of restart indices in index buffer does not match the render primitive in the pipeline.");
@@ -8989,6 +9001,25 @@ void RenderingDeviceVulkan::_begin_frame() {
 	frames[frame].index = Engine::get_singleton()->get_frames_drawn();
 }
 
+VkSampleCountFlagBits RenderingDeviceVulkan::_ensure_supported_sample_count(TextureSamples p_requested_sample_count) const {
+	VkSampleCountFlags sample_count_flags = limits.framebufferColorSampleCounts & limits.framebufferDepthSampleCounts;
+
+	if (sample_count_flags & rasterization_sample_count[p_requested_sample_count]) {
+		// The requested sample count is supported.
+		return rasterization_sample_count[p_requested_sample_count];
+	} else {
+		// Find the closest lower supported sample count.
+		VkSampleCountFlagBits sample_count = rasterization_sample_count[p_requested_sample_count];
+		while (sample_count > VK_SAMPLE_COUNT_1_BIT) {
+			if (sample_count_flags & sample_count) {
+				return sample_count;
+			}
+			sample_count = (VkSampleCountFlagBits)(sample_count >> 1);
+		}
+	}
+	return VK_SAMPLE_COUNT_1_BIT;
+}
+
 void RenderingDeviceVulkan::swap_buffers() {
 	ERR_FAIL_COND_MSG(local_device.is_valid(), "Local devices can't swap buffers.");
 	_THREAD_SAFE_METHOD_
@@ -9336,10 +9367,10 @@ void RenderingDeviceVulkan::initialize(VulkanContext *p_context, bool p_local_de
 
 	// NOTE: If adding new project settings here, also duplicate their definition in
 	// rendering_server.cpp for headless doctool.
-	staging_buffer_block_size = GLOBAL_DEF("rendering/vulkan/staging_buffer/block_size_kb", 256);
+	staging_buffer_block_size = GLOBAL_DEF("rendering/rendering_device/staging_buffer/block_size_kb", 256);
 	staging_buffer_block_size = MAX(4u, staging_buffer_block_size);
 	staging_buffer_block_size *= 1024; // Kb -> bytes.
-	staging_buffer_max_size = GLOBAL_DEF("rendering/vulkan/staging_buffer/max_size_mb", 128);
+	staging_buffer_max_size = GLOBAL_DEF("rendering/rendering_device/staging_buffer/max_size_mb", 128);
 	staging_buffer_max_size = MAX(1u, staging_buffer_max_size);
 	staging_buffer_max_size *= 1024 * 1024;
 
@@ -9347,7 +9378,7 @@ void RenderingDeviceVulkan::initialize(VulkanContext *p_context, bool p_local_de
 		// Validate enough blocks.
 		staging_buffer_max_size = staging_buffer_block_size * 4;
 	}
-	texture_upload_region_size_px = GLOBAL_DEF("rendering/vulkan/staging_buffer/texture_upload_region_size_px", 64);
+	texture_upload_region_size_px = GLOBAL_DEF("rendering/rendering_device/staging_buffer/texture_upload_region_size_px", 64);
 	texture_upload_region_size_px = nearest_power_of_2_templated(texture_upload_region_size_px);
 
 	frames_drawn = frame_count; // Start from frame count, so everything else is immediately old.
@@ -9362,7 +9393,7 @@ void RenderingDeviceVulkan::initialize(VulkanContext *p_context, bool p_local_de
 		ERR_CONTINUE(err != OK);
 	}
 
-	max_descriptors_per_pool = GLOBAL_DEF("rendering/vulkan/descriptor_pools/max_descriptors_per_pool", 64);
+	max_descriptors_per_pool = GLOBAL_DEF("rendering/rendering_device/descriptor_pools/max_descriptors_per_pool", 64);
 
 	// Check to make sure DescriptorPoolKey is good.
 	static_assert(sizeof(uint64_t) * 3 >= UNIFORM_TYPE_MAX * sizeof(uint16_t));

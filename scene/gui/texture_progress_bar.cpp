@@ -33,8 +33,12 @@
 #include "core/config/engine.h"
 
 void TextureProgressBar::set_under_texture(const Ref<Texture2D> &p_texture) {
+	if (under == p_texture) {
+		return;
+	}
+
 	under = p_texture;
-	update();
+	queue_redraw();
 	update_minimum_size();
 }
 
@@ -43,8 +47,12 @@ Ref<Texture2D> TextureProgressBar::get_under_texture() const {
 }
 
 void TextureProgressBar::set_over_texture(const Ref<Texture2D> &p_texture) {
+	if (over == p_texture) {
+		return;
+	}
+
 	over = p_texture;
-	update();
+	queue_redraw();
 	if (under.is_null()) {
 		update_minimum_size();
 	}
@@ -56,8 +64,13 @@ Ref<Texture2D> TextureProgressBar::get_over_texture() const {
 
 void TextureProgressBar::set_stretch_margin(Side p_side, int p_size) {
 	ERR_FAIL_INDEX((int)p_side, 4);
+
+	if (stretch_margin[p_side] == p_size) {
+		return;
+	}
+
 	stretch_margin[p_side] = p_size;
-	update();
+	queue_redraw();
 	update_minimum_size();
 }
 
@@ -67,8 +80,12 @@ int TextureProgressBar::get_stretch_margin(Side p_side) const {
 }
 
 void TextureProgressBar::set_nine_patch_stretch(bool p_stretch) {
+	if (nine_patch_stretch == p_stretch) {
+		return;
+	}
+
 	nine_patch_stretch = p_stretch;
-	update();
+	queue_redraw();
 	update_minimum_size();
 }
 
@@ -91,8 +108,12 @@ Size2 TextureProgressBar::get_minimum_size() const {
 }
 
 void TextureProgressBar::set_progress_texture(const Ref<Texture2D> &p_texture) {
+	if (progress == p_texture) {
+		return;
+	}
+
 	progress = p_texture;
-	update();
+	queue_redraw();
 	update_minimum_size();
 }
 
@@ -101,8 +122,12 @@ Ref<Texture2D> TextureProgressBar::get_progress_texture() const {
 }
 
 void TextureProgressBar::set_progress_offset(Point2 p_offset) {
+	if (progress_offset == p_offset) {
+		return;
+	}
+
 	progress_offset = p_offset;
-	update();
+	queue_redraw();
 }
 
 Point2 TextureProgressBar::get_progress_offset() const {
@@ -110,8 +135,12 @@ Point2 TextureProgressBar::get_progress_offset() const {
 }
 
 void TextureProgressBar::set_tint_under(const Color &p_tint) {
+	if (tint_under == p_tint) {
+		return;
+	}
+
 	tint_under = p_tint;
-	update();
+	queue_redraw();
 }
 
 Color TextureProgressBar::get_tint_under() const {
@@ -119,8 +148,12 @@ Color TextureProgressBar::get_tint_under() const {
 }
 
 void TextureProgressBar::set_tint_progress(const Color &p_tint) {
+	if (tint_progress == p_tint) {
+		return;
+	}
+
 	tint_progress = p_tint;
-	update();
+	queue_redraw();
 }
 
 Color TextureProgressBar::get_tint_progress() const {
@@ -128,8 +161,12 @@ Color TextureProgressBar::get_tint_progress() const {
 }
 
 void TextureProgressBar::set_tint_over(const Color &p_tint) {
+	if (tint_over == p_tint) {
+		return;
+	}
+
 	tint_over = p_tint;
-	update();
+	queue_redraw();
 }
 
 Color TextureProgressBar::get_tint_over() const {
@@ -548,8 +585,13 @@ void TextureProgressBar::_notification(int p_what) {
 
 void TextureProgressBar::set_fill_mode(int p_fill) {
 	ERR_FAIL_INDEX(p_fill, FILL_MODE_MAX);
+
+	if (mode == (FillMode)p_fill) {
+		return;
+	}
+
 	mode = (FillMode)p_fill;
-	update();
+	queue_redraw();
 }
 
 int TextureProgressBar::get_fill_mode() {
@@ -563,8 +605,13 @@ void TextureProgressBar::set_radial_initial_angle(float p_angle) {
 	while (p_angle < 0) {
 		p_angle += 360;
 	}
+
+	if (rad_init_angle == p_angle) {
+		return;
+	}
+
 	rad_init_angle = p_angle;
-	update();
+	queue_redraw();
 }
 
 float TextureProgressBar::get_radial_initial_angle() {
@@ -572,8 +619,14 @@ float TextureProgressBar::get_radial_initial_angle() {
 }
 
 void TextureProgressBar::set_fill_degrees(float p_angle) {
-	rad_max_degrees = CLAMP(p_angle, 0, 360);
-	update();
+	float angle_clamped = CLAMP(p_angle, 0, 360);
+
+	if (rad_max_degrees == angle_clamped) {
+		return;
+	}
+
+	rad_max_degrees = angle_clamped;
+	queue_redraw();
 }
 
 float TextureProgressBar::get_fill_degrees() {
@@ -581,8 +634,12 @@ float TextureProgressBar::get_fill_degrees() {
 }
 
 void TextureProgressBar::set_radial_center_offset(const Point2 &p_off) {
+	if (rad_center_off == p_off) {
+		return;
+	}
+
 	rad_center_off = p_off;
-	update();
+	queue_redraw();
 }
 
 Point2 TextureProgressBar::get_radial_center_offset() {

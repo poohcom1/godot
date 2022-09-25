@@ -40,6 +40,8 @@ struct EditorProgress;
 #include "scene/gui/rich_text_label.h"
 #include "scene/main/node.h"
 
+class EditorExportPlugin;
+
 class EditorExportPlatform : public RefCounted {
 	GDCLASS(EditorExportPlatform, RefCounted);
 
@@ -99,6 +101,20 @@ private:
 
 	static Error _add_shared_object(void *p_userdata, const SharedObject &p_so);
 
+	struct FileExportCache {
+		uint64_t source_modified_time = 0;
+		String source_md5;
+		String saved_path;
+		bool used = false;
+	};
+
+	bool _export_customize_dictionary(Dictionary &dict, LocalVector<Ref<EditorExportPlugin>> &customize_resources_plugins);
+	bool _export_customize_array(Array &array, LocalVector<Ref<EditorExportPlugin>> &customize_resources_plugins);
+	bool _export_customize_object(Object *p_object, LocalVector<Ref<EditorExportPlugin>> &customize_resources_plugins);
+	bool _export_customize_scene_resources(Node *p_root, Node *p_node, LocalVector<Ref<EditorExportPlugin>> &customize_resources_plugins);
+
+	String _export_customize(const String &p_path, LocalVector<Ref<EditorExportPlugin>> &customize_resources_plugins, LocalVector<Ref<EditorExportPlugin>> &customize_scenes_plugins, HashMap<String, FileExportCache> &export_cache, const String &export_base_path, bool p_force_save);
+
 protected:
 	struct ExportNotifier {
 		ExportNotifier(EditorExportPlatform &p_platform, const Ref<EditorExportPreset> &p_preset, bool p_debug, const String &p_path, int p_flags);
@@ -117,10 +133,12 @@ public:
 	struct ExportOption {
 		PropertyInfo option;
 		Variant default_value;
+		bool update_visibility = false;
 
-		ExportOption(const PropertyInfo &p_info, const Variant &p_default) :
+		ExportOption(const PropertyInfo &p_info, const Variant &p_default, bool p_update_visibility = false) :
 				option(p_info),
-				default_value(p_default) {
+				default_value(p_default),
+				update_visibility(p_update_visibility) {
 		}
 		ExportOption() {}
 	};
@@ -136,13 +154,13 @@ public:
 		messages.push_back(msg);
 		switch (p_type) {
 			case EXPORT_MESSAGE_INFO: {
-				print_line(vformat("%s: %s\n", msg.category, msg.text));
+				print_line(vformat("%s: %s", msg.category, msg.text));
 			} break;
 			case EXPORT_MESSAGE_WARNING: {
-				WARN_PRINT(vformat("%s: %s\n", msg.category, msg.text));
+				WARN_PRINT(vformat("%s: %s", msg.category, msg.text));
 			} break;
 			case EXPORT_MESSAGE_ERROR: {
-				ERR_PRINT(vformat("%s: %s\n", msg.category, msg.text));
+				ERR_PRINT(vformat("%s: %s", msg.category, msg.text));
 			} break;
 			default:
 				break;
@@ -170,7 +188,7 @@ public:
 
 	virtual void get_export_options(List<ExportOption> *r_options) = 0;
 	virtual bool should_update_export_options() { return false; }
-	virtual bool get_export_option_visibility(const String &p_option, const HashMap<StringName, Variant> &p_options) const { return true; }
+	virtual bool get_export_option_visibility(const EditorExportPreset *p_preset, const String &p_option, const HashMap<StringName, Variant> &p_options) const { return true; }
 
 	virtual String get_os_name() const = 0;
 	virtual String get_name() const = 0;

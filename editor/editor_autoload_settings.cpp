@@ -35,6 +35,7 @@
 #include "editor/editor_file_dialog.h"
 #include "editor/editor_node.h"
 #include "editor/editor_scale.h"
+#include "editor/editor_undo_redo_manager.h"
 #include "editor/filesystem_dock.h"
 #include "project_settings_editor.h"
 #include "scene/main/window.h"
@@ -163,7 +164,7 @@ void EditorAutoloadSettings::_autoload_add() {
 		if (!fpath.ends_with("/")) {
 			fpath = fpath.get_base_dir();
 		}
-		dialog->config("Node", fpath.plus_file(vformat("%s.gd", autoload_add_name->get_text().camelcase_to_underscore())), false, false);
+		dialog->config("Node", fpath.path_join(vformat("%s.gd", autoload_add_name->get_text().to_snake_case())), false, false);
 		dialog->popup_centered();
 	} else {
 		if (autoload_add(autoload_add_name->get_text(), autoload_add_path->get_text())) {
@@ -193,7 +194,7 @@ void EditorAutoloadSettings::_autoload_edited() {
 	TreeItem *ti = tree->get_edited();
 	int column = tree->get_edited_column();
 
-	UndoRedo *undo_redo = EditorNode::get_undo_redo();
+	Ref<EditorUndoRedoManager> undo_redo = EditorNode::get_undo_redo();
 
 	if (column == 0) {
 		String name = ti->get_text(0);
@@ -288,7 +289,7 @@ void EditorAutoloadSettings::_autoload_button_pressed(Object *p_item, int p_colu
 
 	String name = "autoload/" + ti->get_text(0);
 
-	UndoRedo *undo_redo = EditorNode::get_undo_redo();
+	Ref<EditorUndoRedoManager> undo_redo = EditorNode::get_undo_redo();
 
 	switch (p_button) {
 		case BUTTON_OPEN: {
@@ -370,7 +371,7 @@ void EditorAutoloadSettings::_autoload_open(const String &fpath) {
 
 void EditorAutoloadSettings::_autoload_file_callback(const String &p_path) {
 	// Convert the file name to PascalCase, which is the convention for classes in GDScript.
-	const String class_name = p_path.get_file().get_basename().capitalize().replace(" ", "");
+	const String class_name = p_path.get_file().get_basename().to_pascal_case();
 
 	// If the name collides with a built-in class, prefix the name to make it possible to add without having to edit the name.
 	// The prefix is subjective, but it provides better UX than leaving the Add button disabled :)
@@ -579,7 +580,7 @@ void EditorAutoloadSettings::_script_created(Ref<Script> p_script) {
 	FileSystemDock::get_singleton()->get_script_create_dialog()->hide();
 	path = p_script->get_path().get_base_dir();
 	autoload_add_path->set_text(p_script->get_path());
-	autoload_add_name->set_text(p_script->get_path().get_file().get_basename().capitalize().replace(" ", ""));
+	autoload_add_name->set_text(p_script->get_path().get_file().get_basename().to_pascal_case());
 	_autoload_add();
 }
 
@@ -713,7 +714,7 @@ void EditorAutoloadSettings::drop_data_fw(const Point2 &p_point, const Variant &
 
 	orders.sort();
 
-	UndoRedo *undo_redo = EditorNode::get_undo_redo();
+	Ref<EditorUndoRedoManager> undo_redo = EditorNode::get_undo_redo();
 
 	undo_redo->create_action(TTR("Rearrange Autoloads"));
 
@@ -757,7 +758,7 @@ bool EditorAutoloadSettings::autoload_add(const String &p_name, const String &p_
 
 	name = "autoload/" + name;
 
-	UndoRedo *undo_redo = EditorNode::get_undo_redo();
+	Ref<EditorUndoRedoManager> undo_redo = EditorNode::get_undo_redo();
 
 	undo_redo->create_action(TTR("Add Autoload"));
 	// Singleton autoloads are represented with a leading "*" in their path.
@@ -783,7 +784,7 @@ bool EditorAutoloadSettings::autoload_add(const String &p_name, const String &p_
 void EditorAutoloadSettings::autoload_remove(const String &p_name) {
 	String name = "autoload/" + p_name;
 
-	UndoRedo *undo_redo = EditorNode::get_undo_redo();
+	Ref<EditorUndoRedoManager> undo_redo = EditorNode::get_undo_redo();
 
 	int order = ProjectSettings::get_singleton()->get_order(name);
 

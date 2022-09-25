@@ -102,7 +102,7 @@ private:
 	double inactive_time = 0.0;
 	double frame_remainder = 0.0;
 	int cycle = 0;
-	bool redraw = false;
+	bool do_redraw = false;
 
 	RID mesh;
 	RID multimesh;
@@ -186,14 +186,14 @@ private:
 
 	void _update_mesh_texture();
 
-	void _set_redraw(bool p_redraw);
+	void _set_do_redraw(bool p_do_redraw);
 
 	void _texture_changed();
 
 protected:
 	static void _bind_methods();
 	void _notification(int p_what);
-	virtual void _validate_property(PropertyInfo &property) const override;
+	void _validate_property(PropertyInfo &p_property) const;
 
 public:
 	void set_emitting(bool p_emitting);
@@ -282,7 +282,7 @@ public:
 	void set_gravity(const Vector2 &p_gravity);
 	Vector2 get_gravity() const;
 
-	TypedArray<String> get_configuration_warnings() const override;
+	PackedStringArray get_configuration_warnings() const override;
 
 	void restart();
 

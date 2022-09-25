@@ -41,6 +41,8 @@
 #include "scene/gui/texture_button.h"
 #include "scene/gui/texture_rect.h"
 
+class UndoRedo;
+
 class EditorLog : public HBoxContainer {
 	GDCLASS(EditorLog, HBoxContainer);
 
@@ -93,7 +95,7 @@ private:
 			toggle_button->set_toggle_mode(true);
 			toggle_button->set_pressed(true);
 			toggle_button->set_text(itos(message_count));
-			toggle_button->set_tooltip(TTR(p_tooltip));
+			toggle_button->set_tooltip_text(TTR(p_tooltip));
 			// Don't tint the icon even when in "pressed" state.
 			toggle_button->add_theme_color_override("icon_color_pressed", Color(1, 1, 1, 1));
 			toggle_button->set_focus_mode(FOCUS_NONE);
@@ -182,6 +184,7 @@ protected:
 public:
 	void add_message(const String &p_msg, MessageType p_type = MSG_TYPE_STD);
 	void set_tool_button(Button *p_tool_button);
+	void register_undo_redo(UndoRedo *p_undo_redo);
 	void deinit();
 
 	void clear();

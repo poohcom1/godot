@@ -67,7 +67,7 @@ bool TextureButton::has_point(const Point2 &p_point) const {
 		Rect2 rect = Rect2();
 		Size2 mask_size = click_mask->get_size();
 
-		if (_position_rect.has_no_area()) {
+		if (!_position_rect.has_area()) {
 			rect.size = mask_size;
 		} else if (_tile) {
 			// if the stretch mode is tile we offset the point to keep it inside the mask size
@@ -112,7 +112,7 @@ bool TextureButton::has_point(const Point2 &p_point) const {
 		}
 
 		Point2i p = point;
-		return click_mask->get_bit(p);
+		return click_mask->get_bitv(p);
 	}
 
 	return Control::has_point(p_point);
@@ -294,31 +294,50 @@ void TextureButton::_bind_methods() {
 }
 
 void TextureButton::set_normal_texture(const Ref<Texture2D> &p_normal) {
+	if (normal == p_normal) {
+		return;
+	}
+
 	normal = p_normal;
-	update();
+	queue_redraw();
 	update_minimum_size();
 }
 
 void TextureButton::set_pressed_texture(const Ref<Texture2D> &p_pressed) {
+	if (pressed == p_pressed) {
+		return;
+	}
+
 	pressed = p_pressed;
-	update();
+	queue_redraw();
 	update_minimum_size();
 }
 
 void TextureButton::set_hover_texture(const Ref<Texture2D> &p_hover) {
+	if (hover == p_hover) {
+		return;
+	}
+
 	hover = p_hover;
-	update();
+	queue_redraw();
 	update_minimum_size();
 }
 
 void TextureButton::set_disabled_texture(const Ref<Texture2D> &p_disabled) {
+	if (disabled == p_disabled) {
+		return;
+	}
+
 	disabled = p_disabled;
-	update();
+	queue_redraw();
 }
 
 void TextureButton::set_click_mask(const Ref<BitMap> &p_click_mask) {
+	if (click_mask == p_click_mask) {
+		return;
+	}
 	click_mask = p_click_mask;
-	update();
+	queue_redraw();
 	update_minimum_size();
 }
 
@@ -355,14 +374,22 @@ bool TextureButton::get_ignore_texture_size() const {
 }
 
 void TextureButton::set_ignore_texture_size(bool p_ignore) {
+	if (ignore_texture_size == p_ignore) {
+		return;
+	}
+
 	ignore_texture_size = p_ignore;
 	update_minimum_size();
-	update();
+	queue_redraw();
 }
 
 void TextureButton::set_stretch_mode(StretchMode p_stretch_mode) {
+	if (stretch_mode == p_stretch_mode) {
+		return;
+	}
+
 	stretch_mode = p_stretch_mode;
-	update();
+	queue_redraw();
 }
 
 TextureButton::StretchMode TextureButton::get_stretch_mode() const {
@@ -370,8 +397,12 @@ TextureButton::StretchMode TextureButton::get_stretch_mode() const {
 }
 
 void TextureButton::set_flip_h(bool p_flip) {
+	if (hflip == p_flip) {
+		return;
+	}
+
 	hflip = p_flip;
-	update();
+	queue_redraw();
 }
 
 bool TextureButton::is_flipped_h() const {
@@ -379,8 +410,12 @@ bool TextureButton::is_flipped_h() const {
 }
 
 void TextureButton::set_flip_v(bool p_flip) {
+	if (vflip == p_flip) {
+		return;
+	}
+
 	vflip = p_flip;
-	update();
+	queue_redraw();
 }
 
 bool TextureButton::is_flipped_v() const {

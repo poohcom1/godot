@@ -134,7 +134,7 @@ void ScriptCreateDialog::_notification(int p_what) {
 			path_button->set_icon(get_theme_icon(SNAME("Folder"), SNAME("EditorIcons")));
 			parent_browse_button->set_icon(get_theme_icon(SNAME("Folder"), SNAME("EditorIcons")));
 			parent_search_button->set_icon(get_theme_icon(SNAME("ClassList"), SNAME("EditorIcons")));
-			status_panel->add_theme_style_override("panel", get_theme_stylebox(SNAME("bg"), SNAME("Tree")));
+			status_panel->add_theme_style_override("panel", get_theme_stylebox(SNAME("panel"), SNAME("Tree")));
 		} break;
 	}
 }
@@ -166,6 +166,7 @@ void ScriptCreateDialog::config(const String &p_base_name, const String &p_base_
 	class_name->deselect();
 	parent_name->set_text(p_base_name);
 	parent_name->deselect();
+	internal_name->set_text("");
 
 	if (!p_base_path.is_empty()) {
 		initial_bp = p_base_path.get_basename();
@@ -201,7 +202,7 @@ bool ScriptCreateDialog::_validate_parent(const String &p_string) {
 		}
 	}
 
-	return ClassDB::class_exists(p_string) || ScriptServer::is_global_class(p_string);
+	return EditorNode::get_editor_data().is_type_recognized(p_string);
 }
 
 bool ScriptCreateDialog::_validate_class(const String &p_string) {
@@ -371,7 +372,15 @@ void ScriptCreateDialog::_create_new() {
 
 	const ScriptLanguage::ScriptTemplate sinfo = _get_current_template();
 
-	scr = ScriptServer::get_language(language_menu->get_selected())->make_template(sinfo.content, cname_param, parent_name->get_text());
+	String parent_class = parent_name->get_text();
+	if (!ClassDB::class_exists(parent_class) && !ScriptServer::is_global_class(parent_class)) {
+		// If base is a custom type, replace with script path instead.
+		const EditorData::CustomType *type = EditorNode::get_editor_data().get_custom_type_by_name(parent_class);
+		ERR_FAIL_NULL(type);
+		parent_class = "\"" + type->script->get_path() + "\"";
+	}
+
+	scr = ScriptServer::get_language(language_menu->get_selected())->make_template(sinfo.content, cname_param, parent_class);
 
 	if (has_named_classes) {
 		String cname = class_name->get_text();
@@ -823,7 +832,7 @@ Vector<ScriptLanguage::ScriptTemplate> ScriptCreateDialog::_get_user_templates(c
 	Vector<ScriptLanguage::ScriptTemplate> user_templates;
 	String extension = language->get_extension();
 
-	String dir_path = p_dir.plus_file(p_object);
+	String dir_path = p_dir.path_join(p_object);
 
 	Ref<DirAccess> d = DirAccess::open(dir_path);
 	if (d.is_valid()) {
@@ -859,7 +868,7 @@ ScriptLanguage::ScriptTemplate ScriptCreateDialog::_parse_template(const ScriptL
 
 	// Parse file for meta-information and script content
 	Error err;
-	Ref<FileAccess> file = FileAccess::open(p_path.plus_file(p_filename), FileAccess::READ, &err);
+	Ref<FileAccess> file = FileAccess::open(p_path.path_join(p_filename), FileAccess::READ, &err);
 	if (!err) {
 		while (!file->eof_reached()) {
 			String line = file->get_line();
@@ -897,7 +906,7 @@ ScriptLanguage::ScriptTemplate ScriptCreateDialog::_parse_template(const ScriptL
 
 	// Get name from file name if no name in meta information
 	if (script_template.name == String()) {
-		script_template.name = p_filename.get_basename().replace("_", " ").capitalize();
+		script_template.name = p_filename.get_basename().capitalize();
 	}
 
 	return script_template;

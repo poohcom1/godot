@@ -44,7 +44,7 @@ void EditorDirDialog::_update_dir(TreeItem *p_item, EditorFileSystemDirectory *p
 
 	p_item->set_metadata(0, p_dir->get_path());
 	p_item->set_icon(0, tree->get_theme_icon(SNAME("Folder"), SNAME("EditorIcons")));
-	p_item->set_icon_modulate(0, tree->get_theme_color(SNAME("folder_icon_modulate"), SNAME("FileDialog")));
+	p_item->set_icon_modulate(0, tree->get_theme_color(SNAME("folder_icon_color"), SNAME("FileDialog")));
 
 	if (!p_item->get_parent()) {
 		p_item->set_text(0, "res://");
@@ -172,7 +172,7 @@ void EditorDirDialog::_make_dir_confirm() {
 		mkdirerr->popup_centered(Size2(250, 80) * EDSCALE);
 	} else {
 		opened_paths.insert(dir);
-		//reload(dir.plus_file(makedirname->get_text()));
+		//reload(dir.path_join(makedirname->get_text()));
 		EditorFileSystem::get_singleton()->scan_changes(); //we created a dir, so rescan changes
 	}
 	makedirname->set_text(""); // reset label

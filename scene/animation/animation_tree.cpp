@@ -399,9 +399,9 @@ void AnimationNode::_set_filters(const Array &p_filters) {
 	}
 }
 
-void AnimationNode::_validate_property(PropertyInfo &property) const {
-	if (!has_filter() && (property.name == "filter_enabled" || property.name == "filters")) {
-		property.usage = PROPERTY_USAGE_NONE;
+void AnimationNode::_validate_property(PropertyInfo &p_property) const {
+	if (!has_filter() && (p_property.name == "filter_enabled" || p_property.name == "filters")) {
+		p_property.usage = PROPERTY_USAGE_NONE;
 	}
 }
 
@@ -601,6 +601,8 @@ bool AnimationTree::_update_caches(AnimationPlayer *player) {
 						} else {
 							track_value->object = child;
 						}
+
+						track_value->is_using_angle = anim->track_get_interpolation_type(i) == Animation::INTERPOLATION_LINEAR_ANGLE || anim->track_get_interpolation_type(i) == Animation::INTERPOLATION_CUBIC_ANGLE;
 
 						track_value->subpath = leftover_path;
 						track_value->object_id = track_value->object->get_instance_id();
@@ -804,6 +806,10 @@ bool AnimationTree::_update_caches(AnimationPlayer *player) {
 					default: {
 					}
 				}
+			} else if (track_cache_type == Animation::TYPE_VALUE) {
+				// If it has at least one angle interpolation, it also uses angle interpolation for blending.
+				TrackCacheValue *track_value = memnew(TrackCacheValue);
+				track_value->is_using_angle |= anim->track_get_interpolation_type(i) == Animation::INTERPOLATION_LINEAR_ANGLE || anim->track_get_interpolation_type(i) == Animation::INTERPOLATION_CUBIC_ANGLE;
 			}
 
 			track->setup_pass = setup_pass;
@@ -839,6 +845,11 @@ bool AnimationTree::_update_caches(AnimationPlayer *player) {
 	cache_valid = true;
 
 	return true;
+}
+
+void AnimationTree::_animation_player_changed() {
+	emit_signal(SNAME("animation_player_changed"));
+	_clear_caches();
 }
 
 void AnimationTree::_clear_caches() {
@@ -1353,8 +1364,33 @@ void AnimationTree::_process_graph(double p_delta) {
 								t->value = t->init_value;
 							}
 
-							Variant::sub(value, t->init_value, value);
-							Variant::blend(t->value, value, blend, t->value);
+							// Special case for angle interpolation.
+							if (t->is_using_angle) {
+								// For blending consistency, it prevents rotation of more than 180 degrees from init_value.
+								// This is the same as for Quaternion blends.
+								float rot_a = t->value;
+								float rot_b = value;
+								float rot_init = t->init_value;
+								rot_a = Math::fposmod(rot_a, (float)Math_TAU);
+								rot_b = Math::fposmod(rot_b, (float)Math_TAU);
+								rot_init = Math::fposmod(rot_init, (float)Math_TAU);
+								if (rot_init < Math_PI) {
+									rot_a = rot_a > rot_init + Math_PI ? rot_a - Math_TAU : rot_a;
+									rot_b = rot_b > rot_init + Math_PI ? rot_b - Math_TAU : rot_b;
+								} else {
+									rot_a = rot_a < rot_init - Math_PI ? rot_a + Math_TAU : rot_a;
+									rot_b = rot_b < rot_init - Math_PI ? rot_b + Math_TAU : rot_b;
+								}
+								t->value = Math::fposmod(rot_a + (rot_b - rot_init) * (float)blend, (float)Math_TAU);
+							} else {
+								if (t->init_value.get_type() == Variant::BOOL) {
+									value = Animation::subtract_variant(value.operator real_t(), t->init_value.operator real_t());
+									t->value = Animation::blend_variant(t->value.operator real_t(), value.operator real_t(), blend);
+								} else {
+									value = Animation::subtract_variant(value, t->init_value);
+									t->value = Animation::blend_variant(t->value, value, blend);
+								}
+							}
 						} else {
 							if (blend < CMP_EPSILON) {
 								continue; //nothing to blend
@@ -1528,7 +1564,7 @@ void AnimationTree::_process_graph(double p_delta) {
 							}
 						}
 
-						real_t db = Math::linear2db(MAX(blend, 0.00001));
+						real_t db = Math::linear_to_db(MAX(blend, 0.00001));
 						if (t->object->has_method(SNAME("set_unit_db"))) {
 							t->object->call(SNAME("set_unit_db"), db);
 						} else {
@@ -1672,7 +1708,11 @@ void AnimationTree::_process_graph(double p_delta) {
 				case Animation::TYPE_VALUE: {
 					TrackCacheValue *t = static_cast<TrackCacheValue *>(track);
 
-					t->object->set_indexed(t->subpath, t->value);
+					if (t->init_value.get_type() == Variant::BOOL) {
+						t->object->set_indexed(t->subpath, t->value.operator real_t() >= 0.5);
+					} else {
+						t->object->set_indexed(t->subpath, t->value);
+					}
 
 				} break;
 				case Animation::TYPE_BEZIER: {
@@ -1712,6 +1752,7 @@ void AnimationTree::advance(real_t p_time) {
 void AnimationTree::_notification(int p_what) {
 	switch (p_what) {
 		case NOTIFICATION_ENTER_TREE: {
+			_setup_animation_player();
 			if (last_animation_player.is_valid()) {
 				Object *player = ObjectDB::get_instance(last_animation_player);
 				if (player) {
@@ -1744,8 +1785,43 @@ void AnimationTree::_notification(int p_what) {
 	}
 }
 
+void AnimationTree::_setup_animation_player() {
+	if (!is_inside_tree()) {
+		return;
+	}
+
+	AnimationPlayer *new_player = nullptr;
+	if (!animation_player.is_empty()) {
+		new_player = Object::cast_to<AnimationPlayer>(get_node(animation_player));
+		if (new_player && !new_player->is_connected("animation_list_changed", callable_mp(this, &AnimationTree::_animation_player_changed))) {
+			new_player->connect("animation_list_changed", callable_mp(this, &AnimationTree::_animation_player_changed));
+		}
+	}
+
+	if (new_player) {
+		if (!last_animation_player.is_valid()) {
+			// Animation player set newly.
+			emit_signal(SNAME("animation_player_changed"));
+			return;
+		} else if (last_animation_player == new_player->get_instance_id()) {
+			// Animation player isn't changed.
+			return;
+		}
+	} else if (!last_animation_player.is_valid()) {
+		// Animation player is being empty.
+		return;
+	}
+
+	AnimationPlayer *old_player = Object::cast_to<AnimationPlayer>(ObjectDB::get_instance(last_animation_player));
+	if (old_player && old_player->is_connected("animation_list_changed", callable_mp(this, &AnimationTree::_animation_player_changed))) {
+		old_player->disconnect("animation_list_changed", callable_mp(this, &AnimationTree::_animation_player_changed));
+	}
+	emit_signal(SNAME("animation_player_changed"));
+}
+
 void AnimationTree::set_animation_player(const NodePath &p_player) {
 	animation_player = p_player;
+	_setup_animation_player();
 	update_configuration_warnings();
 }
 
@@ -1773,8 +1849,8 @@ uint64_t AnimationTree::get_last_process_pass() const {
 	return process_pass;
 }
 
-TypedArray<String> AnimationTree::get_configuration_warnings() const {
-	TypedArray<String> warnings = Node::get_configuration_warnings();
+PackedStringArray AnimationTree::get_configuration_warnings() const {
+	PackedStringArray warnings = Node::get_configuration_warnings();
 
 	if (!root.is_valid()) {
 		warnings.push_back(RTR("No root AnimationNode for the graph is set."));
@@ -1982,6 +2058,8 @@ void AnimationTree::_bind_methods() {
 	BIND_ENUM_CONSTANT(ANIMATION_PROCESS_PHYSICS);
 	BIND_ENUM_CONSTANT(ANIMATION_PROCESS_IDLE);
 	BIND_ENUM_CONSTANT(ANIMATION_PROCESS_MANUAL);
+
+	ADD_SIGNAL(MethodInfo("animation_player_changed"));
 }
 
 AnimationTree::AnimationTree() {

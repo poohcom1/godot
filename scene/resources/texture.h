@@ -251,7 +251,7 @@ private:
 
 protected:
 	static void _bind_methods();
-	void _validate_property(PropertyInfo &property) const override;
+	void _validate_property(PropertyInfo &p_property) const;
 
 public:
 	static Ref<Image> load_image_from_file(Ref<FileAccess> p_file, int p_size_limit);
@@ -422,9 +422,9 @@ class ImageTextureLayered : public TextureLayered {
 	int layers = 0;
 	bool mipmaps = false;
 
-	Error _create_from_images(const Array &p_images);
+	Error _create_from_images(const TypedArray<Image> &p_images);
 
-	Array _get_images() const;
+	TypedArray<Image> _get_images() const;
 
 protected:
 	static void _bind_methods();
@@ -506,7 +506,7 @@ private:
 
 protected:
 	static void _bind_methods();
-	void _validate_property(PropertyInfo &property) const override;
+	void _validate_property(PropertyInfo &p_property) const;
 
 public:
 	Image::Format get_format() const override;
@@ -651,7 +651,7 @@ private:
 
 protected:
 	static void _bind_methods();
-	void _validate_property(PropertyInfo &property) const override;
+	void _validate_property(PropertyInfo &p_property) const;
 
 public:
 	Image::Format get_format() const override;
@@ -769,15 +769,6 @@ public:
 class GradientTexture1D : public Texture2D {
 	GDCLASS(GradientTexture1D, Texture2D);
 
-public:
-	struct Point {
-		float offset = 0.0;
-		Color color;
-		bool operator<(const Point &p_ponit) const {
-			return offset < p_ponit.offset;
-		}
-	};
-
 private:
 	Ref<Gradient> gradient;
 	bool update_pending = false;
@@ -883,8 +874,6 @@ VARIANT_ENUM_CAST(GradientTexture2D::Fill);
 VARIANT_ENUM_CAST(GradientTexture2D::Repeat);
 
 class ProxyTexture : public Texture2D {
-	GDCLASS(ProxyTexture, Texture2D);
-
 private:
 	mutable RID proxy_ph;
 	mutable RID proxy;
@@ -924,15 +913,15 @@ private:
 
 	struct Frame {
 		Ref<Texture2D> texture;
-		float delay_sec = 0.0;
+		float duration = 1.0;
 	};
 
 	Frame frames[MAX_FRAMES];
 	int frame_count = 1.0;
 	int current_frame = 0;
 	bool pause = false;
-	bool oneshot = false;
-	float fps = 4.0;
+	bool one_shot = false;
+	float speed_scale = 1.0;
 
 	float time = 0.0;
 
@@ -942,7 +931,7 @@ private:
 
 protected:
 	static void _bind_methods();
-	void _validate_property(PropertyInfo &property) const override;
+	void _validate_property(PropertyInfo &p_property) const;
 
 public:
 	void set_frames(int p_frames);
@@ -954,17 +943,17 @@ public:
 	void set_pause(bool p_pause);
 	bool get_pause() const;
 
-	void set_oneshot(bool p_oneshot);
-	bool get_oneshot() const;
+	void set_one_shot(bool p_one_shot);
+	bool get_one_shot() const;
 
 	void set_frame_texture(int p_frame, const Ref<Texture2D> &p_texture);
 	Ref<Texture2D> get_frame_texture(int p_frame) const;
 
-	void set_frame_delay(int p_frame, float p_delay_sec);
-	float get_frame_delay(int p_frame) const;
+	void set_frame_duration(int p_frame, float p_duration);
+	float get_frame_duration(int p_frame) const;
 
-	void set_fps(float p_fps);
-	float get_fps() const;
+	void set_speed_scale(float p_scale);
+	float get_speed_scale() const;
 
 	virtual int get_width() const override;
 	virtual int get_height() const override;

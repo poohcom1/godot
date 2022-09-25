@@ -45,11 +45,14 @@ public:
 	static const String PROJECT_DATA_DIR_NAME_SUFFIX;
 
 	enum {
-		//properties that are not for built in values begin from this value, so builtin ones are displayed first
+		// Properties that are not for built in values begin from this value, so builtin ones are displayed first.
 		NO_BUILTIN_ORDER_BASE = 1 << 16
 	};
+
+#ifdef TOOLS_ENABLED
 	const static PackedStringArray get_required_features();
 	const static PackedStringArray get_unsupported_features(const PackedStringArray &p_project_features);
+#endif // TOOLS_ENABLED
 
 	struct AutoloadInfo {
 		StringName name;
@@ -102,6 +105,8 @@ protected:
 	bool _set(const StringName &p_name, const Variant &p_value);
 	bool _get(const StringName &p_name, Variant &r_ret) const;
 	void _get_property_list(List<PropertyInfo> *p_list) const;
+	bool _property_can_revert(const StringName &p_name) const;
+	bool _property_get_revert(const StringName &p_name, Variant &r_property) const;
 
 	static ProjectSettings *singleton;
 
@@ -114,8 +119,10 @@ protected:
 
 	Error _save_custom_bnd(const String &p_file);
 
+#ifdef TOOLS_ENABLED
 	const static PackedStringArray _get_supported_features();
 	const static PackedStringArray _trim_to_supported_features(const PackedStringArray &p_project_features);
+#endif // TOOLS_ENABLED
 
 	void _convert_to_last_version(int p_from_version);
 
@@ -146,9 +153,6 @@ public:
 	void set_restart_if_changed(const String &p_name, bool p_restart);
 	void set_ignore_value_in_docs(const String &p_name, bool p_ignore);
 	bool get_ignore_value_in_docs(const String &p_name) const;
-
-	bool property_can_revert(const String &p_name);
-	Variant property_get_revert(const String &p_name);
 
 	String get_project_data_dir_name() const;
 	String get_project_data_path() const;

@@ -1,13 +1,12 @@
 using System;
 using Godot;
 using GodotTools.Internals;
-using JetBrains.Annotations;
 using static GodotTools.Internals.Globals;
 using File = GodotTools.Utils.File;
 
 namespace GodotTools.Build
 {
-    public class MSBuildPanel : VBoxContainer
+    public partial class MSBuildPanel : VBoxContainer
     {
         public BuildOutputView BuildOutputView { get; private set; }
 
@@ -28,7 +27,6 @@ namespace GodotTools.Build
             BuildOutputView.UpdateIssuesList();
         }
 
-        [UsedImplicitly]
         public void BuildSolution()
         {
             if (!File.Exists(GodotSharpDirs.ProjectSlnPath))
@@ -57,7 +55,6 @@ namespace GodotTools.Build
                 Internal.ReloadAssemblies(softReload: false);
         }
 
-        [UsedImplicitly]
         private void RebuildSolution()
         {
             if (!File.Exists(GodotSharpDirs.ProjectSlnPath))
@@ -73,7 +70,7 @@ namespace GodotTools.Build
                 GD.PushError("Failed to setup Godot NuGet Offline Packages: " + e.Message);
             }
 
-            if (!BuildManager.BuildProjectBlocking("Debug", targets: new[] { "Rebuild" }))
+            if (!BuildManager.BuildProjectBlocking("Debug", rebuild: true))
                 return; // Build failed
 
             // Notify running game for hot-reload
@@ -86,18 +83,17 @@ namespace GodotTools.Build
                 Internal.ReloadAssemblies(softReload: false);
         }
 
-        [UsedImplicitly]
         private void CleanSolution()
         {
             if (!File.Exists(GodotSharpDirs.ProjectSlnPath))
                 return; // No solution to build
 
-            BuildManager.BuildProjectBlocking("Debug", targets: new[] { "Clean" });
+            _ = BuildManager.CleanProjectBlocking("Debug");
         }
 
         private void ViewLogToggled(bool pressed) => BuildOutputView.LogVisible = pressed;
 
-        private void BuildMenuOptionPressed(int id)
+        private void BuildMenuOptionPressed(long id)
         {
             switch ((BuildMenuOptions)id)
             {
@@ -126,7 +122,7 @@ namespace GodotTools.Build
         {
             base._Ready();
 
-            CustomMinimumSize = new Vector2(0, 228) * EditorScale;
+            CustomMinimumSize = new Vector2i(0, (int)(228 * EditorScale));
             SizeFlagsVertical = (int)SizeFlags.ExpandFill;
 
             var toolBarHBox = new HBoxContainer { SizeFlagsHorizontal = (int)SizeFlags.ExpandFill };
@@ -143,7 +139,7 @@ namespace GodotTools.Build
 
             _errorsBtn = new Button
             {
-                HintTooltip = "Show Errors".TTR(),
+                TooltipText = "Show Errors".TTR(),
                 Icon = GetThemeIcon("StatusError", "EditorIcons"),
                 ExpandIcon = false,
                 ToggleMode = true,
@@ -155,7 +151,7 @@ namespace GodotTools.Build
 
             _warningsBtn = new Button
             {
-                HintTooltip = "Show Warnings".TTR(),
+                TooltipText = "Show Warnings".TTR(),
                 Icon = GetThemeIcon("NodeWarning", "EditorIcons"),
                 ExpandIcon = false,
                 ToggleMode = true,
@@ -179,7 +175,7 @@ namespace GodotTools.Build
             AddChild(BuildOutputView);
         }
 
-        public override void _Notification(int what)
+        public override void _Notification(long what)
         {
             base._Notification(what);
 

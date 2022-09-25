@@ -46,6 +46,7 @@
 #include "scene/debugger/scene_debugger.h"
 #include "scene/main/multiplayer_api.h"
 #include "scene/main/viewport.h"
+#include "scene/resources/environment.h"
 #include "scene/resources/font.h"
 #include "scene/resources/material.h"
 #include "scene/resources/mesh.h"
@@ -85,6 +86,14 @@ void SceneTreeTimer::set_process_always(bool p_process_always) {
 
 bool SceneTreeTimer::is_process_always() {
 	return process_always;
+}
+
+void SceneTreeTimer::set_process_in_physics(bool p_process_in_physics) {
+	process_in_physics = p_process_in_physics;
+}
+
+bool SceneTreeTimer::is_process_in_physics() {
+	return process_in_physics;
 }
 
 void SceneTreeTimer::set_ignore_time_scale(bool p_ignore) {
@@ -419,6 +428,8 @@ bool SceneTree::physics_process(double p_time) {
 	_flush_ugc();
 	MessageQueue::get_singleton()->flush(); //small little hack
 
+	process_timers(p_time, true); //go through timers
+
 	process_tweens(p_time, true);
 
 	flush_transform_notifications();
@@ -461,37 +472,7 @@ bool SceneTree::process(double p_time) {
 
 	_flush_delete_queue();
 
-	//go through timers
-
-	List<Ref<SceneTreeTimer>>::Element *L = timers.back(); //last element
-
-	for (List<Ref<SceneTreeTimer>>::Element *E = timers.front(); E;) {
-		List<Ref<SceneTreeTimer>>::Element *N = E->next();
-		if (paused && !E->get()->is_process_always()) {
-			if (E == L) {
-				break; //break on last, so if new timers were added during list traversal, ignore them.
-			}
-			E = N;
-			continue;
-		}
-
-		double time_left = E->get()->get_time_left();
-		if (E->get()->is_ignore_time_scale()) {
-			time_left -= Engine::get_singleton()->get_process_step();
-		} else {
-			time_left -= p_time;
-		}
-		E->get()->set_time_left(time_left);
-
-		if (time_left <= 0) {
-			E->get()->emit_signal(SNAME("timeout"));
-			timers.erase(E);
-		}
-		if (E == L) {
-			break; //break on last, so if new timers were added during list traversal, ignore them.
-		}
-		E = N;
-	}
+	process_timers(p_time, false); //go through timers
 
 	process_tweens(p_time, false);
 
@@ -527,6 +508,38 @@ bool SceneTree::process(double p_time) {
 #endif // TOOLS_ENABLED
 
 	return _quit;
+}
+
+void SceneTree::process_timers(float p_delta, bool p_physics_frame) {
+	List<Ref<SceneTreeTimer>>::Element *L = timers.back(); //last element
+
+	for (List<Ref<SceneTreeTimer>>::Element *E = timers.front(); E;) {
+		List<Ref<SceneTreeTimer>>::Element *N = E->next();
+		if ((paused && !E->get()->is_process_always()) || (E->get()->is_process_in_physics() != p_physics_frame)) {
+			if (E == L) {
+				break; //break on last, so if new timers were added during list traversal, ignore them.
+			}
+			E = N;
+			continue;
+		}
+
+		double time_left = E->get()->get_time_left();
+		if (E->get()->is_ignore_time_scale()) {
+			time_left -= Engine::get_singleton()->get_process_step();
+		} else {
+			time_left -= p_delta;
+		}
+		E->get()->set_time_left(time_left);
+
+		if (time_left <= 0) {
+			E->get()->emit_signal(SNAME("timeout"));
+			timers.erase(E);
+		}
+		if (E == L) {
+			break; //break on last, so if new timers were added during list traversal, ignore them.
+		}
+		E = N;
+	}
 }
 
 void SceneTree::process_tweens(float p_delta, bool p_physics) {
@@ -709,22 +722,6 @@ float SceneTree::get_debug_paths_width() const {
 	return debug_paths_width;
 }
 
-void SceneTree::set_debug_navigation_color(const Color &p_color) {
-	debug_navigation_color = p_color;
-}
-
-Color SceneTree::get_debug_navigation_color() const {
-	return debug_navigation_color;
-}
-
-void SceneTree::set_debug_navigation_disabled_color(const Color &p_color) {
-	debug_navigation_disabled_color = p_color;
-}
-
-Color SceneTree::get_debug_navigation_disabled_color() const {
-	return debug_navigation_disabled_color;
-}
-
 Ref<Material> SceneTree::get_debug_paths_material() {
 	if (debug_paths_material.is_valid()) {
 		return debug_paths_material;
@@ -740,40 +737,6 @@ Ref<Material> SceneTree::get_debug_paths_material() {
 	debug_paths_material = _debug_material;
 
 	return debug_paths_material;
-}
-
-Ref<Material> SceneTree::get_debug_navigation_material() {
-	if (navigation_material.is_valid()) {
-		return navigation_material;
-	}
-
-	Ref<StandardMaterial3D> line_material = Ref<StandardMaterial3D>(memnew(StandardMaterial3D));
-	line_material->set_shading_mode(StandardMaterial3D::SHADING_MODE_UNSHADED);
-	line_material->set_transparency(StandardMaterial3D::TRANSPARENCY_ALPHA);
-	line_material->set_flag(StandardMaterial3D::FLAG_SRGB_VERTEX_COLOR, true);
-	line_material->set_flag(StandardMaterial3D::FLAG_ALBEDO_FROM_VERTEX_COLOR, true);
-	line_material->set_albedo(get_debug_navigation_color());
-
-	navigation_material = line_material;
-
-	return navigation_material;
-}
-
-Ref<Material> SceneTree::get_debug_navigation_disabled_material() {
-	if (navigation_disabled_material.is_valid()) {
-		return navigation_disabled_material;
-	}
-
-	Ref<StandardMaterial3D> line_material = Ref<StandardMaterial3D>(memnew(StandardMaterial3D));
-	line_material->set_shading_mode(StandardMaterial3D::SHADING_MODE_UNSHADED);
-	line_material->set_transparency(StandardMaterial3D::TRANSPARENCY_ALPHA);
-	line_material->set_flag(StandardMaterial3D::FLAG_SRGB_VERTEX_COLOR, true);
-	line_material->set_flag(StandardMaterial3D::FLAG_ALBEDO_FROM_VERTEX_COLOR, true);
-	line_material->set_albedo(get_debug_navigation_disabled_color());
-
-	navigation_disabled_material = line_material;
-
-	return navigation_disabled_material;
 }
 
 Ref<Material> SceneTree::get_debug_collision_material() {
@@ -1000,8 +963,8 @@ int64_t SceneTree::get_frame() const {
 	return current_frame;
 }
 
-Array SceneTree::_get_nodes_in_group(const StringName &p_group) {
-	Array ret;
+TypedArray<Node> SceneTree::_get_nodes_in_group(const StringName &p_group) {
+	TypedArray<Node> ret;
 	HashMap<StringName, Group>::Iterator E = group_map.find(p_group);
 	if (!E) {
 		return ret;
@@ -1125,16 +1088,16 @@ void SceneTree::_change_scene(Node *p_to) {
 	}
 }
 
-Error SceneTree::change_scene(const String &p_path) {
+Error SceneTree::change_scene_to_file(const String &p_path) {
 	Ref<PackedScene> new_scene = ResourceLoader::load(p_path);
 	if (new_scene.is_null()) {
 		return ERR_CANT_OPEN;
 	}
 
-	return change_scene_to(new_scene);
+	return change_scene_to_packed(new_scene);
 }
 
-Error SceneTree::change_scene_to(const Ref<PackedScene> &p_scene) {
+Error SceneTree::change_scene_to_packed(const Ref<PackedScene> &p_scene) {
 	Node *new_scene = nullptr;
 	if (p_scene.is_valid()) {
 		new_scene = p_scene->instantiate();
@@ -1148,7 +1111,7 @@ Error SceneTree::change_scene_to(const Ref<PackedScene> &p_scene) {
 Error SceneTree::reload_current_scene() {
 	ERR_FAIL_COND_V(!current_scene, ERR_UNCONFIGURED);
 	String fname = current_scene->get_scene_file_path();
-	return change_scene(fname);
+	return change_scene_to_file(fname);
 }
 
 void SceneTree::add_current_scene(Node *p_current) {
@@ -1156,11 +1119,13 @@ void SceneTree::add_current_scene(Node *p_current) {
 	root->add_child(p_current);
 }
 
-Ref<SceneTreeTimer> SceneTree::create_timer(double p_delay_sec, bool p_process_always) {
+Ref<SceneTreeTimer> SceneTree::create_timer(double p_delay_sec, bool p_process_always, bool p_process_in_physics, bool p_ignore_time_scale) {
 	Ref<SceneTreeTimer> stt;
 	stt.instantiate();
 	stt->set_process_always(p_process_always);
 	stt->set_time_left(p_delay_sec);
+	stt->set_process_in_physics(p_process_in_physics);
+	stt->set_ignore_time_scale(p_ignore_time_scale);
 	timers.push_back(stt);
 	return stt;
 }
@@ -1171,8 +1136,8 @@ Ref<Tween> SceneTree::create_tween() {
 	return tween;
 }
 
-Array SceneTree::get_processed_tweens() {
-	Array ret;
+TypedArray<Tween> SceneTree::get_processed_tweens() {
+	TypedArray<Tween> ret;
 	ret.resize(tweens.size());
 
 	int i = 0;
@@ -1258,7 +1223,7 @@ void SceneTree::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_pause", "enable"), &SceneTree::set_pause);
 	ClassDB::bind_method(D_METHOD("is_paused"), &SceneTree::is_paused);
 
-	ClassDB::bind_method(D_METHOD("create_timer", "time_sec", "process_always"), &SceneTree::create_timer, DEFVAL(true));
+	ClassDB::bind_method(D_METHOD("create_timer", "time_sec", "process_always", "process_in_physics", "ignore_time_scale"), &SceneTree::create_timer, DEFVAL(true), DEFVAL(false), DEFVAL(false));
 	ClassDB::bind_method(D_METHOD("create_tween"), &SceneTree::create_tween);
 	ClassDB::bind_method(D_METHOD("get_processed_tweens"), &SceneTree::get_processed_tweens);
 
@@ -1295,8 +1260,8 @@ void SceneTree::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_current_scene", "child_node"), &SceneTree::set_current_scene);
 	ClassDB::bind_method(D_METHOD("get_current_scene"), &SceneTree::get_current_scene);
 
-	ClassDB::bind_method(D_METHOD("change_scene", "path"), &SceneTree::change_scene);
-	ClassDB::bind_method(D_METHOD("change_scene_to", "packed_scene"), &SceneTree::change_scene_to);
+	ClassDB::bind_method(D_METHOD("change_scene_to_file", "path"), &SceneTree::change_scene_to_file);
+	ClassDB::bind_method(D_METHOD("change_scene_to_packed", "packed_scene"), &SceneTree::change_scene_to_packed);
 
 	ClassDB::bind_method(D_METHOD("reload_current_scene"), &SceneTree::reload_current_scene);
 
@@ -1351,7 +1316,7 @@ void SceneTree::add_idle_callback(IdleCallback p_callback) {
 }
 
 void SceneTree::get_argument_options(const StringName &p_function, int p_idx, List<String> *r_options) const {
-	if (p_function == "change_scene") {
+	if (p_function == "change_scene_to_file") {
 		Ref<DirAccess> dir_access = DirAccess::create(DirAccess::ACCESS_RESOURCES);
 		List<String> directories;
 		directories.push_back(dir_access->get_current_dir());
@@ -1370,9 +1335,9 @@ void SceneTree::get_argument_options(const StringName &p_function, int p_idx, Li
 				}
 
 				if (dir_access->dir_exists(filename)) {
-					directories.push_back(dir_access->get_current_dir().plus_file(filename));
+					directories.push_back(dir_access->get_current_dir().path_join(filename));
 				} else if (filename.ends_with(".tscn") || filename.ends_with(".scn")) {
-					r_options->push_back("\"" + dir_access->get_current_dir().plus_file(filename) + "\"");
+					r_options->push_back("\"" + dir_access->get_current_dir().path_join(filename) + "\"");
 				}
 
 				filename = dir_access->get_next();
@@ -1389,8 +1354,6 @@ SceneTree::SceneTree() {
 	debug_collision_contact_color = GLOBAL_DEF("debug/shapes/collision/contact_color", Color(1.0, 0.2, 0.1, 0.8));
 	debug_paths_color = GLOBAL_DEF("debug/shapes/paths/geometry_color", Color(0.1, 1.0, 0.7, 0.4));
 	debug_paths_width = GLOBAL_DEF("debug/shapes/paths/geometry_width", 2.0);
-	debug_navigation_color = GLOBAL_DEF("debug/shapes/navigation/geometry_color", Color(0.1, 1.0, 0.7, 0.4));
-	debug_navigation_disabled_color = GLOBAL_DEF("debug/shapes/navigation/disabled_geometry_color", Color(1.0, 0.7, 0.1, 0.4));
 	collision_debug_contacts = GLOBAL_DEF("debug/shapes/collision/max_contacts_displayed", 10000);
 	ProjectSettings::get_singleton()->set_custom_property_info("debug/shapes/collision/max_contacts_displayed", PropertyInfo(Variant::INT, "debug/shapes/collision/max_contacts_displayed", PROPERTY_HINT_RANGE, "0,20000,1")); // No negative
 
@@ -1418,9 +1381,13 @@ SceneTree::SceneTree() {
 	root->set_as_audio_listener_2d(true);
 	current_scene = nullptr;
 
-	const int msaa_mode = GLOBAL_DEF_BASIC("rendering/anti_aliasing/quality/msaa", 0);
-	ProjectSettings::get_singleton()->set_custom_property_info("rendering/anti_aliasing/quality/msaa", PropertyInfo(Variant::INT, "rendering/anti_aliasing/quality/msaa", PROPERTY_HINT_ENUM, String::utf8("Disabled (Fastest),2× (Average),4× (Slow),8× (Slowest)")));
-	root->set_msaa(Viewport::MSAA(msaa_mode));
+	const int msaa_mode_2d = GLOBAL_DEF_BASIC("rendering/anti_aliasing/quality/msaa_2d", 0);
+	ProjectSettings::get_singleton()->set_custom_property_info("rendering/anti_aliasing/quality/msaa_2d", PropertyInfo(Variant::INT, "rendering/anti_aliasing/quality/msaa_2d", PROPERTY_HINT_ENUM, String::utf8("Disabled (Fastest),2× (Average),4× (Slow),8× (Slowest)")));
+	root->set_msaa_2d(Viewport::MSAA(msaa_mode_2d));
+
+	const int msaa_mode_3d = GLOBAL_DEF_BASIC("rendering/anti_aliasing/quality/msaa_3d", 0);
+	ProjectSettings::get_singleton()->set_custom_property_info("rendering/anti_aliasing/quality/msaa_3d", PropertyInfo(Variant::INT, "rendering/anti_aliasing/quality/msaa_3d", PROPERTY_HINT_ENUM, String::utf8("Disabled (Fastest),2× (Average),4× (Slow),8× (Slowest)")));
+	root->set_msaa_3d(Viewport::MSAA(msaa_mode_3d));
 
 	const int ssaa_mode = GLOBAL_DEF_BASIC("rendering/anti_aliasing/quality/screen_space_aa", 0);
 	ProjectSettings::get_singleton()->set_custom_property_info("rendering/anti_aliasing/quality/screen_space_aa", PropertyInfo(Variant::INT, "rendering/anti_aliasing/quality/screen_space_aa", PROPERTY_HINT_ENUM, "Disabled (Fastest),FXAA (Fast)"));
@@ -1468,18 +1435,18 @@ SceneTree::SceneTree() {
 		}
 	}
 
-	int shadowmap_size = GLOBAL_DEF("rendering/shadows/positional_shadow/atlas_size", 4096);
-	ProjectSettings::get_singleton()->set_custom_property_info("rendering/shadows/positional_shadow/atlas_size", PropertyInfo(Variant::INT, "rendering/shadows/positional_shadow/atlas_size", PROPERTY_HINT_RANGE, "256,16384"));
-	GLOBAL_DEF("rendering/shadows/positional_shadow/atlas_size.mobile", 2048);
-	bool shadowmap_16_bits = GLOBAL_DEF("rendering/shadows/positional_shadow/atlas_16_bits", true);
-	int atlas_q0 = GLOBAL_DEF("rendering/shadows/positional_shadow/atlas_quadrant_0_subdiv", 2);
-	int atlas_q1 = GLOBAL_DEF("rendering/shadows/positional_shadow/atlas_quadrant_1_subdiv", 2);
-	int atlas_q2 = GLOBAL_DEF("rendering/shadows/positional_shadow/atlas_quadrant_2_subdiv", 3);
-	int atlas_q3 = GLOBAL_DEF("rendering/shadows/positional_shadow/atlas_quadrant_3_subdiv", 4);
-	ProjectSettings::get_singleton()->set_custom_property_info("rendering/shadows/positional_shadow/atlas_quadrant_0_subdiv", PropertyInfo(Variant::INT, "rendering/shadows/positional_shadow/atlas_quadrant_0_subdiv", PROPERTY_HINT_ENUM, "Disabled,1 Shadow,4 Shadows,16 Shadows,64 Shadows,256 Shadows,1024 Shadows"));
-	ProjectSettings::get_singleton()->set_custom_property_info("rendering/shadows/positional_shadow/atlas_quadrant_1_subdiv", PropertyInfo(Variant::INT, "rendering/shadows/positional_shadow/atlas_quadrant_1_subdiv", PROPERTY_HINT_ENUM, "Disabled,1 Shadow,4 Shadows,16 Shadows,64 Shadows,256 Shadows,1024 Shadows"));
-	ProjectSettings::get_singleton()->set_custom_property_info("rendering/shadows/positional_shadow/atlas_quadrant_2_subdiv", PropertyInfo(Variant::INT, "rendering/shadows/positional_shadow/atlas_quadrant_2_subdiv", PROPERTY_HINT_ENUM, "Disabled,1 Shadow,4 Shadows,16 Shadows,64 Shadows,256 Shadows,1024 Shadows"));
-	ProjectSettings::get_singleton()->set_custom_property_info("rendering/shadows/positional_shadow/atlas_quadrant_3_subdiv", PropertyInfo(Variant::INT, "rendering/shadows/positional_shadow/atlas_quadrant_3_subdiv", PROPERTY_HINT_ENUM, "Disabled,1 Shadow,4 Shadows,16 Shadows,64 Shadows,256 Shadows,1024 Shadows"));
+	int shadowmap_size = GLOBAL_DEF("rendering/lights_and_shadows/positional_shadow/atlas_size", 4096);
+	ProjectSettings::get_singleton()->set_custom_property_info("rendering/lights_and_shadows/positional_shadow/atlas_size", PropertyInfo(Variant::INT, "rendering/lights_and_shadows/positional_shadow/atlas_size", PROPERTY_HINT_RANGE, "256,16384"));
+	GLOBAL_DEF("rendering/lights_and_shadows/positional_shadow/atlas_size.mobile", 2048);
+	bool shadowmap_16_bits = GLOBAL_DEF("rendering/lights_and_shadows/positional_shadow/atlas_16_bits", true);
+	int atlas_q0 = GLOBAL_DEF("rendering/lights_and_shadows/positional_shadow/atlas_quadrant_0_subdiv", 2);
+	int atlas_q1 = GLOBAL_DEF("rendering/lights_and_shadows/positional_shadow/atlas_quadrant_1_subdiv", 2);
+	int atlas_q2 = GLOBAL_DEF("rendering/lights_and_shadows/positional_shadow/atlas_quadrant_2_subdiv", 3);
+	int atlas_q3 = GLOBAL_DEF("rendering/lights_and_shadows/positional_shadow/atlas_quadrant_3_subdiv", 4);
+	ProjectSettings::get_singleton()->set_custom_property_info("rendering/lights_and_shadows/positional_shadow/atlas_quadrant_0_subdiv", PropertyInfo(Variant::INT, "rendering/lights_and_shadows/positional_shadow/atlas_quadrant_0_subdiv", PROPERTY_HINT_ENUM, "Disabled,1 Shadow,4 Shadows,16 Shadows,64 Shadows,256 Shadows,1024 Shadows"));
+	ProjectSettings::get_singleton()->set_custom_property_info("rendering/lights_and_shadows/positional_shadow/atlas_quadrant_1_subdiv", PropertyInfo(Variant::INT, "rendering/lights_and_shadows/positional_shadow/atlas_quadrant_1_subdiv", PROPERTY_HINT_ENUM, "Disabled,1 Shadow,4 Shadows,16 Shadows,64 Shadows,256 Shadows,1024 Shadows"));
+	ProjectSettings::get_singleton()->set_custom_property_info("rendering/lights_and_shadows/positional_shadow/atlas_quadrant_2_subdiv", PropertyInfo(Variant::INT, "rendering/lights_and_shadows/positional_shadow/atlas_quadrant_2_subdiv", PROPERTY_HINT_ENUM, "Disabled,1 Shadow,4 Shadows,16 Shadows,64 Shadows,256 Shadows,1024 Shadows"));
+	ProjectSettings::get_singleton()->set_custom_property_info("rendering/lights_and_shadows/positional_shadow/atlas_quadrant_3_subdiv", PropertyInfo(Variant::INT, "rendering/lights_and_shadows/positional_shadow/atlas_quadrant_3_subdiv", PROPERTY_HINT_ENUM, "Disabled,1 Shadow,4 Shadows,16 Shadows,64 Shadows,256 Shadows,1024 Shadows"));
 
 	root->set_positional_shadow_atlas_size(shadowmap_size);
 	root->set_positional_shadow_atlas_16_bits(shadowmap_16_bits);

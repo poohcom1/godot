@@ -158,11 +158,10 @@ void SceneShaderForwardMobile::ShaderData::set_code(const String &p_code) {
 		print_line(gen_code.defines[i]);
 	}
 
-	RBMap<String, String>::Element * el = gen_code.code.front();
+	HashMap<String, String>::Iterator el = gen_code.code.begin();
 	while (el) {
-		print_line("\n**code " + el->key() + ":\n" + el->value());
-
-		el = el->next();
+		print_line("\n**code " + el->key + ":\n" + el->value);
+		++el;
 	}
 
 	print_line("\n**uniforms:\n" + gen_code.uniforms);
@@ -332,7 +331,7 @@ void SceneShaderForwardMobile::ShaderData::set_code(const String &p_code) {
 	valid = true;
 }
 
-void SceneShaderForwardMobile::ShaderData::set_default_texture_param(const StringName &p_name, RID p_texture, int p_index) {
+void SceneShaderForwardMobile::ShaderData::set_default_texture_parameter(const StringName &p_name, RID p_texture, int p_index) {
 	if (!p_texture.is_valid()) {
 		if (default_texture_params.has(p_name) && default_texture_params[p_name].has(p_index)) {
 			default_texture_params[p_name].erase(p_index);
@@ -353,7 +352,10 @@ void SceneShaderForwardMobile::ShaderData::get_shader_uniform_list(List<Property
 	HashMap<int, StringName> order;
 
 	for (const KeyValue<StringName, ShaderLanguage::ShaderNode::Uniform> &E : uniforms) {
-		if (E.value.scope != ShaderLanguage::ShaderNode::Uniform::SCOPE_LOCAL) {
+		if (E.value.scope != ShaderLanguage::ShaderNode::Uniform::SCOPE_LOCAL ||
+				E.value.hint == ShaderLanguage::ShaderNode::Uniform::HINT_SCREEN_TEXTURE ||
+				E.value.hint == ShaderLanguage::ShaderNode::Uniform::HINT_NORMAL_ROUGHNESS_TEXTURE ||
+				E.value.hint == ShaderLanguage::ShaderNode::Uniform::HINT_DEPTH_TEXTURE) {
 			continue;
 		}
 
@@ -401,7 +403,7 @@ void SceneShaderForwardMobile::ShaderData::get_instance_param_list(List<Renderer
 	}
 }
 
-bool SceneShaderForwardMobile::ShaderData::is_param_texture(const StringName &p_param) const {
+bool SceneShaderForwardMobile::ShaderData::is_parameter_texture(const StringName &p_param) const {
 	if (!uniforms.has(p_param)) {
 		return false;
 	}

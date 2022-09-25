@@ -110,7 +110,7 @@ NavigationMeshEditor::NavigationMeshEditor() {
 	button_reset->set_flat(true);
 	bake_hbox->add_child(button_reset);
 	// No button text, we only use a revert icon which is set when entering the tree.
-	button_reset->set_tooltip(TTR("Clear the navigation mesh."));
+	button_reset->set_tooltip_text(TTR("Clear the navigation mesh."));
 	button_reset->connect("pressed", callable_mp(this, &NavigationMeshEditor::_clear_pressed));
 
 	bake_info = memnew(Label);
@@ -145,7 +145,7 @@ void NavigationMeshEditorPlugin::make_visible(bool p_visible) {
 
 NavigationMeshEditorPlugin::NavigationMeshEditorPlugin() {
 	navigation_mesh_editor = memnew(NavigationMeshEditor);
-	EditorNode::get_singleton()->get_main_control()->add_child(navigation_mesh_editor);
+	EditorNode::get_singleton()->get_main_screen_control()->add_child(navigation_mesh_editor);
 	add_control_to_container(CONTAINER_SPATIAL_EDITOR_MENU, navigation_mesh_editor->bake_hbox);
 	navigation_mesh_editor->hide();
 	navigation_mesh_editor->bake_hbox->hide();

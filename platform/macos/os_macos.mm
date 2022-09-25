@@ -48,18 +48,19 @@
 _FORCE_INLINE_ String OS_MacOS::get_framework_executable(const String &p_path) {
 	// Append framework executable name, or return as is if p_path is not a framework.
 	Ref<DirAccess> da = DirAccess::create(DirAccess::ACCESS_FILESYSTEM);
-	if (da->dir_exists(p_path) && da->file_exists(p_path.plus_file(p_path.get_file().get_basename()))) {
-		return p_path.plus_file(p_path.get_file().get_basename());
+	if (da->dir_exists(p_path) && da->file_exists(p_path.path_join(p_path.get_file().get_basename()))) {
+		return p_path.path_join(p_path.get_file().get_basename());
 	} else {
 		return p_path;
 	}
 }
 
 void OS_MacOS::pre_wait_observer_cb(CFRunLoopObserverRef p_observer, CFRunLoopActivity p_activiy, void *p_context) {
-	// Prevent main loop from sleeping and redraw window during resize / modal popups.
+	// Prevent main loop from sleeping and redraw window during modal popup display.
+	// Do not redraw when rendering is done from the separate thread, it will conflict with the OpenGL context updates.
 
 	DisplayServerMacOS *ds = (DisplayServerMacOS *)DisplayServer::get_singleton();
-	if (get_singleton()->get_main_loop() && ds && (get_singleton()->get_render_thread_mode() != RENDER_SEPARATE_THREAD || !ds->get_is_resizing())) {
+	if (get_singleton()->get_main_loop() && ds && (get_singleton()->get_render_thread_mode() != RENDER_SEPARATE_THREAD) && !ds->get_is_resizing()) {
 		Main::force_redraw();
 		if (!Main::is_iterating()) { // Avoid cyclic loop.
 			Main::iteration();
@@ -133,6 +134,15 @@ String OS_MacOS::get_name() const {
 	return "macOS";
 }
 
+String OS_MacOS::get_distribution_name() const {
+	return get_name();
+}
+
+String OS_MacOS::get_version() const {
+	NSOperatingSystemVersion ver = [NSProcessInfo processInfo].operatingSystemVersion;
+	return vformat("%d.%d.%d", (int64_t)ver.majorVersion, (int64_t)ver.minorVersion, (int64_t)ver.patchVersion);
+}
+
 void OS_MacOS::alert(const String &p_alert, const String &p_title) {
 	NSAlert *window = [[NSAlert alloc] init];
 	NSString *ns_title = [NSString stringWithUTF8String:p_title.utf8().get_data()];
@@ -155,12 +165,12 @@ Error OS_MacOS::open_dynamic_library(const String p_path, void *&p_library_handl
 
 	if (!FileAccess::exists(path)) {
 		// Load .dylib or framework from within the executable path.
-		path = get_framework_executable(get_executable_path().get_base_dir().plus_file(p_path.get_file()));
+		path = get_framework_executable(get_executable_path().get_base_dir().path_join(p_path.get_file()));
 	}
 
 	if (!FileAccess::exists(path)) {
 		// Load .dylib or framework from a standard macOS location.
-		path = get_framework_executable(get_executable_path().get_base_dir().plus_file("../Frameworks").plus_file(p_path.get_file()));
+		path = get_framework_executable(get_executable_path().get_base_dir().path_join("../Frameworks").path_join(p_path.get_file()));
 	}
 
 	p_library_handle = dlopen(path.utf8().get_data(), RTLD_NOW);
@@ -187,7 +197,7 @@ String OS_MacOS::get_config_path() const {
 		}
 	}
 	if (has_environment("HOME")) {
-		return get_environment("HOME").plus_file("Library/Application Support");
+		return get_environment("HOME").path_join("Library/Application Support");
 	}
 	return ".";
 }
@@ -214,7 +224,7 @@ String OS_MacOS::get_cache_path() const {
 		}
 	}
 	if (has_environment("HOME")) {
-		return get_environment("HOME").plus_file("Library/Caches");
+		return get_environment("HOME").path_join("Library/Caches");
 	}
 	return get_config_path();
 }
@@ -512,8 +522,6 @@ Error OS_MacOS::move_to_trash(const String &p_path) {
 }
 
 void OS_MacOS::run() {
-	force_quit = false;
-
 	if (!main_loop) {
 		return;
 	}
@@ -521,7 +529,7 @@ void OS_MacOS::run() {
 	main_loop->initialize();
 
 	bool quit = false;
-	while (!force_quit && !quit) {
+	while (!quit) {
 		@try {
 			if (DisplayServer::get_singleton()) {
 				DisplayServer::get_singleton()->process_events(); // Get rid of pending events.
@@ -541,7 +549,6 @@ void OS_MacOS::run() {
 
 OS_MacOS::OS_MacOS() {
 	main_loop = nullptr;
-	force_quit = false;
 
 	Vector<Logger *> loggers;
 	loggers.push_back(memnew(MacOSTerminalLogger));

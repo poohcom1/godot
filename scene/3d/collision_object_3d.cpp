@@ -183,6 +183,17 @@ bool CollisionObject3D::get_collision_mask_value(int p_layer_number) const {
 	return get_collision_mask() & (1 << (p_layer_number - 1));
 }
 
+void CollisionObject3D::set_collision_priority(real_t p_priority) {
+	collision_priority = p_priority;
+	if (!area) {
+		PhysicsServer3D::get_singleton()->body_set_collision_priority(get_rid(), p_priority);
+	}
+}
+
+real_t CollisionObject3D::get_collision_priority() const {
+	return collision_priority;
+}
+
 void CollisionObject3D::set_disable_mode(DisableMode p_mode) {
 	if (disable_mode == p_mode) {
 		return;
@@ -432,6 +443,8 @@ void CollisionObject3D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_collision_layer_value", "layer_number"), &CollisionObject3D::get_collision_layer_value);
 	ClassDB::bind_method(D_METHOD("set_collision_mask_value", "layer_number", "value"), &CollisionObject3D::set_collision_mask_value);
 	ClassDB::bind_method(D_METHOD("get_collision_mask_value", "layer_number"), &CollisionObject3D::get_collision_mask_value);
+	ClassDB::bind_method(D_METHOD("set_collision_priority", "priority"), &CollisionObject3D::set_collision_priority);
+	ClassDB::bind_method(D_METHOD("get_collision_priority"), &CollisionObject3D::get_collision_priority);
 	ClassDB::bind_method(D_METHOD("set_disable_mode", "mode"), &CollisionObject3D::set_disable_mode);
 	ClassDB::bind_method(D_METHOD("get_disable_mode"), &CollisionObject3D::get_disable_mode);
 	ClassDB::bind_method(D_METHOD("set_ray_pickable", "ray_pickable"), &CollisionObject3D::set_ray_pickable);
@@ -456,6 +469,8 @@ void CollisionObject3D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("shape_find_owner", "shape_index"), &CollisionObject3D::shape_find_owner);
 
 	GDVIRTUAL_BIND(_input_event, "camera", "event", "position", "normal", "shape_idx");
+	GDVIRTUAL_BIND(_mouse_enter);
+	GDVIRTUAL_BIND(_mouse_exit);
 
 	ADD_SIGNAL(MethodInfo("input_event", PropertyInfo(Variant::OBJECT, "camera", PROPERTY_HINT_RESOURCE_TYPE, "Node"), PropertyInfo(Variant::OBJECT, "event", PROPERTY_HINT_RESOURCE_TYPE, "InputEvent"), PropertyInfo(Variant::VECTOR3, "position"), PropertyInfo(Variant::VECTOR3, "normal"), PropertyInfo(Variant::INT, "shape_idx")));
 	ADD_SIGNAL(MethodInfo("mouse_entered"));
@@ -466,6 +481,7 @@ void CollisionObject3D::_bind_methods() {
 	ADD_GROUP("Collision", "collision_");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "collision_layer", PROPERTY_HINT_LAYERS_3D_PHYSICS), "set_collision_layer", "get_collision_layer");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "collision_mask", PROPERTY_HINT_LAYERS_3D_PHYSICS), "set_collision_mask", "get_collision_mask");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "collision_priority"), "set_collision_priority", "get_collision_priority");
 
 	ADD_GROUP("Input", "input_");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "input_ray_pickable"), "set_ray_pickable", "is_ray_pickable");
@@ -532,8 +548,8 @@ void CollisionObject3D::get_shape_owners(List<uint32_t> *r_owners) {
 	}
 }
 
-Array CollisionObject3D::_get_shape_owners() {
-	Array ret;
+PackedInt32Array CollisionObject3D::_get_shape_owners() {
+	PackedInt32Array ret;
 	for (const KeyValue<uint32_t, ShapeData> &E : shapes) {
 		ret.push_back(E.key);
 	}
@@ -687,8 +703,8 @@ bool CollisionObject3D::get_capture_input_on_drag() const {
 	return capture_input_on_drag;
 }
 
-TypedArray<String> CollisionObject3D::get_configuration_warnings() const {
-	TypedArray<String> warnings = Node::get_configuration_warnings();
+PackedStringArray CollisionObject3D::get_configuration_warnings() const {
+	PackedStringArray warnings = Node::get_configuration_warnings();
 
 	if (shapes.is_empty()) {
 		warnings.push_back(RTR("This node has no shape, so it can't collide or interact with other objects.\nConsider adding a CollisionShape3D or CollisionPolygon3D as a child to define its shape."));

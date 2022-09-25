@@ -79,7 +79,7 @@ protected:
 	_FORCE_INLINE_ RID _get_light() const { return canvas_light; }
 	void _notification(int p_what);
 	static void _bind_methods();
-	void _validate_property(PropertyInfo &property) const override;
+	void _validate_property(PropertyInfo &p_property) const;
 
 public:
 	void set_enabled(bool p_enabled);
@@ -171,7 +171,7 @@ public:
 	void set_texture_scale(real_t p_scale);
 	real_t get_texture_scale() const;
 
-	TypedArray<String> get_configuration_warnings() const override;
+	PackedStringArray get_configuration_warnings() const override;
 
 	PointLight2D();
 };

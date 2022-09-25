@@ -56,7 +56,7 @@ void GodotBody3D::update_mass_properties() {
 	// Update shapes and motions.
 
 	switch (mode) {
-		case PhysicsServer3D::BODY_MODE_DYNAMIC: {
+		case PhysicsServer3D::BODY_MODE_RIGID: {
 			real_t total_area = 0;
 			for (int i = 0; i < get_shape_count(); i++) {
 				if (is_shape_disabled(i)) {
@@ -154,7 +154,7 @@ void GodotBody3D::update_mass_properties() {
 			_inv_inertia = Vector3();
 			_inv_mass = 0;
 		} break;
-		case PhysicsServer3D::BODY_MODE_DYNAMIC_LINEAR: {
+		case PhysicsServer3D::BODY_MODE_RIGID_LINEAR: {
 			_inv_inertia_tensor.set_zero();
 			_inv_mass = 1.0 / mass;
 
@@ -201,7 +201,7 @@ void GodotBody3D::set_param(PhysicsServer3D::BodyParameter p_param, const Varian
 			real_t mass_value = p_value;
 			ERR_FAIL_COND(mass_value <= 0);
 			mass = mass_value;
-			if (mode >= PhysicsServer3D::BODY_MODE_DYNAMIC) {
+			if (mode >= PhysicsServer3D::BODY_MODE_RIGID) {
 				_mass_properties_changed();
 			}
 		} break;
@@ -209,12 +209,12 @@ void GodotBody3D::set_param(PhysicsServer3D::BodyParameter p_param, const Varian
 			inertia = p_value;
 			if ((inertia.x <= 0.0) || (inertia.y <= 0.0) || (inertia.z <= 0.0)) {
 				calculate_inertia = true;
-				if (mode == PhysicsServer3D::BODY_MODE_DYNAMIC) {
+				if (mode == PhysicsServer3D::BODY_MODE_RIGID) {
 					_mass_properties_changed();
 				}
 			} else {
 				calculate_inertia = false;
-				if (mode == PhysicsServer3D::BODY_MODE_DYNAMIC) {
+				if (mode == PhysicsServer3D::BODY_MODE_RIGID) {
 					principal_inertia_axes_local = Basis();
 					_inv_inertia = inertia.inverse();
 					_update_transform_dependent();
@@ -263,7 +263,7 @@ Variant GodotBody3D::get_param(PhysicsServer3D::BodyParameter p_param) const {
 			return mass;
 		} break;
 		case PhysicsServer3D::BODY_PARAM_INERTIA: {
-			if (mode == PhysicsServer3D::BODY_MODE_DYNAMIC) {
+			if (mode == PhysicsServer3D::BODY_MODE_RIGID) {
 				return _inv_inertia.inverse();
 			} else {
 				return Vector3();
@@ -315,7 +315,7 @@ void GodotBody3D::set_mode(PhysicsServer3D::BodyMode p_mode) {
 			_update_transform_dependent();
 
 		} break;
-		case PhysicsServer3D::BODY_MODE_DYNAMIC: {
+		case PhysicsServer3D::BODY_MODE_RIGID: {
 			_inv_mass = mass > 0 ? (1.0 / mass) : 0;
 			if (!calculate_inertia) {
 				principal_inertia_axes_local = Basis();
@@ -327,7 +327,7 @@ void GodotBody3D::set_mode(PhysicsServer3D::BodyMode p_mode) {
 			set_active(true);
 
 		} break;
-		case PhysicsServer3D::BODY_MODE_DYNAMIC_LINEAR: {
+		case PhysicsServer3D::BODY_MODE_RIGID_LINEAR: {
 			_inv_mass = mass > 0 ? (1.0 / mass) : 0;
 			_inv_inertia = Vector3();
 			angular_velocity = Vector3();
@@ -407,7 +407,7 @@ void GodotBody3D::set_state(PhysicsServer3D::BodyState p_state, const Variant &p
 		} break;
 		case PhysicsServer3D::BODY_STATE_CAN_SLEEP: {
 			can_sleep = p_variant;
-			if (mode >= PhysicsServer3D::BODY_MODE_DYNAMIC && !active && !can_sleep) {
+			if (mode >= PhysicsServer3D::BODY_MODE_RIGID && !active && !can_sleep) {
 				set_active(true);
 			}
 
@@ -674,7 +674,7 @@ void GodotBody3D::integrate_velocities(real_t p_step) {
 		return;
 	}
 
-	if (fi_callback_data || body_state_callback) {
+	if (fi_callback_data || body_state_callback.get_object()) {
 		get_space()->body_add_to_state_query_list(&direct_state_query_list);
 	}
 
@@ -744,7 +744,7 @@ void GodotBody3D::wakeup_neighbours() {
 				continue;
 			}
 			GodotBody3D *b = n[i];
-			if (b->mode < PhysicsServer3D::BODY_MODE_DYNAMIC) {
+			if (b->mode < PhysicsServer3D::BODY_MODE_RIGID) {
 				continue;
 			}
 
@@ -756,11 +756,12 @@ void GodotBody3D::wakeup_neighbours() {
 }
 
 void GodotBody3D::call_queries() {
+	Variant direct_state_variant = get_direct_state();
+
 	if (fi_callback_data) {
 		if (!fi_callback_data->callable.get_object()) {
 			set_force_integration_callback(Callable());
 		} else {
-			Variant direct_state_variant = get_direct_state();
 			const Variant *vp[2] = { &direct_state_variant, &fi_callback_data->udata };
 
 			Callable::CallError ce;
@@ -770,8 +771,11 @@ void GodotBody3D::call_queries() {
 		}
 	}
 
-	if (body_state_callback_instance) {
-		(body_state_callback)(body_state_callback_instance, get_direct_state());
+	if (body_state_callback.get_object()) {
+		const Variant *vp[1] = { &direct_state_variant };
+		Callable::CallError ce;
+		Variant rv;
+		body_state_callback.callp(vp, 1, rv, ce);
 	}
 }
 
@@ -792,9 +796,8 @@ bool GodotBody3D::sleep_test(real_t p_step) {
 	}
 }
 
-void GodotBody3D::set_state_sync_callback(void *p_instance, PhysicsServer3D::BodyStateCallback p_callback) {
-	body_state_callback_instance = p_instance;
-	body_state_callback = p_callback;
+void GodotBody3D::set_state_sync_callback(const Callable &p_callable) {
+	body_state_callback = p_callable;
 }
 
 void GodotBody3D::set_force_integration_callback(const Callable &p_callable, const Variant &p_udata) {

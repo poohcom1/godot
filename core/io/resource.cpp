@@ -93,15 +93,14 @@ String Resource::get_path() const {
 String Resource::generate_scene_unique_id() {
 	// Generate a unique enough hash, but still user-readable.
 	// If it's not unique it does not matter because the saver will try again.
-	OS::Date date = OS::get_singleton()->get_date();
-	OS::Time time = OS::get_singleton()->get_time();
+	OS::DateTime dt = OS::get_singleton()->get_datetime();
 	uint32_t hash = hash_murmur3_one_32(OS::get_singleton()->get_ticks_usec());
-	hash = hash_murmur3_one_32(date.year, hash);
-	hash = hash_murmur3_one_32(date.month, hash);
-	hash = hash_murmur3_one_32(date.day, hash);
-	hash = hash_murmur3_one_32(time.hour, hash);
-	hash = hash_murmur3_one_32(time.minute, hash);
-	hash = hash_murmur3_one_32(time.second, hash);
+	hash = hash_murmur3_one_32(dt.year, hash);
+	hash = hash_murmur3_one_32(dt.month, hash);
+	hash = hash_murmur3_one_32(dt.day, hash);
+	hash = hash_murmur3_one_32(dt.hour, hash);
+	hash = hash_murmur3_one_32(dt.minute, hash);
+	hash = hash_murmur3_one_32(dt.second, hash);
 	hash = hash_murmur3_one_32(Math::rand(), hash);
 
 	static constexpr uint32_t characters = 5;
@@ -490,7 +489,7 @@ bool ResourceCache::has(const String &p_path) {
 
 	Resource **res = resources.getptr(p_path);
 
-	if (res && (*res)->reference_get_count() == 0) {
+	if (res && (*res)->get_reference_count() == 0) {
 		// This resource is in the process of being deleted, ignore its existence.
 		(*res)->path_cache = String();
 		resources.erase(p_path);
@@ -542,44 +541,4 @@ int ResourceCache::get_cached_resource_count() {
 	lock.unlock();
 
 	return rc;
-}
-
-void ResourceCache::dump(const char *p_file, bool p_short) {
-#ifdef DEBUG_ENABLED
-	lock.lock();
-
-	HashMap<String, int> type_count;
-
-	Ref<FileAccess> f;
-	if (p_file) {
-		f = FileAccess::open(String::utf8(p_file), FileAccess::WRITE);
-		ERR_FAIL_COND_MSG(f.is_null(), "Cannot create file at path '" + String::utf8(p_file) + "'.");
-	}
-
-	for (KeyValue<String, Resource *> &E : resources) {
-		Resource *r = E.value;
-
-		if (!type_count.has(r->get_class())) {
-			type_count[r->get_class()] = 0;
-		}
-
-		type_count[r->get_class()]++;
-
-		if (!p_short) {
-			if (f.is_valid()) {
-				f->store_line(r->get_class() + ": " + r->get_path());
-			}
-		}
-	}
-
-	for (const KeyValue<String, int> &E : type_count) {
-		if (f.is_valid()) {
-			f->store_line(E.key + " count: " + itos(E.value));
-		}
-	}
-
-	lock.unlock();
-#else
-	WARN_PRINT("ResourceCache::dump only with in debug builds.");
-#endif
 }

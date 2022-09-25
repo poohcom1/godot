@@ -44,7 +44,7 @@ bool Bone2D::_set(const StringName &p_path, const Variant &p_value) {
 	} else if (path.begins_with("length")) {
 		set_length(p_value);
 	} else if (path.begins_with("bone_angle")) {
-		set_bone_angle(Math::deg2rad(real_t(p_value)));
+		set_bone_angle(Math::deg_to_rad(real_t(p_value)));
 	} else if (path.begins_with("default_length")) {
 		set_length(p_value);
 	}
@@ -66,7 +66,7 @@ bool Bone2D::_get(const StringName &p_path, Variant &r_ret) const {
 	} else if (path.begins_with("length")) {
 		r_ret = get_length();
 	} else if (path.begins_with("bone_angle")) {
-		r_ret = Math::rad2deg(get_bone_angle());
+		r_ret = Math::rad_to_deg(get_bone_angle());
 	} else if (path.begins_with("default_length")) {
 		r_ret = get_length();
 	}
@@ -126,7 +126,7 @@ void Bone2D::_notification(int p_what) {
 				return;
 			}
 
-			update();
+			queue_redraw();
 #endif // TOOLS_ENABLED
 		} break;
 
@@ -143,12 +143,12 @@ void Bone2D::_notification(int p_what) {
 				return;
 			}
 
-			update();
+			queue_redraw();
 
 			if (get_parent()) {
 				Bone2D *parent_bone = Object::cast_to<Bone2D>(get_parent());
 				if (parent_bone) {
-					parent_bone->update();
+					parent_bone->queue_redraw();
 				}
 			}
 #endif // TOOLS_ENABLED
@@ -365,7 +365,7 @@ bool Bone2D::_editor_get_bone_shape(Vector<Vector2> *p_shape, Vector<Vector2> *p
 
 void Bone2D::_editor_set_show_bone_gizmo(bool p_show_gizmo) {
 	_editor_show_bone_gizmo = p_show_gizmo;
-	update();
+	queue_redraw();
 }
 
 bool Bone2D::_editor_get_show_bone_gizmo() const {
@@ -434,8 +434,8 @@ int Bone2D::get_index_in_skeleton() const {
 	return skeleton_index;
 }
 
-TypedArray<String> Bone2D::get_configuration_warnings() const {
-	TypedArray<String> warnings = Node::get_configuration_warnings();
+PackedStringArray Bone2D::get_configuration_warnings() const {
+	PackedStringArray warnings = Node::get_configuration_warnings();
 	if (!skeleton) {
 		if (parent_bone) {
 			warnings.push_back(RTR("This Bone2D chain should end at a Skeleton2D node."));
@@ -493,7 +493,7 @@ void Bone2D::set_length(real_t p_length) {
 	length = p_length;
 
 #ifdef TOOLS_ENABLED
-	update();
+	queue_redraw();
 #endif // TOOLS_ENABLED
 }
 
@@ -505,7 +505,7 @@ void Bone2D::set_bone_angle(real_t p_angle) {
 	bone_angle = p_angle;
 
 #ifdef TOOLS_ENABLED
-	update();
+	queue_redraw();
 #endif // TOOLS_ENABLED
 }
 

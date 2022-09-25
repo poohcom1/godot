@@ -387,11 +387,25 @@ void GodotPhysicsServer3D::area_set_collision_layer(RID p_area, uint32_t p_layer
 	area->set_collision_layer(p_layer);
 }
 
+uint32_t GodotPhysicsServer3D::area_get_collision_layer(RID p_area) const {
+	GodotArea3D *area = area_owner.get_or_null(p_area);
+	ERR_FAIL_COND_V(!area, 0);
+
+	return area->get_collision_layer();
+}
+
 void GodotPhysicsServer3D::area_set_collision_mask(RID p_area, uint32_t p_mask) {
 	GodotArea3D *area = area_owner.get_or_null(p_area);
 	ERR_FAIL_COND(!area);
 
 	area->set_collision_mask(p_mask);
+}
+
+uint32_t GodotPhysicsServer3D::area_get_collision_mask(RID p_area) const {
+	GodotArea3D *area = area_owner.get_or_null(p_area);
+	ERR_FAIL_COND_V(!area, 0);
+
+	return area->get_collision_mask();
 }
 
 void GodotPhysicsServer3D::area_set_monitorable(RID p_area, bool p_monitorable) {
@@ -593,6 +607,20 @@ uint32_t GodotPhysicsServer3D::body_get_collision_mask(RID p_body) const {
 	return body->get_collision_mask();
 }
 
+void GodotPhysicsServer3D::body_set_collision_priority(RID p_body, real_t p_priority) {
+	GodotBody3D *body = body_owner.get_or_null(p_body);
+	ERR_FAIL_COND(!body);
+
+	body->set_collision_priority(p_priority);
+}
+
+real_t GodotPhysicsServer3D::body_get_collision_priority(RID p_body) const {
+	const GodotBody3D *body = body_owner.get_or_null(p_body);
+	ERR_FAIL_COND_V(!body, 0);
+
+	return body->get_collision_priority();
+}
+
 void GodotPhysicsServer3D::body_attach_object_instance_id(RID p_body, ObjectID p_id) {
 	GodotBody3D *body = body_owner.get_or_null(p_body);
 	if (body) {
@@ -746,7 +774,7 @@ void GodotPhysicsServer3D::body_set_constant_force(RID p_body, const Vector3 &p_
 	ERR_FAIL_COND(!body);
 
 	body->set_constant_force(p_force);
-	if (!p_force.is_equal_approx(Vector3())) {
+	if (!p_force.is_zero_approx()) {
 		body->wakeup();
 	}
 }
@@ -762,7 +790,7 @@ void GodotPhysicsServer3D::body_set_constant_torque(RID p_body, const Vector3 &p
 	ERR_FAIL_COND(!body);
 
 	body->set_constant_torque(p_torque);
-	if (!p_torque.is_equal_approx(Vector3())) {
+	if (!p_torque.is_zero_approx()) {
 		body->wakeup();
 	}
 }
@@ -863,10 +891,10 @@ int GodotPhysicsServer3D::body_get_max_contacts_reported(RID p_body) const {
 	return body->get_max_contacts_reported();
 }
 
-void GodotPhysicsServer3D::body_set_state_sync_callback(RID p_body, void *p_instance, BodyStateCallback p_callback) {
+void GodotPhysicsServer3D::body_set_state_sync_callback(RID p_body, const Callable &p_callable) {
 	GodotBody3D *body = body_owner.get_or_null(p_body);
 	ERR_FAIL_COND(!body);
-	body->set_state_sync_callback(p_instance, p_callback);
+	body->set_state_sync_callback(p_callable);
 }
 
 void GodotPhysicsServer3D::body_set_force_integration_callback(RID p_body, const Callable &p_callable, const Variant &p_udata) {

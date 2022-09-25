@@ -37,6 +37,8 @@
 #include "core/string/ustring.h"
 
 struct _NO_DISCARD_ Vector4 {
+	static const int AXIS_COUNT = 4;
+
 	enum Axis {
 		AXIS_X,
 		AXIS_Y,
@@ -73,6 +75,7 @@ struct _NO_DISCARD_ Vector4 {
 
 	_FORCE_INLINE_ real_t length_squared() const;
 	bool is_equal_approx(const Vector4 &p_vec4) const;
+	bool is_zero_approx() const;
 	real_t length() const;
 	void normalize();
 	Vector4 normalized() const;
@@ -89,6 +92,7 @@ struct _NO_DISCARD_ Vector4 {
 	Vector4 round() const;
 	Vector4 lerp(const Vector4 &p_to, const real_t p_weight) const;
 	Vector4 cubic_interpolate(const Vector4 &p_b, const Vector4 &p_pre_a, const Vector4 &p_post_b, const real_t p_weight) const;
+	Vector4 cubic_interpolate_in_time(const Vector4 &p_b, const Vector4 &p_pre_a, const Vector4 &p_post_b, const real_t p_weight, const real_t &p_b_t, const real_t &p_pre_a_t, const real_t &p_post_b_t) const;
 
 	Vector4 posmod(const real_t p_mod) const;
 	Vector4 posmodv(const Vector4 &p_modv) const;

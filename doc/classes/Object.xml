@@ -5,7 +5,7 @@
 	</brief_description>
 	<description>
 		Every class which is not a built-in type inherits from this class.
-		You can construct Objects from scripting languages, using [code]Object.new()[/code] in GDScript, [code]new Object[/code] in C#, or the "Construct Object" node in VisualScript.
+		You can construct Objects from scripting languages, using [code]Object.new()[/code] in GDScript, or [code]new Object[/code] in C#.
 		Objects do not manage memory. If a class inherits from Object, you will have to delete instances of it manually. To do so, call the [method free] method from your script or delete the instance from C++.
 		Some classes that extend Object add memory management. This is the case of [RefCounted], which counts references and deletes itself automatically when no longer referenced. [Node], another fundamental type, deletes all its children when freed from memory.
 		Objects export properties, which are mainly useful for storage and editing, but not really so much in programming. Properties are exported in [method _get_property_list] and handled in [method _get] and [method _set]. However, scripting languages and C++ have simpler means to export them.
@@ -43,7 +43,7 @@
 			</description>
 		</method>
 		<method name="_get_property_list" qualifiers="virtual">
-			<return type="Array" />
+			<return type="Dictionary[]" />
 			<description>
 				Virtual method which can be overridden to customize the return value of [method get_property_list].
 				Returns the object's property list as an [Array] of dictionaries.
@@ -62,6 +62,22 @@
 			<param index="0" name="what" type="int" />
 			<description>
 				Called whenever the object receives a notification, which is identified in [param what] by a constant. The base [Object] has two constants [constant NOTIFICATION_POSTINITIALIZE] and [constant NOTIFICATION_PREDELETE], but subclasses such as [Node] define a lot more notifications which are also received by this method.
+			</description>
+		</method>
+		<method name="_property_can_revert" qualifiers="virtual">
+			<return type="bool" />
+			<param index="0" name="property" type="StringName" />
+			<description>
+				Virtual methods that can be overridden to customize the property revert behavior in the editor.
+				Returns [code]true[/code] if the property identified by [code]name[/code] can be reverted to a default value. Override [method _property_get_revert] to return the actual value.
+			</description>
+		</method>
+		<method name="_property_get_revert" qualifiers="virtual">
+			<return type="Variant" />
+			<param index="0" name="property" type="StringName" />
+			<description>
+				Virtual methods that can be overridden to customize the property revert behavior in the editor.
+				Returns the default value of the property identified by [code]name[/code]. [method _property_can_revert] must be overridden as well for this method to be called.
 			</description>
 		</method>
 		<method name="_set" qualifiers="virtual">
@@ -337,7 +353,7 @@
 			</description>
 		</method>
 		<method name="get_incoming_connections" qualifiers="const">
-			<return type="Array" />
+			<return type="Dictionary[]" />
 			<description>
 				Returns an [Array] of dictionaries with information about signals that are connected to the object.
 				Each [Dictionary] contains three String entries:
@@ -367,7 +383,8 @@
 			<param index="1" name="default" type="Variant" default="null" />
 			<description>
 				Returns the object's metadata entry for the given [param name].
-				Throws error if the entry does not exist, unless [param default] is not [code]null[/code] (in which case the default value will be returned).
+				Throws error if the entry does not exist, unless [param default] is not [code]null[/code] (in which case the default value will be returned). See also [method has_meta], [method set_meta] and [method remove_meta].
+				[b]Note:[/b] Metadata that has a [param name] starting with an underscore ([code]_[/code]) is considered editor-only. Editor-only metadata is not displayed in the inspector and should not be edited.
 			</description>
 		</method>
 		<method name="get_meta_list" qualifiers="const">
@@ -377,13 +394,13 @@
 			</description>
 		</method>
 		<method name="get_method_list" qualifiers="const">
-			<return type="Array" />
+			<return type="Dictionary[]" />
 			<description>
 				Returns the object's methods and their signatures as an [Array].
 			</description>
 		</method>
 		<method name="get_property_list" qualifiers="const">
-			<return type="Array" />
+			<return type="Dictionary[]" />
 			<description>
 				Returns the object's property list as an [Array] of dictionaries.
 				Each property's [Dictionary] contain at least [code]name: String[/code] and [code]type: int[/code] (see [enum Variant.Type]) entries. Optionally, it can also include [code]hint: int[/code] (see [enum PropertyHint]), [code]hint_string: String[/code], and [code]usage: int[/code] (see [enum PropertyUsageFlags]).
@@ -396,14 +413,14 @@
 			</description>
 		</method>
 		<method name="get_signal_connection_list" qualifiers="const">
-			<return type="Array" />
+			<return type="Dictionary[]" />
 			<param index="0" name="signal" type="StringName" />
 			<description>
 				Returns an [Array] of connections for the given [param signal].
 			</description>
 		</method>
 		<method name="get_signal_list" qualifiers="const">
-			<return type="Array" />
+			<return type="Dictionary[]" />
 			<description>
 				Returns the list of signals as an [Array] of dictionaries.
 			</description>
@@ -412,7 +429,8 @@
 			<return type="bool" />
 			<param index="0" name="name" type="StringName" />
 			<description>
-				Returns [code]true[/code] if a metadata entry is found with the given [param name].
+				Returns [code]true[/code] if a metadata entry is found with the given [param name]. See also [method get_meta], [method set_meta] and [method remove_meta].
+				[b]Note:[/b] Metadata that has a [param name] starting with an underscore ([code]_[/code]) is considered editor-only. Editor-only metadata is not displayed in the inspector and should not be edited.
 			</description>
 		</method>
 		<method name="has_method" qualifiers="const">
@@ -483,7 +501,8 @@
 			<return type="void" />
 			<param index="0" name="name" type="StringName" />
 			<description>
-				Removes a given entry from the object's metadata. See also [method set_meta].
+				Removes a given entry from the object's metadata. See also [method has_meta], [method get_meta] and [method set_meta].
+				[b]Note:[/b] Metadata that has a [param name] starting with an underscore ([code]_[/code]) is considered editor-only. Editor-only metadata is not displayed in the inspector and should not be edited.
 			</description>
 		</method>
 		<method name="set">
@@ -546,7 +565,8 @@
 			<param index="1" name="value" type="Variant" />
 			<description>
 				Adds, changes or removes a given entry in the object's metadata. Metadata are serialized and can take any [Variant] value.
-				To remove a given entry from the object's metadata, use [method remove_meta]. Metadata is also removed if its value is set to [code]null[/code]. This means you can also use [code]set_meta("name", null)[/code] to remove metadata for [code]"name"[/code].
+				To remove a given entry from the object's metadata, use [method remove_meta]. Metadata is also removed if its value is set to [code]null[/code]. This means you can also use [code]set_meta("name", null)[/code] to remove metadata for [code]"name"[/code]. See also [method has_meta] and [method get_meta].
+				[b]Note:[/b] Metadata that has a [param name] starting with an underscore ([code]_[/code]) is considered editor-only. Editor-only metadata is not displayed in the inspector and should not be edited.
 			</description>
 		</method>
 		<method name="set_script">
@@ -613,7 +633,7 @@
 		<constant name="CONNECT_PERSIST" value="2" enum="ConnectFlags">
 			Persisting connections are saved when the object is serialized to file.
 		</constant>
-		<constant name="CONNECT_ONESHOT" value="4" enum="ConnectFlags">
+		<constant name="CONNECT_ONE_SHOT" value="4" enum="ConnectFlags">
 			One-shot connections disconnect themselves after emission.
 		</constant>
 		<constant name="CONNECT_REFERENCE_COUNTED" value="8" enum="ConnectFlags">

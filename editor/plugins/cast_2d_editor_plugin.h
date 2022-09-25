@@ -35,13 +35,14 @@
 #include "scene/2d/node_2d.h"
 
 class CanvasItemEditor;
+class EditorUndoRedoManager;
 
 class Cast2DEditor : public Control {
 	GDCLASS(Cast2DEditor, Control);
 
-	UndoRedo *undo_redo = nullptr;
+	Ref<EditorUndoRedoManager> undo_redo;
 	CanvasItemEditor *canvas_item_editor = nullptr;
-	Node2D *node;
+	Node2D *node = nullptr;
 
 	bool pressed = false;
 	Point2 original_target_position;

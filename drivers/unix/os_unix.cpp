@@ -51,7 +51,6 @@
 #include <sys/sysctl.h>
 #endif
 
-#include <assert.h>
 #include <dlfcn.h>
 #include <errno.h>
 #include <poll.h>
@@ -92,7 +91,7 @@ static void _setup_clock() {
 	_clock_start = mach_absolute_time() * _clock_scale;
 }
 #else
-#if defined(CLOCK_MONOTONIC_RAW) && !defined(JAVASCRIPT_ENABLED) // This is a better clock on Linux.
+#if defined(CLOCK_MONOTONIC_RAW) && !defined(WEB_ENABLED) // This is a better clock on Linux.
 #define GODOT_CLOCK CLOCK_MONOTONIC_RAW
 #else
 #define GODOT_CLOCK CLOCK_MONOTONIC
@@ -103,10 +102,6 @@ static void _setup_clock() {
 	_clock_start = ((uint64_t)tv_now.tv_nsec / 1000L) + (uint64_t)tv_now.tv_sec * 1000000L;
 }
 #endif
-
-void OS_Unix::debug_break() {
-	assert(false);
-}
 
 static void handle_interrupt(int sig) {
 	if (!EngineDebugger::is_active()) {
@@ -194,13 +189,21 @@ String OS_Unix::get_name() const {
 	return "Unix";
 }
 
+String OS_Unix::get_distribution_name() const {
+	return "";
+}
+
+String OS_Unix::get_version() const {
+	return "";
+}
+
 double OS_Unix::get_unix_time() const {
 	struct timeval tv_now;
 	gettimeofday(&tv_now, nullptr);
 	return (double)tv_now.tv_sec + double(tv_now.tv_usec) / 1000000;
 }
 
-OS::Date OS_Unix::get_date(bool p_utc) const {
+OS::DateTime OS_Unix::get_datetime(bool p_utc) const {
 	time_t t = time(nullptr);
 	struct tm lt;
 	if (p_utc) {
@@ -208,7 +211,7 @@ OS::Date OS_Unix::get_date(bool p_utc) const {
 	} else {
 		localtime_r(&t, &lt);
 	}
-	Date ret;
+	DateTime ret;
 	ret.year = 1900 + lt.tm_year;
 	// Index starting at 1 to match OS_Unix::get_date
 	//   and Windows SYSTEMTIME and tm_mon follows the typical structure
@@ -216,24 +219,11 @@ OS::Date OS_Unix::get_date(bool p_utc) const {
 	ret.month = (Month)(lt.tm_mon + 1);
 	ret.day = lt.tm_mday;
 	ret.weekday = (Weekday)lt.tm_wday;
-	ret.dst = lt.tm_isdst;
-
-	return ret;
-}
-
-OS::Time OS_Unix::get_time(bool p_utc) const {
-	time_t t = time(nullptr);
-	struct tm lt;
-	if (p_utc) {
-		gmtime_r(&t, &lt);
-	} else {
-		localtime_r(&t, &lt);
-	}
-	Time ret;
 	ret.hour = lt.tm_hour;
 	ret.minute = lt.tm_min;
 	ret.second = lt.tm_sec;
-	get_time_zone_info();
+	ret.dst = lt.tm_isdst;
+
 	return ret;
 }
 
@@ -292,7 +282,7 @@ uint64_t OS_Unix::get_ticks_usec() const {
 Error OS_Unix::execute(const String &p_path, const List<String> &p_arguments, String *r_pipe, int *r_exitcode, bool read_stderr, Mutex *p_pipe_mutex, bool p_open_console) {
 #ifdef __EMSCRIPTEN__
 	// Don't compile this code at all to avoid undefined references.
-	// Actual virtual call goes to OS_JavaScript.
+	// Actual virtual call goes to OS_Web.
 	ERR_FAIL_V(ERR_BUG);
 #else
 	if (r_pipe) {
@@ -366,7 +356,7 @@ Error OS_Unix::execute(const String &p_path, const List<String> &p_arguments, St
 Error OS_Unix::create_process(const String &p_path, const List<String> &p_arguments, ProcessID *r_child_id, bool p_open_console) {
 #ifdef __EMSCRIPTEN__
 	// Don't compile this code at all to avoid undefined references.
-	// Actual virtual call goes to OS_JavaScript.
+	// Actual virtual call goes to OS_Web.
 	ERR_FAIL_V(ERR_BUG);
 #else
 	pid_t pid = fork();
@@ -454,12 +444,12 @@ Error OS_Unix::open_dynamic_library(const String p_path, void *&p_library_handle
 
 	if (!FileAccess::exists(path)) {
 		// This code exists so GDExtension can load .so files from within the executable path.
-		path = get_executable_path().get_base_dir().plus_file(p_path.get_file());
+		path = get_executable_path().get_base_dir().path_join(p_path.get_file());
 	}
 
 	if (!FileAccess::exists(path)) {
 		// This code exists so GDExtension can load .so files from a standard unix location.
-		path = get_executable_path().get_base_dir().plus_file("../lib").plus_file(p_path.get_file());
+		path = get_executable_path().get_base_dir().path_join("../lib").path_join(p_path.get_file());
 	}
 
 	p_library_handle = dlopen(path.utf8().get_data(), RTLD_NOW);
@@ -526,13 +516,13 @@ String OS_Unix::get_user_data_dir() const {
 			if (custom_dir.is_empty()) {
 				custom_dir = appname;
 			}
-			return get_data_path().plus_file(custom_dir);
+			return get_data_path().path_join(custom_dir);
 		} else {
-			return get_data_path().plus_file(get_godot_dir_name()).plus_file("app_userdata").plus_file(appname);
+			return get_data_path().path_join(get_godot_dir_name()).path_join("app_userdata").path_join(appname);
 		}
 	}
 
-	return get_data_path().plus_file(get_godot_dir_name()).plus_file("app_userdata").plus_file("[unnamed project]");
+	return get_data_path().path_join(get_godot_dir_name()).path_join("app_userdata").path_join("[unnamed project]");
 }
 
 String OS_Unix::get_executable_path() const {

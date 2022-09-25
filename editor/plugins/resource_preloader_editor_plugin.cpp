@@ -196,7 +196,7 @@ void ResourcePreloaderEditor::_update_library() {
 
 		String type = r->get_class();
 		ti->set_icon(0, EditorNode::get_singleton()->get_class_icon(type, "Object"));
-		ti->set_tooltip(0, TTR("Instance:") + " " + r->get_path() + "\n" + TTR("Type:") + " " + type);
+		ti->set_tooltip_text(0, TTR("Instance:") + " " + r->get_path() + "\n" + TTR("Type:") + " " + type);
 
 		ti->set_text(1, r->get_path());
 		ti->set_editable(1, false);
@@ -232,6 +232,10 @@ void ResourcePreloaderEditor::_cell_button_pressed(Object *p_item, int p_column,
 	} else if (p_id == BUTTON_REMOVE) {
 		_remove_resource(item->get_text(0));
 	}
+}
+
+void ResourcePreloaderEditor::set_undo_redo(Ref<EditorUndoRedoManager> p_undo_redo) {
+	undo_redo = p_undo_redo;
 }
 
 void ResourcePreloaderEditor::edit(ResourcePreloader *p_preloader) {
@@ -352,7 +356,7 @@ ResourcePreloaderEditor::ResourcePreloaderEditor() {
 	vbc->add_child(hbc);
 
 	load = memnew(Button);
-	load->set_tooltip(TTR("Load Resource"));
+	load->set_tooltip_text(TTR("Load Resource"));
 	hbc->add_child(load);
 
 	paste = memnew(Button);
@@ -387,7 +391,7 @@ ResourcePreloaderEditor::ResourcePreloaderEditor() {
 }
 
 void ResourcePreloaderEditorPlugin::edit(Object *p_object) {
-	preloader_editor->set_undo_redo(&get_undo_redo());
+	preloader_editor->set_undo_redo(EditorNode::get_undo_redo());
 	ResourcePreloader *s = Object::cast_to<ResourcePreloader>(p_object);
 	if (!s) {
 		return;

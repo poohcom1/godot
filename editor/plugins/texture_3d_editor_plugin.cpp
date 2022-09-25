@@ -53,12 +53,12 @@ void Texture3DEditor::_texture_changed() {
 	if (!is_visible()) {
 		return;
 	}
-	update();
+	queue_redraw();
 }
 
 void Texture3DEditor::_update_material() {
-	material->set_shader_uniform("layer", (layer->get_value() + 0.5) / texture->get_depth());
-	material->set_shader_uniform("tex", texture->get_rid());
+	material->set_shader_parameter("layer", (layer->get_value() + 0.5) / texture->get_depth());
+	material->set_shader_parameter("tex", texture->get_rid());
 
 	String format = Image::get_format_name(texture->get_format());
 
@@ -124,7 +124,7 @@ void Texture3DEditor::edit(Ref<Texture3D> p_texture) {
 		}
 
 		texture->connect("changed", callable_mp(this, &Texture3DEditor::_texture_changed));
-		update();
+		queue_redraw();
 		texture_rect->set_material(material);
 		setting = true;
 		layer->set_max(texture->get_depth() - 1);
@@ -136,10 +136,6 @@ void Texture3DEditor::edit(Ref<Texture3D> p_texture) {
 	} else {
 		hide();
 	}
-}
-
-void Texture3DEditor::_bind_methods() {
-	ClassDB::bind_method(D_METHOD("_layer_changed"), &Texture3DEditor::_layer_changed);
 }
 
 Texture3DEditor::Texture3DEditor() {
@@ -173,7 +169,7 @@ Texture3DEditor::Texture3DEditor() {
 	info->add_theme_constant_override("shadow_offset_y", 2);
 
 	setting = false;
-	layer->connect("value_changed", Callable(this, "_layer_changed"));
+	layer->connect("value_changed", callable_mp(this, &Texture3DEditor::_layer_changed));
 }
 
 Texture3DEditor::~Texture3DEditor() {

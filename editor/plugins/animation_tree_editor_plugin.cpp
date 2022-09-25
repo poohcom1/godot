@@ -50,8 +50,16 @@
 #include "scene/scene_string_names.h"
 
 void AnimationTreeEditor::edit(AnimationTree *p_tree) {
+	if (p_tree && !p_tree->is_connected("animation_player_changed", callable_mp(this, &AnimationTreeEditor::_animation_list_changed))) {
+		p_tree->connect("animation_player_changed", callable_mp(this, &AnimationTreeEditor::_animation_list_changed), CONNECT_DEFERRED);
+	}
+
 	if (tree == p_tree) {
 		return;
+	}
+
+	if (tree && tree->is_connected("animation_player_changed", callable_mp(this, &AnimationTreeEditor::_animation_list_changed))) {
+		tree->disconnect("animation_player_changed", callable_mp(this, &AnimationTreeEditor::_animation_list_changed));
 	}
 
 	tree = p_tree;
@@ -59,16 +67,24 @@ void AnimationTreeEditor::edit(AnimationTree *p_tree) {
 	Vector<String> path;
 	if (tree && tree->has_meta("_tree_edit_path")) {
 		path = tree->get_meta("_tree_edit_path");
-		edit_path(path);
 	} else {
 		current_root = ObjectID();
 	}
+
+	edit_path(path);
 }
 
 void AnimationTreeEditor::_path_button_pressed(int p_path) {
 	edited_path.clear();
 	for (int i = 0; i <= p_path; i++) {
 		edited_path.push_back(button_path[i]);
+	}
+}
+
+void AnimationTreeEditor::_animation_list_changed() {
+	AnimationNodeBlendTreeEditor *bte = AnimationNodeBlendTreeEditor::get_singleton();
+	if (bte) {
+		bte->update_graph();
 	}
 }
 
@@ -129,6 +145,11 @@ void AnimationTreeEditor::edit_path(const Vector<String> &p_path) {
 	} else {
 		current_root = ObjectID();
 		edited_path = button_path;
+
+		for (int i = 0; i < editors.size(); i++) {
+			editors[i]->edit(Ref<AnimationNode>());
+			editors[i]->hide();
+		}
 	}
 
 	_update_path();

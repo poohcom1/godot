@@ -1,8 +1,3 @@
-#if REAL_T_IS_DOUBLE
-using real_t = System.Double;
-#else
-using real_t = System.Single;
-#endif
 using System;
 using System.Runtime.InteropServices;
 
@@ -153,6 +148,9 @@ namespace Godot
         /// Access whole columns in the form of <see cref="Vector3"/>.
         /// </summary>
         /// <param name="column">Which column vector.</param>
+        /// <exception cref="ArgumentOutOfRangeException">
+        /// <paramref name="column"/> is not 0, 1, 2 or 3.
+        /// </exception>
         /// <value>The basis column.</value>
         public Vector3 this[int column]
         {
@@ -167,7 +165,7 @@ namespace Godot
                     case 2:
                         return Column2;
                     default:
-                        throw new IndexOutOfRangeException();
+                        throw new ArgumentOutOfRangeException(nameof(column));
                 }
             }
             set
@@ -184,7 +182,7 @@ namespace Godot
                         Column2 = value;
                         return;
                     default:
-                        throw new IndexOutOfRangeException();
+                        throw new ArgumentOutOfRangeException(nameof(column));
                 }
             }
         }
@@ -371,8 +369,8 @@ namespace Godot
         /// but are more efficient for some internal calculations.
         /// </summary>
         /// <param name="index">Which row.</param>
-        /// <exception cref="IndexOutOfRangeException">
-        /// Thrown when the <paramref name="index"/> is not 0, 1 or 2.
+        /// <exception cref="ArgumentOutOfRangeException">
+        /// <paramref name="index"/> is not 0, 1 or 2.
         /// </exception>
         /// <returns>One of <c>Row0</c>, <c>Row1</c>, or <c>Row2</c>.</returns>
         public Vector3 GetRow(int index)
@@ -386,7 +384,7 @@ namespace Godot
                 case 2:
                     return Row2;
                 default:
-                    throw new IndexOutOfRangeException();
+                    throw new ArgumentOutOfRangeException(nameof(index));
             }
         }
 
@@ -396,8 +394,8 @@ namespace Godot
         /// </summary>
         /// <param name="index">Which row.</param>
         /// <param name="value">The vector to set the row to.</param>
-        /// <exception cref="IndexOutOfRangeException">
-        /// Thrown when the <paramref name="index"/> is not 0, 1 or 2.
+        /// <exception cref="ArgumentOutOfRangeException">
+        /// <paramref name="index"/> is not 0, 1 or 2.
         /// </exception>
         public void SetRow(int index, Vector3 value)
         {
@@ -413,7 +411,7 @@ namespace Godot
                     Row2 = value;
                     return;
                 default:
-                    throw new IndexOutOfRangeException();
+                    throw new ArgumentOutOfRangeException(nameof(index));
             }
         }
 
@@ -501,6 +499,15 @@ namespace Godot
                 cofac10 * detInv, cofac11 * detInv, cofac12 * detInv,
                 cofac20 * detInv, cofac21 * detInv, cofac22 * detInv
             );
+        }
+
+        internal Basis Lerp(Basis to, real_t weight)
+        {
+            Basis b = this;
+            b.Row0 = Row0.Lerp(to.Row0, weight);
+            b.Row1 = Row1.Lerp(to.Row1, weight);
+            b.Row2 = Row2.Lerp(to.Row2, weight);
+            return b;
         }
 
         /// <summary>
@@ -621,41 +628,6 @@ namespace Godot
             tr.Row2[1] = temp;
 
             return tr;
-        }
-
-        /// <summary>
-        /// Returns a vector transformed (multiplied) by the basis matrix.
-        /// </summary>
-        /// <seealso cref="XformInv(Vector3)"/>
-        /// <param name="v">A vector to transform.</param>
-        /// <returns>The transformed vector.</returns>
-        public Vector3 Xform(Vector3 v)
-        {
-            return new Vector3
-            (
-                Row0.Dot(v),
-                Row1.Dot(v),
-                Row2.Dot(v)
-            );
-        }
-
-        /// <summary>
-        /// Returns a vector transformed (multiplied) by the transposed basis matrix.
-        ///
-        /// Note: This results in a multiplication by the inverse of the
-        /// basis matrix only if it represents a rotation-reflection.
-        /// </summary>
-        /// <seealso cref="Xform(Vector3)"/>
-        /// <param name="v">A vector to inversely transform.</param>
-        /// <returns>The inversely transformed vector.</returns>
-        public Vector3 XformInv(Vector3 v)
-        {
-            return new Vector3
-            (
-                Row0[0] * v.x + Row1[0] * v.y + Row2[0] * v.z,
-                Row0[1] * v.x + Row1[1] * v.y + Row2[1] * v.z,
-                Row0[2] * v.x + Row1[2] * v.y + Row2[2] * v.z
-            );
         }
 
         private static readonly Basis[] _orthoBases = {
@@ -862,6 +834,41 @@ namespace Godot
         }
 
         /// <summary>
+        /// Returns a Vector3 transformed (multiplied) by the basis matrix.
+        /// </summary>
+        /// <param name="basis">The basis matrix transformation to apply.</param>
+        /// <param name="vector">A Vector3 to transform.</param>
+        /// <returns>The transformed Vector3.</returns>
+        public static Vector3 operator *(Basis basis, Vector3 vector)
+        {
+            return new Vector3
+            (
+                basis.Row0.Dot(vector),
+                basis.Row1.Dot(vector),
+                basis.Row2.Dot(vector)
+            );
+        }
+
+        /// <summary>
+        /// Returns a Vector3 transformed (multiplied) by the transposed basis matrix.
+        ///
+        /// Note: This results in a multiplication by the inverse of the
+        /// basis matrix only if it represents a rotation-reflection.
+        /// </summary>
+        /// <param name="vector">A Vector3 to inversely transform.</param>
+        /// <param name="basis">The basis matrix transformation to apply.</param>
+        /// <returns>The inversely transformed vector.</returns>
+        public static Vector3 operator *(Vector3 vector, Basis basis)
+        {
+            return new Vector3
+            (
+                basis.Row0[0] * vector.x + basis.Row1[0] * vector.y + basis.Row2[0] * vector.z,
+                basis.Row0[1] * vector.x + basis.Row1[1] * vector.y + basis.Row2[1] * vector.z,
+                basis.Row0[2] * vector.x + basis.Row1[2] * vector.y + basis.Row2[2] * vector.z
+            );
+        }
+
+        /// <summary>
         /// Returns <see langword="true"/> if the basis matrices are exactly
         /// equal. Note: Due to floating-point precision errors, consider using
         /// <see cref="IsEqualApprox"/> instead, which is more reliable.
@@ -897,12 +904,7 @@ namespace Godot
         /// <returns>Whether or not the basis matrix and the object are exactly equal.</returns>
         public override bool Equals(object obj)
         {
-            if (obj is Basis)
-            {
-                return Equals((Basis)obj);
-            }
-
-            return false;
+            return obj is Basis other && Equals(other);
         }
 
         /// <summary>

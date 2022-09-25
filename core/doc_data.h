@@ -32,7 +32,6 @@
 #define DOC_DATA_H
 
 #include "core/io/xml_parser.h"
-#include "core/templates/rb_map.h"
 #include "core/variant/variant.h"
 
 struct ScriptMemberInfo {
@@ -66,6 +65,8 @@ public:
 		String return_enum;
 		String qualifiers;
 		String description;
+		bool is_deprecated = false;
+		bool is_experimental = false;
 		Vector<ArgumentDoc> arguments;
 		Vector<int> errors_returned;
 		bool operator<(const MethodDoc &p_method) const {
@@ -105,6 +106,8 @@ public:
 		String enumeration;
 		bool is_bitfield = false;
 		String description;
+		bool is_deprecated = false;
+		bool is_experimental = false;
 		bool operator<(const ConstantDoc &p_const) const {
 			return name < p_const.name;
 		}
@@ -126,6 +129,8 @@ public:
 		String default_value;
 		bool overridden = false;
 		String overrides;
+		bool is_deprecated = false;
+		bool is_experimental = false;
 		bool operator<(const PropertyDoc &p_prop) const {
 			return name < p_prop.name;
 		}
@@ -167,6 +172,8 @@ public:
 		Vector<PropertyDoc> properties;
 		Vector<MethodDoc> annotations;
 		Vector<ThemeItemDoc> theme_properties;
+		bool is_deprecated = false;
+		bool is_experimental = false;
 		bool is_script_doc = false;
 		String script_path;
 		bool operator<(const ClassDoc &p_class) const {

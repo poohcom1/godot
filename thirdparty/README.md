@@ -195,6 +195,7 @@ Files extracted from upstream source:
   to `glslang/build_info.h`
 - `LICENSE.txt`
 - Unnecessary files like `CMakeLists.txt`, `*.m4` and `updateGrammar` removed.
+- Patch in `patches/unused_cleanup.diff` must be applied.
 
 
 ## graphite
@@ -213,7 +214,7 @@ Files extracted from upstream source:
 ## harfbuzz
 
 - Upstream: https://github.com/harfbuzz/harfbuzz
-- Version: 5.1.0 (f1f2be776bcd994fa9262622e1a7098a066e5cf7, 2022)
+- Version: 5.2.0 (4a1d891c6317d2c83e5f3c2607ec5f5ccedffcde, 2022)
 - License: MIT
 
 Files extracted from upstream source:
@@ -275,7 +276,7 @@ Files extracted from upstream source:
 ## libpng
 
 - Upstream: http://libpng.org/pub/png/libpng.html
-- Version: 1.6.37 (a40189cf881e9f0db80511c382292a5604c3c3d1, 2019)
+- Version: 1.6.38 (0a158f3506502dfa23edfc42790dfaed82efba17, 2022)
 - License: libpng/zlib
 
 Files extracted from upstream source:
@@ -319,12 +320,12 @@ Files extracted from upstream source:
 ## libwebp
 
 - Upstream: https://chromium.googlesource.com/webm/libwebp/
-- Version: 1.2.2 (b0a860891dcd4c0c2d7c6149e5cccb6eb881cc21, 2022)
+- Version: 1.2.4 (0d1f12546bd803099a60c070517a552483f3790e, 2022)
 - License: BSD-3-Clause
 
 Files extracted from upstream source:
 
-- `src/*` except from: `.am`, `.rc` and `.in` files
+- `src/` and `sharpyuv/` except from: `.am`, `.rc` and `.in` files
 - `AUTHORS`, `COPYING`, `PATENTS`
 
 
@@ -343,6 +344,9 @@ File extracted from upstream release tarball:
   https://github.com/ARMmbed/mbedtls/pull/1453).
 - Added 2 files `godot_core_mbedtls_platform.c` and `godot_core_mbedtls_config.h`
   providing configuration for light bundling with core.
+
+Some changes have been made in order to fix Windows on ARM build errors.
+They are marked with `// -- GODOT start --` and `// -- GODOT end --`
 
 
 ## meshoptimizer
@@ -373,6 +377,9 @@ Files extracted from upstream repository:
 - `minimp3.h`
 - `minimp3_ex.h`
 - `LICENSE`
+
+Some changes have been made in order to fix Windows on ARM build errors.
+They are marked with `// -- GODOT start --` and `// -- GODOT end --`
 
 
 ## miniupnpc
@@ -528,7 +535,7 @@ Patch files are provided in `oidn/patches/`.
 ## openxr
 
 - Upstream: https://github.com/KhronosGroup/OpenXR-SDK
-- Version: 1.0.23 (885a90f8934d84121344ba8e4aa5159d5b496e08, 2022)
+- Version: 1.0.25 (c16a18c99740ea5dd251e3af117e0e5aea4ceaa9, 2022)
 - License: Apache 2.0
 
 Files extracted from upstream source:

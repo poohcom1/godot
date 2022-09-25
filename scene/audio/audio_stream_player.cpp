@@ -40,6 +40,7 @@ void AudioStreamPlayer::_notification(int p_what) {
 			if (autoplay && !Engine::get_singleton()->is_editor_hint()) {
 				play();
 			}
+			set_stream_paused(false);
 		} break;
 
 		case NOTIFICATION_INTERNAL_PROCESS: {
@@ -64,6 +65,10 @@ void AudioStreamPlayer::_notification(int p_what) {
 		} break;
 
 		case NOTIFICATION_EXIT_TREE: {
+			set_stream_paused(true);
+		} break;
+
+		case NOTIFICATION_PREDELETE: {
 			for (Ref<AudioStreamPlayback> &playback : stream_playbacks) {
 				AudioServer::get_singleton()->stop_playback_stream(playback);
 			}
@@ -256,7 +261,7 @@ Vector<AudioFrame> AudioStreamPlayer::_get_volume_vector() {
 		channel_volume_db = AudioFrame(0, 0);
 	}
 
-	float volume_linear = Math::db2linear(volume_db);
+	float volume_linear = Math::db_to_linear(volume_db);
 
 	// Set the volume vector up according to the speaker mode and mix target.
 	// TODO do we need to scale the volume down when we output to more channels?
@@ -283,8 +288,8 @@ Vector<AudioFrame> AudioStreamPlayer::_get_volume_vector() {
 	return volume_vector;
 }
 
-void AudioStreamPlayer::_validate_property(PropertyInfo &property) const {
-	if (property.name == "bus") {
+void AudioStreamPlayer::_validate_property(PropertyInfo &p_property) const {
+	if (p_property.name == "bus") {
 		String options;
 		for (int i = 0; i < AudioServer::get_singleton()->get_bus_count(); i++) {
 			if (i > 0) {
@@ -294,10 +299,8 @@ void AudioStreamPlayer::_validate_property(PropertyInfo &property) const {
 			options += name;
 		}
 
-		property.hint_string = options;
+		p_property.hint_string = options;
 	}
-
-	Node::_validate_property(property);
 }
 
 void AudioStreamPlayer::_bus_layout_changed() {

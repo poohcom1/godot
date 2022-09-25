@@ -50,6 +50,7 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/utsname.h>
 #include <unistd.h>
 
 #ifdef FONTCONFIG_ENABLED
@@ -65,7 +66,7 @@ void OS_LinuxBSD::alert(const String &p_alert, const String &p_title) {
 
 	for (int i = 0; i < path_elems.size(); i++) {
 		for (uint64_t k = 0; k < sizeof(message_programs) / sizeof(char *); k++) {
-			String tested_path = path_elems[i].plus_file(message_programs[k]);
+			String tested_path = path_elems[i].path_join(message_programs[k]);
 
 			if (FileAccess::exists(tested_path)) {
 				program = tested_path;
@@ -203,6 +204,42 @@ String OS_LinuxBSD::get_name() const {
 #else
 	return "BSD";
 #endif
+}
+
+String OS_LinuxBSD::get_systemd_os_release_info_value(const String &key) const {
+	static String info;
+	if (info.is_empty()) {
+		Ref<FileAccess> f = FileAccess::open("/etc/os-release", FileAccess::READ);
+		if (f.is_valid()) {
+			while (!f->eof_reached()) {
+				const String line = f->get_line();
+				if (line.find(key) != -1) {
+					return line.split("=")[1].strip_edges();
+				}
+			}
+		}
+	}
+	return info;
+}
+
+String OS_LinuxBSD::get_distribution_name() const {
+	static String systemd_name = get_systemd_os_release_info_value("NAME"); // returns a value for systemd users, otherwise an empty string.
+	if (!systemd_name.is_empty()) {
+		return systemd_name;
+	}
+	struct utsname uts; // returns a decent value for BSD family.
+	uname(&uts);
+	return uts.sysname;
+}
+
+String OS_LinuxBSD::get_version() const {
+	static String systemd_version = get_systemd_os_release_info_value("VERSION"); // returns a value for systemd users, otherwise an empty string.
+	if (!systemd_version.is_empty()) {
+		return systemd_version;
+	}
+	struct utsname uts; // returns a decent value for BSD family.
+	uname(&uts);
+	return uts.version;
 }
 
 Error OS_LinuxBSD::shell_open(String p_uri) {
@@ -432,10 +469,10 @@ String OS_LinuxBSD::get_config_path() const {
 			return get_environment("XDG_CONFIG_HOME");
 		} else {
 			WARN_PRINT_ONCE("`XDG_CONFIG_HOME` is a relative path. Ignoring its value and falling back to `$HOME/.config` or `.` per the XDG Base Directory specification.");
-			return has_environment("HOME") ? get_environment("HOME").plus_file(".config") : ".";
+			return has_environment("HOME") ? get_environment("HOME").path_join(".config") : ".";
 		}
 	} else if (has_environment("HOME")) {
-		return get_environment("HOME").plus_file(".config");
+		return get_environment("HOME").path_join(".config");
 	} else {
 		return ".";
 	}
@@ -447,10 +484,10 @@ String OS_LinuxBSD::get_data_path() const {
 			return get_environment("XDG_DATA_HOME");
 		} else {
 			WARN_PRINT_ONCE("`XDG_DATA_HOME` is a relative path. Ignoring its value and falling back to `$HOME/.local/share` or `get_config_path()` per the XDG Base Directory specification.");
-			return has_environment("HOME") ? get_environment("HOME").plus_file(".local/share") : get_config_path();
+			return has_environment("HOME") ? get_environment("HOME").path_join(".local/share") : get_config_path();
 		}
 	} else if (has_environment("HOME")) {
-		return get_environment("HOME").plus_file(".local/share");
+		return get_environment("HOME").path_join(".local/share");
 	} else {
 		return get_config_path();
 	}
@@ -462,10 +499,10 @@ String OS_LinuxBSD::get_cache_path() const {
 			return get_environment("XDG_CACHE_HOME");
 		} else {
 			WARN_PRINT_ONCE("`XDG_CACHE_HOME` is a relative path. Ignoring its value and falling back to `$HOME/.cache` or `get_config_path()` per the XDG Base Directory specification.");
-			return has_environment("HOME") ? get_environment("HOME").plus_file(".cache") : get_config_path();
+			return has_environment("HOME") ? get_environment("HOME").path_join(".cache") : get_config_path();
 		}
 	} else if (has_environment("HOME")) {
-		return get_environment("HOME").plus_file(".cache");
+		return get_environment("HOME").path_join(".cache");
 	} else {
 		return get_config_path();
 	}
@@ -519,8 +556,6 @@ String OS_LinuxBSD::get_system_dir(SystemDir p_dir, bool p_shared_storage) const
 }
 
 void OS_LinuxBSD::run() {
-	force_quit = false;
-
 	if (!main_loop) {
 		return;
 	}
@@ -532,7 +567,7 @@ void OS_LinuxBSD::run() {
 	//int frames=0;
 	//uint64_t frame=0;
 
-	while (!force_quit) {
+	while (true) {
 		DisplayServer::get_singleton()->process_events(); // get rid of pending events
 #ifdef JOYDEV_ENABLED
 		joypad->process_joypads();
@@ -688,10 +723,9 @@ Error OS_LinuxBSD::move_to_trash(const String &p_path) {
 	String renamed_path = path.get_base_dir() + "/" + file_name;
 
 	// Generates the .trashinfo file
-	OS::Date date = OS::get_singleton()->get_date(false);
-	OS::Time time = OS::get_singleton()->get_time(false);
-	String timestamp = vformat("%04d-%02d-%02dT%02d:%02d:", date.year, (int)date.month, date.day, time.hour, time.minute);
-	timestamp = vformat("%s%02d", timestamp, time.second); // vformat only supports up to 6 arguments.
+	OS::DateTime dt = OS::get_singleton()->get_datetime(false);
+	String timestamp = vformat("%04d-%02d-%02dT%02d:%02d:", dt.year, (int)dt.month, dt.day, dt.hour, dt.minute);
+	timestamp = vformat("%s%02d", timestamp, dt.second); // vformat only supports up to 6 arguments.
 	String trash_info = "[Trash Info]\nPath=" + path.uri_encode() + "\nDeletionDate=" + timestamp + "\n";
 	{
 		Error err;
@@ -730,7 +764,6 @@ Error OS_LinuxBSD::move_to_trash(const String &p_path) {
 
 OS_LinuxBSD::OS_LinuxBSD() {
 	main_loop = nullptr;
-	force_quit = false;
 
 #ifdef PULSEAUDIO_ENABLED
 	AudioDriverManager::add_driver(&driver_pulseaudio);

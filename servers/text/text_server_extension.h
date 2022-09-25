@@ -35,6 +35,7 @@
 #include "core/object/script_language.h"
 #include "core/os/thread_safe.h"
 #include "core/variant/native_ptr.h"
+#include "core/variant/typed_array.h"
 #include "servers/text_server.h"
 
 class TextServerExtension : public TextServer {
@@ -107,10 +108,10 @@ public:
 	GDVIRTUAL2(font_set_style_name, RID, const String &);
 	GDVIRTUAL1RC(String, font_get_style_name, RID);
 
-	virtual void font_set_antialiased(const RID &p_font_rid, bool p_antialiased) override;
-	virtual bool font_is_antialiased(const RID &p_font_rid) const override;
-	GDVIRTUAL2(font_set_antialiased, RID, bool);
-	GDVIRTUAL1RC(bool, font_is_antialiased, RID);
+	virtual void font_set_antialiasing(RID p_font_rid, TextServer::FontAntialiasing p_antialiasing) override;
+	virtual TextServer::FontAntialiasing font_get_antialiasing(RID p_font_rid) const override;
+	GDVIRTUAL2(font_set_antialiasing, RID, TextServer::FontAntialiasing);
+	GDVIRTUAL1RC(TextServer::FontAntialiasing, font_get_antialiasing, RID);
 
 	virtual void font_set_generate_mipmaps(const RID &p_font_rid, bool p_generate_mipmaps) override;
 	virtual bool font_get_generate_mipmaps(const RID &p_font_rid) const override;
@@ -172,10 +173,10 @@ public:
 	GDVIRTUAL2(font_set_oversampling, RID, double);
 	GDVIRTUAL1RC(double, font_get_oversampling, RID);
 
-	virtual Array font_get_size_cache_list(const RID &p_font_rid) const override;
+	virtual TypedArray<Vector2i> font_get_size_cache_list(const RID &p_font_rid) const override;
 	virtual void font_clear_size_cache(const RID &p_font_rid) override;
 	virtual void font_remove_size_cache(const RID &p_font_rid, const Vector2i &p_size) override;
-	GDVIRTUAL1RC(Array, font_get_size_cache_list, RID);
+	GDVIRTUAL1RC(TypedArray<Vector2i>, font_get_size_cache_list, RID);
 	GDVIRTUAL1(font_clear_size_cache, RID);
 	GDVIRTUAL2(font_remove_size_cache, RID, const Vector2i &);
 
@@ -221,10 +222,10 @@ public:
 	GDVIRTUAL4(font_set_texture_offsets, RID, const Vector2i &, int64_t, const PackedInt32Array &);
 	GDVIRTUAL3RC(PackedInt32Array, font_get_texture_offsets, RID, const Vector2i &, int64_t);
 
-	virtual Array font_get_glyph_list(const RID &p_font_rid, const Vector2i &p_size) const override;
+	virtual PackedInt32Array font_get_glyph_list(const RID &p_font_rid, const Vector2i &p_size) const override;
 	virtual void font_clear_glyphs(const RID &p_font_rid, const Vector2i &p_size) override;
 	virtual void font_remove_glyph(const RID &p_font_rid, const Vector2i &p_size, int64_t p_glyph) override;
-	GDVIRTUAL2RC(Array, font_get_glyph_list, RID, const Vector2i &);
+	GDVIRTUAL2RC(PackedInt32Array, font_get_glyph_list, RID, const Vector2i &);
 	GDVIRTUAL2(font_clear_glyphs, RID, const Vector2i &);
 	GDVIRTUAL3(font_remove_glyph, RID, const Vector2i &, int64_t);
 
@@ -262,10 +263,10 @@ public:
 	virtual Dictionary font_get_glyph_contours(const RID &p_font, int64_t p_size, int64_t p_index) const override;
 	GDVIRTUAL3RC(Dictionary, font_get_glyph_contours, RID, int64_t, int64_t);
 
-	virtual Array font_get_kerning_list(const RID &p_font_rid, int64_t p_size) const override;
+	virtual TypedArray<Vector2i> font_get_kerning_list(const RID &p_font_rid, int64_t p_size) const override;
 	virtual void font_clear_kerning_map(const RID &p_font_rid, int64_t p_size) override;
 	virtual void font_remove_kerning(const RID &p_font_rid, int64_t p_size, const Vector2i &p_glyph_pair) override;
-	GDVIRTUAL2RC(Array, font_get_kerning_list, RID, int64_t);
+	GDVIRTUAL2RC(TypedArray<Vector2i>, font_get_kerning_list, RID, int64_t);
 	GDVIRTUAL2(font_clear_kerning_map, RID, int64_t);
 	GDVIRTUAL3(font_remove_kerning, RID, int64_t, const Vector2i &);
 
@@ -377,19 +378,19 @@ public:
 	GDVIRTUAL3(shaped_text_set_spacing, RID, SpacingType, int64_t);
 	GDVIRTUAL2RC(int64_t, shaped_text_get_spacing, RID, SpacingType);
 
-	virtual bool shaped_text_add_string(const RID &p_shaped, const String &p_text, const Array &p_fonts, int64_t p_size, const Dictionary &p_opentype_features = Dictionary(), const String &p_language = "", const Variant &p_meta = Variant()) override;
+	virtual bool shaped_text_add_string(const RID &p_shaped, const String &p_text, const TypedArray<RID> &p_fonts, int64_t p_size, const Dictionary &p_opentype_features = Dictionary(), const String &p_language = "", const Variant &p_meta = Variant()) override;
 	virtual bool shaped_text_add_object(const RID &p_shaped, const Variant &p_key, const Size2 &p_size, InlineAlignment p_inline_align = INLINE_ALIGNMENT_CENTER, int64_t p_length = 1) override;
 	virtual bool shaped_text_resize_object(const RID &p_shaped, const Variant &p_key, const Size2 &p_size, InlineAlignment p_inline_align = INLINE_ALIGNMENT_CENTER) override;
-	GDVIRTUAL7R(bool, shaped_text_add_string, RID, const String &, const Array &, int64_t, const Dictionary &, const String &, const Variant &);
+	GDVIRTUAL7R(bool, shaped_text_add_string, RID, const String &, const TypedArray<RID> &, int64_t, const Dictionary &, const String &, const Variant &);
 	GDVIRTUAL5R(bool, shaped_text_add_object, RID, const Variant &, const Size2 &, InlineAlignment, int64_t);
 	GDVIRTUAL4R(bool, shaped_text_resize_object, RID, const Variant &, const Size2 &, InlineAlignment);
 
 	virtual int64_t shaped_get_span_count(const RID &p_shaped) const override;
 	virtual Variant shaped_get_span_meta(const RID &p_shaped, int64_t p_index) const override;
-	virtual void shaped_set_span_update_font(const RID &p_shaped, int64_t p_index, const Array &p_fonts, int64_t p_size, const Dictionary &p_opentype_features = Dictionary()) override;
+	virtual void shaped_set_span_update_font(const RID &p_shaped, int64_t p_index, const TypedArray<RID> &p_fonts, int64_t p_size, const Dictionary &p_opentype_features = Dictionary()) override;
 	GDVIRTUAL1RC(int64_t, shaped_get_span_count, RID);
 	GDVIRTUAL2RC(Variant, shaped_get_span_meta, RID, int64_t);
-	GDVIRTUAL5(shaped_set_span_update_font, RID, int64_t, const Array &, int64_t, const Dictionary &);
+	GDVIRTUAL5(shaped_set_span_update_font, RID, int64_t, const TypedArray<RID> &, int64_t, const Dictionary &);
 
 	virtual RID shaped_text_substr(const RID &p_shaped, int64_t p_start, int64_t p_length) const override;
 	virtual RID shaped_text_get_parent(const RID &p_shaped) const override;
@@ -504,12 +505,12 @@ public:
 	GDVIRTUAL2RC(String, string_to_upper, const String &, const String &);
 	GDVIRTUAL2RC(String, string_to_lower, const String &, const String &);
 
-	Array parse_structured_text(StructuredTextParser p_parser_type, const Array &p_args, const String &p_text) const;
-	GDVIRTUAL3RC(Array, parse_structured_text, StructuredTextParser, const Array &, const String &);
+	TypedArray<Vector2i> parse_structured_text(StructuredTextParser p_parser_type, const Array &p_args, const String &p_text) const;
+	GDVIRTUAL3RC(TypedArray<Vector2i>, parse_structured_text, StructuredTextParser, const Array &, const String &);
 
-	virtual int is_confusable(const String &p_string, const PackedStringArray &p_dict) const override;
+	virtual int64_t is_confusable(const String &p_string, const PackedStringArray &p_dict) const override;
 	virtual bool spoof_check(const String &p_string) const override;
-	GDVIRTUAL2RC(int, is_confusable, const String &, const PackedStringArray &);
+	GDVIRTUAL2RC(int64_t, is_confusable, const String &, const PackedStringArray &);
 	GDVIRTUAL1RC(bool, spoof_check, const String &);
 
 	TextServerExtension();

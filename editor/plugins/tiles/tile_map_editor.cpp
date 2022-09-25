@@ -35,6 +35,7 @@
 #include "editor/editor_node.h"
 #include "editor/editor_resource_preview.h"
 #include "editor/editor_scale.h"
+#include "editor/editor_undo_redo_manager.h"
 #include "editor/plugins/canvas_item_editor_plugin.h"
 
 #include "scene/2d/camera_2d.h"
@@ -350,7 +351,7 @@ void TileMapEditorTilesPlugin::_update_atlas_view() {
 
 	tile_atlas_view->set_atlas_source(*tile_map->get_tileset(), atlas_source, source_id);
 	TilesEditorPlugin::get_singleton()->synchronize_atlas_view(tile_atlas_view);
-	tile_atlas_control->update();
+	tile_atlas_control->queue_redraw();
 }
 
 void TileMapEditorTilesPlugin::_update_scenes_collection_view() {
@@ -576,7 +577,7 @@ bool TileMapEditorTilesPlugin::forward_canvas_gui_input(const Ref<InputEvent> &p
 				_fix_invalid_tiles_in_tile_map_selection();
 			} break;
 			case DRAG_TYPE_BUCKET: {
-				Vector<Vector2i> line = TileMapEditor::get_line(tile_map, tile_map->world_to_map(drag_last_mouse_pos), tile_map->world_to_map(mpos));
+				Vector<Vector2i> line = TileMapEditor::get_line(tile_map, tile_map->local_to_map(drag_last_mouse_pos), tile_map->local_to_map(mpos));
 				for (int i = 0; i < line.size(); i++) {
 					if (!drag_modified.has(line[i])) {
 						HashMap<Vector2i, TileMapCell> to_draw = _draw_bucket_fill(line[i], bucket_contiguous_checkbox->is_pressed(), drag_erasing);
@@ -623,7 +624,7 @@ bool TileMapEditorTilesPlugin::forward_canvas_gui_input(const Ref<InputEvent> &p
 					}
 				} else if (tool_buttons_group->get_pressed_button() == select_tool_button) {
 					drag_start_mouse_pos = mpos;
-					if (tile_map_selection.has(tile_map->world_to_map(drag_start_mouse_pos)) && !mb->is_shift_pressed()) {
+					if (tile_map_selection.has(tile_map->local_to_map(drag_start_mouse_pos)) && !mb->is_shift_pressed()) {
 						// Move the selection
 						_update_selection_pattern_from_tilemap_selection(); // Make sure the pattern is up to date before moving.
 						drag_type = DRAG_TYPE_MOVE;
@@ -672,7 +673,7 @@ bool TileMapEditorTilesPlugin::forward_canvas_gui_input(const Ref<InputEvent> &p
 							drag_type = DRAG_TYPE_BUCKET;
 							drag_start_mouse_pos = mpos;
 							drag_modified.clear();
-							Vector<Vector2i> line = TileMapEditor::get_line(tile_map, tile_map->world_to_map(drag_last_mouse_pos), tile_map->world_to_map(mpos));
+							Vector<Vector2i> line = TileMapEditor::get_line(tile_map, tile_map->local_to_map(drag_last_mouse_pos), tile_map->local_to_map(mpos));
 							for (int i = 0; i < line.size(); i++) {
 								if (!drag_modified.has(line[i])) {
 									HashMap<Vector2i, TileMapCell> to_draw = _draw_bucket_fill(line[i], bucket_contiguous_checkbox->is_pressed(), drag_erasing);
@@ -751,14 +752,14 @@ void TileMapEditorTilesPlugin::forward_canvas_draw_over_viewport(Control *p_over
 
 		if (drag_type == DRAG_TYPE_PICK) {
 			// Draw the area being picked.
-			Rect2i rect = Rect2i(tile_map->world_to_map(drag_start_mouse_pos), tile_map->world_to_map(drag_last_mouse_pos) - tile_map->world_to_map(drag_start_mouse_pos)).abs();
+			Rect2i rect = Rect2i(tile_map->local_to_map(drag_start_mouse_pos), tile_map->local_to_map(drag_last_mouse_pos) - tile_map->local_to_map(drag_start_mouse_pos)).abs();
 			rect.size += Vector2i(1, 1);
 			for (int x = rect.position.x; x < rect.get_end().x; x++) {
 				for (int y = rect.position.y; y < rect.get_end().y; y++) {
 					Vector2i coords = Vector2i(x, y);
 					if (tile_map->get_cell_source_id(tile_map_layer, coords) != TileSet::INVALID_SOURCE) {
 						Transform2D tile_xform;
-						tile_xform.set_origin(tile_map->map_to_world(coords));
+						tile_xform.set_origin(tile_map->map_to_local(coords));
 						tile_xform.set_scale(tile_shape_size);
 						tile_set->draw_tile_shape(p_overlay, xform * tile_xform, Color(1.0, 1.0, 1.0), false);
 					}
@@ -766,7 +767,7 @@ void TileMapEditorTilesPlugin::forward_canvas_draw_over_viewport(Control *p_over
 			}
 		} else if (drag_type == DRAG_TYPE_SELECT) {
 			// Draw the area being selected.
-			Rect2i rect = Rect2i(tile_map->world_to_map(drag_start_mouse_pos), tile_map->world_to_map(drag_last_mouse_pos) - tile_map->world_to_map(drag_start_mouse_pos)).abs();
+			Rect2i rect = Rect2i(tile_map->local_to_map(drag_start_mouse_pos), tile_map->local_to_map(drag_last_mouse_pos) - tile_map->local_to_map(drag_start_mouse_pos)).abs();
 			rect.size += Vector2i(1, 1);
 			RBSet<Vector2i> to_draw;
 			for (int x = rect.position.x; x < rect.get_end().x; x++) {
@@ -788,8 +789,8 @@ void TileMapEditorTilesPlugin::forward_canvas_draw_over_viewport(Control *p_over
 				for (const Vector2i &E : tile_map_selection) {
 					top_left = top_left.min(E);
 				}
-				Vector2i offset = drag_start_mouse_pos - tile_map->map_to_world(top_left);
-				offset = tile_map->world_to_map(drag_last_mouse_pos - offset) - tile_map->world_to_map(drag_start_mouse_pos - offset);
+				Vector2i offset = drag_start_mouse_pos - tile_map->map_to_local(top_left);
+				offset = tile_map->local_to_map(drag_last_mouse_pos - offset) - tile_map->local_to_map(drag_start_mouse_pos - offset);
 
 				TypedArray<Vector2i> selection_used_cells = selection_pattern->get_used_cells();
 				for (int i = 0; i < selection_used_cells.size(); i++) {
@@ -802,7 +803,7 @@ void TileMapEditorTilesPlugin::forward_canvas_draw_over_viewport(Control *p_over
 			Vector2 mouse_offset = (Vector2(tile_map_clipboard->get_size()) / 2.0 - Vector2(0.5, 0.5)) * tile_set->get_tile_size();
 			TypedArray<Vector2i> clipboard_used_cells = tile_map_clipboard->get_used_cells();
 			for (int i = 0; i < clipboard_used_cells.size(); i++) {
-				Vector2i coords = tile_map->map_pattern(tile_map->world_to_map(drag_last_mouse_pos - mouse_offset), clipboard_used_cells[i], tile_map_clipboard);
+				Vector2i coords = tile_map->map_pattern(tile_map->local_to_map(drag_last_mouse_pos - mouse_offset), clipboard_used_cells[i], tile_map_clipboard);
 				preview[coords] = TileMapCell(tile_map_clipboard->get_cell_source_id(clipboard_used_cells[i]), tile_map_clipboard->get_cell_atlas_coords(clipboard_used_cells[i]), tile_map_clipboard->get_cell_alternative_tile(clipboard_used_cells[i]));
 			}
 		} else if (!picker_button->is_pressed() && !(drag_type == DRAG_TYPE_NONE && Input::get_singleton()->is_key_pressed(Key::CTRL) && !Input::get_singleton()->is_key_pressed(Key::SHIFT))) {
@@ -823,11 +824,11 @@ void TileMapEditorTilesPlugin::forward_canvas_draw_over_viewport(Control *p_over
 				}
 			} else if (drag_type == DRAG_TYPE_RECT) {
 				// Preview for a rect pattern.
-				preview = _draw_rect(tile_map->world_to_map(drag_start_mouse_pos), tile_map->world_to_map(drag_last_mouse_pos), drag_erasing);
+				preview = _draw_rect(tile_map->local_to_map(drag_start_mouse_pos), tile_map->local_to_map(drag_last_mouse_pos), drag_erasing);
 				expand_grid = true;
 			} else if (tool_buttons_group->get_pressed_button() == bucket_tool_button && drag_type == DRAG_TYPE_NONE) {
 				// Preview for a fill pattern.
-				preview = _draw_bucket_fill(tile_map->world_to_map(drag_last_mouse_pos), bucket_contiguous_checkbox->is_pressed(), erase_button->is_pressed());
+				preview = _draw_bucket_fill(tile_map->local_to_map(drag_last_mouse_pos), bucket_contiguous_checkbox->is_pressed(), erase_button->is_pressed());
 			}
 
 			// Expand the grid if needed
@@ -860,7 +861,7 @@ void TileMapEditorTilesPlugin::forward_canvas_draw_over_viewport(Control *p_over
 							float opacity = CLAMP(MIN(left_opacity, MIN(right_opacity, MIN(top_opacity, bottom_opacity))) + 0.1, 0.0f, 1.0f);
 
 							Transform2D tile_xform;
-							tile_xform.set_origin(tile_map->map_to_world(Vector2(x, y)));
+							tile_xform.set_origin(tile_map->map_to_local(Vector2(x, y)));
 							tile_xform.set_scale(tile_shape_size);
 							Color color = grid_color;
 							color.a = color.a * opacity;
@@ -873,7 +874,7 @@ void TileMapEditorTilesPlugin::forward_canvas_draw_over_viewport(Control *p_over
 			// Draw the preview.
 			for (const KeyValue<Vector2i, TileMapCell> &E : preview) {
 				Transform2D tile_xform;
-				tile_xform.set_origin(tile_map->map_to_world(E.key));
+				tile_xform.set_origin(tile_map->map_to_local(E.key));
 				tile_xform.set_scale(tile_set->get_tile_size());
 				if (!(drag_erasing || erase_button->is_pressed()) && random_tile_toggle->is_pressed()) {
 					tile_set->draw_tile_shape(p_overlay, xform * tile_xform, Color(1.0, 1.0, 1.0, 0.5), true);
@@ -898,9 +899,9 @@ void TileMapEditorTilesPlugin::forward_canvas_draw_over_viewport(Control *p_over
 
 							bool transpose = tile_data->get_transpose();
 							if (transpose) {
-								dest_rect.position = (tile_map->map_to_world(E.key) - Vector2(dest_rect.size.y, dest_rect.size.x) / 2 - tile_offset);
+								dest_rect.position = (tile_map->map_to_local(E.key) - Vector2(dest_rect.size.y, dest_rect.size.x) / 2 - tile_offset);
 							} else {
-								dest_rect.position = (tile_map->map_to_world(E.key) - dest_rect.size / 2 - tile_offset);
+								dest_rect.position = (tile_map->map_to_local(E.key) - dest_rect.size / 2 - tile_offset);
 							}
 
 							dest_rect = xform.xform(dest_rect);
@@ -1011,7 +1012,7 @@ HashMap<Vector2i, TileMapCell> TileMapEditorTilesPlugin::_draw_line(Vector2 p_st
 		// Paint the tiles on the tile map.
 		if (!p_erase && random_tile_toggle->is_pressed()) {
 			// Paint a random tile.
-			Vector<Vector2i> line = TileMapEditor::get_line(tile_map, tile_map->world_to_map(p_from_mouse_pos), tile_map->world_to_map(p_to_mouse_pos));
+			Vector<Vector2i> line = TileMapEditor::get_line(tile_map, tile_map->local_to_map(p_from_mouse_pos), tile_map->local_to_map(p_to_mouse_pos));
 			for (int i = 0; i < line.size(); i++) {
 				output.insert(line[i], _pick_random_tile(pattern));
 			}
@@ -1019,9 +1020,9 @@ HashMap<Vector2i, TileMapCell> TileMapEditorTilesPlugin::_draw_line(Vector2 p_st
 			// Paint the pattern.
 			// If we paint several tiles, we virtually move the mouse as if it was in the center of the "brush"
 			Vector2 mouse_offset = (Vector2(pattern->get_size()) / 2.0 - Vector2(0.5, 0.5)) * tile_set->get_tile_size();
-			Vector2i last_hovered_cell = tile_map->world_to_map(p_from_mouse_pos - mouse_offset);
-			Vector2i new_hovered_cell = tile_map->world_to_map(p_to_mouse_pos - mouse_offset);
-			Vector2i drag_start_cell = tile_map->world_to_map(p_start_drag_mouse_pos - mouse_offset);
+			Vector2i last_hovered_cell = tile_map->local_to_map(p_from_mouse_pos - mouse_offset);
+			Vector2i new_hovered_cell = tile_map->local_to_map(p_to_mouse_pos - mouse_offset);
+			Vector2i drag_start_cell = tile_map->local_to_map(p_start_drag_mouse_pos - mouse_offset);
 
 			TypedArray<Vector2i> used_cells = pattern->get_used_cells();
 			Vector2i offset = Vector2i(Math::posmod(drag_start_cell.x, pattern->get_size().x), Math::posmod(drag_start_cell.y, pattern->get_size().y)); // Note: no posmodv for Vector2i for now. Meh.s
@@ -1171,7 +1172,7 @@ HashMap<Vector2i, TileMapCell> TileMapEditorTilesPlugin::_draw_bucket_fill(Vecto
 			TypedArray<Vector2i> to_check;
 			if (source_cell.source_id == TileSet::INVALID_SOURCE) {
 				Rect2i rect = tile_map->get_used_rect();
-				if (rect.has_no_area()) {
+				if (!rect.has_area()) {
 					rect = Rect2i(p_coords, Vector2i(1, 1));
 				}
 				for (int x = boundaries.position.x; x < boundaries.get_end().x; x++) {
@@ -1240,7 +1241,7 @@ void TileMapEditorTilesPlugin::_stop_dragging() {
 			if (!Input::get_singleton()->is_key_pressed(Key::SHIFT) && !Input::get_singleton()->is_key_pressed(Key::CTRL)) {
 				tile_map_selection.clear();
 			}
-			Rect2i rect = Rect2i(tile_map->world_to_map(drag_start_mouse_pos), tile_map->world_to_map(mpos) - tile_map->world_to_map(drag_start_mouse_pos)).abs();
+			Rect2i rect = Rect2i(tile_map->local_to_map(drag_start_mouse_pos), tile_map->local_to_map(mpos) - tile_map->local_to_map(drag_start_mouse_pos)).abs();
 			for (int x = rect.position.x; x <= rect.get_end().x; x++) {
 				for (int y = rect.position.y; y <= rect.get_end().y; y++) {
 					Vector2i coords = Vector2i(x, y);
@@ -1286,8 +1287,8 @@ void TileMapEditorTilesPlugin::_stop_dragging() {
 				}
 
 				// Get the offset from the mouse.
-				Vector2i offset = drag_start_mouse_pos - tile_map->map_to_world(top_left);
-				offset = tile_map->world_to_map(mpos - offset) - tile_map->world_to_map(drag_start_mouse_pos - offset);
+				Vector2i offset = drag_start_mouse_pos - tile_map->map_to_local(top_left);
+				offset = tile_map->local_to_map(mpos - offset) - tile_map->local_to_map(drag_start_mouse_pos - offset);
 
 				TypedArray<Vector2i> selection_used_cells = selection_pattern->get_used_cells();
 
@@ -1333,7 +1334,7 @@ void TileMapEditorTilesPlugin::_stop_dragging() {
 			}
 		} break;
 		case DRAG_TYPE_PICK: {
-			Rect2i rect = Rect2i(tile_map->world_to_map(drag_start_mouse_pos), tile_map->world_to_map(mpos) - tile_map->world_to_map(drag_start_mouse_pos)).abs();
+			Rect2i rect = Rect2i(tile_map->local_to_map(drag_start_mouse_pos), tile_map->local_to_map(mpos) - tile_map->local_to_map(drag_start_mouse_pos)).abs();
 			rect.size += Vector2i(1, 1);
 
 			int picked_source = -1;
@@ -1358,11 +1359,11 @@ void TileMapEditorTilesPlugin::_stop_dragging() {
 				for (int i = 0; i < sources_list->get_item_count(); i++) {
 					if (int(sources_list->get_item_metadata(i)) == picked_source) {
 						sources_list->set_current(i);
+						TilesEditorPlugin::get_singleton()->set_sources_lists_current(i);
 						break;
 					}
 				}
 				sources_list->ensure_current_is_visible();
-				TilesEditorPlugin::get_singleton()->set_sources_lists_current(picked_source);
 			}
 
 			Ref<TileMapPattern> new_selection_pattern = tile_map->get_pattern(tile_map_layer, coords_array);
@@ -1393,7 +1394,7 @@ void TileMapEditorTilesPlugin::_stop_dragging() {
 			undo_redo->commit_action();
 		} break;
 		case DRAG_TYPE_RECT: {
-			HashMap<Vector2i, TileMapCell> to_draw = _draw_rect(tile_map->world_to_map(drag_start_mouse_pos), tile_map->world_to_map(mpos), drag_erasing);
+			HashMap<Vector2i, TileMapCell> to_draw = _draw_rect(tile_map->local_to_map(drag_start_mouse_pos), tile_map->local_to_map(mpos), drag_erasing);
 			undo_redo->create_action(TTR("Paint tiles"));
 			for (const KeyValue<Vector2i, TileMapCell> &E : to_draw) {
 				if (!drag_erasing && E.value.source_id == TileSet::INVALID_SOURCE) {
@@ -1417,7 +1418,7 @@ void TileMapEditorTilesPlugin::_stop_dragging() {
 			undo_redo->create_action(TTR("Paste tiles"));
 			TypedArray<Vector2i> used_cells = tile_map_clipboard->get_used_cells();
 			for (int i = 0; i < used_cells.size(); i++) {
-				Vector2i coords = tile_map->map_pattern(tile_map->world_to_map(mpos - mouse_offset), used_cells[i], tile_map_clipboard);
+				Vector2i coords = tile_map->map_pattern(tile_map->local_to_map(mpos - mouse_offset), used_cells[i], tile_map_clipboard);
 				undo_redo->add_do_method(tile_map, "set_cell", tile_map_layer, coords, tile_map_clipboard->get_cell_source_id(used_cells[i]), tile_map_clipboard->get_cell_atlas_coords(used_cells[i]), tile_map_clipboard->get_cell_alternative_tile(used_cells[i]));
 				undo_redo->add_undo_method(tile_map, "set_cell", tile_map_layer, coords, tile_map->get_cell_source_id(tile_map_layer, coords), tile_map->get_cell_atlas_coords(tile_map_layer, coords), tile_map->get_cell_alternative_tile(tile_map_layer, coords));
 			}
@@ -1650,8 +1651,8 @@ void TileMapEditorTilesPlugin::_update_tileset_selection_from_selection_pattern(
 		}
 	}
 	_update_source_display();
-	tile_atlas_control->update();
-	alternative_tiles_control->update();
+	tile_atlas_control->queue_redraw();
+	alternative_tiles_control->queue_redraw();
 }
 
 void TileMapEditorTilesPlugin::_tile_atlas_control_draw() {
@@ -1735,7 +1736,7 @@ void TileMapEditorTilesPlugin::_tile_atlas_control_mouse_exited() {
 	hovered_tile.set_atlas_coords(TileSetSource::INVALID_ATLAS_COORDS);
 	hovered_tile.alternative_tile = TileSetSource::INVALID_TILE_ALTERNATIVE;
 	tile_set_dragging_selection = false;
-	tile_atlas_control->update();
+	tile_atlas_control->queue_redraw();
 }
 
 void TileMapEditorTilesPlugin::_tile_atlas_control_gui_input(const Ref<InputEvent> &p_event) {
@@ -1779,8 +1780,8 @@ void TileMapEditorTilesPlugin::_tile_atlas_control_gui_input(const Ref<InputEven
 
 	Ref<InputEventMouseMotion> mm = p_event;
 	if (mm.is_valid()) {
-		tile_atlas_control->update();
-		alternative_tiles_control->update();
+		tile_atlas_control->queue_redraw();
+		alternative_tiles_control->queue_redraw();
 	}
 
 	Ref<InputEventMouseButton> mb = p_event;
@@ -1840,7 +1841,7 @@ void TileMapEditorTilesPlugin::_tile_atlas_control_gui_input(const Ref<InputEven
 			}
 			tile_set_dragging_selection = false;
 		}
-		tile_atlas_control->update();
+		tile_atlas_control->queue_redraw();
 	}
 }
 
@@ -1894,7 +1895,7 @@ void TileMapEditorTilesPlugin::_tile_alternatives_control_mouse_exited() {
 	hovered_tile.set_atlas_coords(TileSetSource::INVALID_ATLAS_COORDS);
 	hovered_tile.alternative_tile = TileSetSource::INVALID_TILE_ALTERNATIVE;
 	tile_set_dragging_selection = false;
-	alternative_tiles_control->update();
+	alternative_tiles_control->queue_redraw();
 }
 
 void TileMapEditorTilesPlugin::_tile_alternatives_control_gui_input(const Ref<InputEvent> &p_event) {
@@ -1937,8 +1938,8 @@ void TileMapEditorTilesPlugin::_tile_alternatives_control_gui_input(const Ref<In
 
 	Ref<InputEventMouseMotion> mm = p_event;
 	if (mm.is_valid()) {
-		tile_atlas_control->update();
-		alternative_tiles_control->update();
+		tile_atlas_control->queue_redraw();
+		alternative_tiles_control->queue_redraw();
 	}
 
 	Ref<InputEventMouseButton> mb = p_event;
@@ -1958,8 +1959,8 @@ void TileMapEditorTilesPlugin::_tile_alternatives_control_gui_input(const Ref<In
 			}
 			_update_selection_pattern_from_tileset_tiles_selection();
 		}
-		tile_atlas_control->update();
-		alternative_tiles_control->update();
+		tile_atlas_control->queue_redraw();
+		alternative_tiles_control->queue_redraw();
 	}
 }
 
@@ -2019,9 +2020,9 @@ TileMapEditorTilesPlugin::TileMapEditorTilesPlugin() {
 			->connect("mouse_exited", callable_mp(this, &TileMapEditorTilesPlugin::_mouse_exited_viewport));
 
 	// --- Shortcuts ---
-	ED_SHORTCUT("tiles_editor/cut", TTR("Cut"), KeyModifierMask::CMD | Key::X);
-	ED_SHORTCUT("tiles_editor/copy", TTR("Copy"), KeyModifierMask::CMD | Key::C);
-	ED_SHORTCUT("tiles_editor/paste", TTR("Paste"), KeyModifierMask::CMD | Key::V);
+	ED_SHORTCUT("tiles_editor/cut", TTR("Cut"), KeyModifierMask::CMD_OR_CTRL | Key::X);
+	ED_SHORTCUT("tiles_editor/copy", TTR("Copy"), KeyModifierMask::CMD_OR_CTRL | Key::C);
+	ED_SHORTCUT("tiles_editor/paste", TTR("Paste"), KeyModifierMask::CMD_OR_CTRL | Key::V);
 	ED_SHORTCUT("tiles_editor/cancel", TTR("Cancel"), Key::ESCAPE);
 	ED_SHORTCUT("tiles_editor/delete", TTR("Delete"), Key::KEY_DELETE);
 
@@ -2049,7 +2050,7 @@ TileMapEditorTilesPlugin::TileMapEditorTilesPlugin() {
 	paint_tool_button->set_toggle_mode(true);
 	paint_tool_button->set_button_group(tool_buttons_group);
 	paint_tool_button->set_shortcut(ED_SHORTCUT("tiles_editor/paint_tool", "Paint", Key::D));
-	paint_tool_button->set_tooltip(TTR("Shift: Draw line.") + "\n" + TTR("Shift+Ctrl: Draw rectangle."));
+	paint_tool_button->set_tooltip_text(TTR("Shift: Draw line.") + "\n" + TTR("Shift+Ctrl: Draw rectangle."));
 	paint_tool_button->connect("pressed", callable_mp(this, &TileMapEditorTilesPlugin::_update_toolbar));
 	tilemap_tiles_tools_buttons->add_child(paint_tool_button);
 
@@ -2090,7 +2091,7 @@ TileMapEditorTilesPlugin::TileMapEditorTilesPlugin() {
 	picker_button->set_flat(true);
 	picker_button->set_toggle_mode(true);
 	picker_button->set_shortcut(ED_SHORTCUT("tiles_editor/picker", "Picker", Key::P));
-	picker_button->set_tooltip(TTR("Alternatively hold Ctrl with other tools to pick tile."));
+	picker_button->set_tooltip_text(TTR("Alternatively hold Ctrl with other tools to pick tile."));
 	picker_button->connect("pressed", callable_mp(CanvasItemEditor::get_singleton(), &CanvasItemEditor::update_viewport));
 	tools_settings->add_child(picker_button);
 
@@ -2099,7 +2100,7 @@ TileMapEditorTilesPlugin::TileMapEditorTilesPlugin() {
 	erase_button->set_flat(true);
 	erase_button->set_toggle_mode(true);
 	erase_button->set_shortcut(ED_SHORTCUT("tiles_editor/eraser", "Eraser", Key::E));
-	erase_button->set_tooltip(TTR("Alternatively use RMB to erase tiles."));
+	erase_button->set_tooltip_text(TTR("Alternatively use RMB to erase tiles."));
 	erase_button->connect("pressed", callable_mp(CanvasItemEditor::get_singleton(), &CanvasItemEditor::update_viewport));
 	tools_settings->add_child(erase_button);
 
@@ -2118,13 +2119,13 @@ TileMapEditorTilesPlugin::TileMapEditorTilesPlugin() {
 	random_tile_toggle = memnew(Button);
 	random_tile_toggle->set_flat(true);
 	random_tile_toggle->set_toggle_mode(true);
-	random_tile_toggle->set_tooltip(TTR("Place Random Tile"));
+	random_tile_toggle->set_tooltip_text(TTR("Place Random Tile"));
 	random_tile_toggle->connect("toggled", callable_mp(this, &TileMapEditorTilesPlugin::_on_random_tile_checkbox_toggled));
 	tools_settings->add_child(random_tile_toggle);
 
 	// Random tile scattering.
 	scatter_label = memnew(Label);
-	scatter_label->set_tooltip(TTR("Defines the probability of painting nothing instead of a randomly selected tile."));
+	scatter_label->set_tooltip_text(TTR("Defines the probability of painting nothing instead of a randomly selected tile."));
 	scatter_label->set_text(TTR("Scattering:"));
 	tools_settings->add_child(scatter_label);
 
@@ -2132,7 +2133,7 @@ TileMapEditorTilesPlugin::TileMapEditorTilesPlugin() {
 	scatter_spinbox->set_min(0.0);
 	scatter_spinbox->set_max(1000);
 	scatter_spinbox->set_step(0.001);
-	scatter_spinbox->set_tooltip(TTR("Defines the probability of painting nothing instead of a randomly selected tile."));
+	scatter_spinbox->set_tooltip_text(TTR("Defines the probability of painting nothing instead of a randomly selected tile."));
 	scatter_spinbox->get_line_edit()->add_theme_constant_override("minimum_character_width", 4);
 	scatter_spinbox->connect("value_changed", callable_mp(this, &TileMapEditorTilesPlugin::_on_scattering_spinbox_changed));
 	tools_settings->add_child(scatter_spinbox);
@@ -2169,7 +2170,7 @@ TileMapEditorTilesPlugin::TileMapEditorTilesPlugin() {
 	split_container_left_side->set_h_size_flags(Control::SIZE_EXPAND_FILL);
 	split_container_left_side->set_v_size_flags(Control::SIZE_EXPAND_FILL);
 	split_container_left_side->set_stretch_ratio(0.25);
-	split_container_left_side->set_custom_minimum_size(Size2i(70, 0) * EDSCALE);
+	split_container_left_side->set_custom_minimum_size(Size2(70, 0) * EDSCALE);
 	atlas_sources_split_container->add_child(split_container_left_side);
 
 	HBoxContainer *sources_bottom_actions = memnew(HBoxContainer);
@@ -2177,7 +2178,7 @@ TileMapEditorTilesPlugin::TileMapEditorTilesPlugin() {
 
 	source_sort_button = memnew(MenuButton);
 	source_sort_button->set_flat(true);
-	source_sort_button->set_tooltip(TTR("Sort sources"));
+	source_sort_button->set_tooltip_text(TTR("Sort sources"));
 
 	PopupMenu *p = source_sort_button->get_popup();
 	p->connect("id_pressed", callable_mp(this, &TileMapEditorTilesPlugin::_set_source_sort));
@@ -2189,11 +2190,11 @@ TileMapEditorTilesPlugin::TileMapEditorTilesPlugin() {
 	sources_bottom_actions->add_child(source_sort_button);
 
 	sources_list = memnew(ItemList);
-	sources_list->set_fixed_icon_size(Size2i(60, 60) * EDSCALE);
+	sources_list->set_fixed_icon_size(Size2(60, 60) * EDSCALE);
 	sources_list->set_h_size_flags(Control::SIZE_EXPAND_FILL);
 	sources_list->set_v_size_flags(Control::SIZE_EXPAND_FILL);
 	sources_list->set_stretch_ratio(0.25);
-	sources_list->set_custom_minimum_size(Size2i(70, 0) * EDSCALE);
+	sources_list->set_custom_minimum_size(Size2(70, 0) * EDSCALE);
 	sources_list->set_texture_filter(CanvasItem::TEXTURE_FILTER_NEAREST);
 	sources_list->connect("item_selected", callable_mp(this, &TileMapEditorTilesPlugin::_update_fix_selected_and_hovered).unbind(1));
 	sources_list->connect("item_selected", callable_mp(this, &TileMapEditorTilesPlugin::_update_source_display).unbind(1));
@@ -2557,7 +2558,7 @@ RBSet<Vector2i> TileMapEditorTerrainsPlugin::_get_cells_for_bucket_fill(Vector2i
 		TypedArray<Vector2i> to_check;
 		if (source_cell.source_id == TileSet::INVALID_SOURCE) {
 			Rect2i rect = tile_map->get_used_rect();
-			if (rect.has_no_area()) {
+			if (!rect.has_area()) {
 				rect = Rect2i(p_coords, Vector2i(1, 1));
 			}
 			for (int x = boundaries.position.x; x < boundaries.get_end().x; x++) {
@@ -2639,7 +2640,7 @@ void TileMapEditorTerrainsPlugin::_stop_dragging() {
 
 	switch (drag_type) {
 		case DRAG_TYPE_PICK: {
-			Vector2i coords = tile_map->world_to_map(mpos);
+			Vector2i coords = tile_map->local_to_map(mpos);
 			TileMapCell cell = tile_map->get_cell(tile_map_layer, coords);
 			TileData *tile_data = nullptr;
 
@@ -2713,7 +2714,7 @@ void TileMapEditorTerrainsPlugin::_stop_dragging() {
 			undo_redo->commit_action(false);
 		} break;
 		case DRAG_TYPE_LINE: {
-			HashMap<Vector2i, TileMapCell> to_draw = _draw_line(tile_map->world_to_map(drag_start_mouse_pos), tile_map->world_to_map(mpos), drag_erasing);
+			HashMap<Vector2i, TileMapCell> to_draw = _draw_line(tile_map->local_to_map(drag_start_mouse_pos), tile_map->local_to_map(mpos), drag_erasing);
 			undo_redo->create_action(TTR("Paint terrain"));
 			for (const KeyValue<Vector2i, TileMapCell> &E : to_draw) {
 				if (!drag_erasing && E.value.source_id == TileSet::INVALID_SOURCE) {
@@ -2725,7 +2726,7 @@ void TileMapEditorTerrainsPlugin::_stop_dragging() {
 			undo_redo->commit_action();
 		} break;
 		case DRAG_TYPE_RECT: {
-			HashMap<Vector2i, TileMapCell> to_draw = _draw_rect(tile_map->world_to_map(drag_start_mouse_pos), tile_map->world_to_map(mpos), drag_erasing);
+			HashMap<Vector2i, TileMapCell> to_draw = _draw_rect(tile_map->local_to_map(drag_start_mouse_pos), tile_map->local_to_map(mpos), drag_erasing);
 			undo_redo->create_action(TTR("Paint terrain"));
 			for (const KeyValue<Vector2i, TileMapCell> &E : to_draw) {
 				if (!drag_erasing && E.value.source_id == TileSet::INVALID_SOURCE) {
@@ -2835,7 +2836,7 @@ bool TileMapEditorTerrainsPlugin::forward_canvas_gui_input(const Ref<InputEvent>
 		switch (drag_type) {
 			case DRAG_TYPE_PAINT: {
 				if (selected_terrain_set >= 0) {
-					HashMap<Vector2i, TileMapCell> to_draw = _draw_line(tile_map->world_to_map(drag_last_mouse_pos), tile_map->world_to_map(mpos), drag_erasing);
+					HashMap<Vector2i, TileMapCell> to_draw = _draw_line(tile_map->local_to_map(drag_last_mouse_pos), tile_map->local_to_map(mpos), drag_erasing);
 					for (const KeyValue<Vector2i, TileMapCell> &E : to_draw) {
 						if (!drag_modified.has(E.key)) {
 							drag_modified[E.key] = tile_map->get_cell(tile_map_layer, E.key);
@@ -2879,7 +2880,7 @@ bool TileMapEditorTerrainsPlugin::forward_canvas_gui_input(const Ref<InputEvent>
 						drag_start_mouse_pos = mpos;
 
 						drag_modified.clear();
-						Vector2i cell = tile_map->world_to_map(mpos);
+						Vector2i cell = tile_map->local_to_map(mpos);
 						HashMap<Vector2i, TileMapCell> to_draw = _draw_line(cell, cell, drag_erasing);
 						for (const KeyValue<Vector2i, TileMapCell> &E : to_draw) {
 							drag_modified[E.key] = tile_map->get_cell(tile_map_layer, E.key);
@@ -2906,7 +2907,7 @@ bool TileMapEditorTerrainsPlugin::forward_canvas_gui_input(const Ref<InputEvent>
 						drag_type = DRAG_TYPE_BUCKET;
 						drag_start_mouse_pos = mpos;
 						drag_modified.clear();
-						Vector<Vector2i> line = TileMapEditor::get_line(tile_map, tile_map->world_to_map(drag_last_mouse_pos), tile_map->world_to_map(mpos));
+						Vector<Vector2i> line = TileMapEditor::get_line(tile_map, tile_map->local_to_map(drag_last_mouse_pos), tile_map->local_to_map(mpos));
 						for (int i = 0; i < line.size(); i++) {
 							if (!drag_modified.has(line[i])) {
 								HashMap<Vector2i, TileMapCell> to_draw = _draw_bucket_fill(line[i], bucket_contiguous_checkbox->is_pressed(), drag_erasing);
@@ -2970,10 +2971,10 @@ void TileMapEditorTerrainsPlugin::forward_canvas_draw_over_viewport(Control *p_o
 
 		if (drag_type == DRAG_TYPE_PICK) {
 			// Draw the area being picked.
-			Vector2i coords = tile_map->world_to_map(drag_last_mouse_pos);
+			Vector2i coords = tile_map->local_to_map(drag_last_mouse_pos);
 			if (tile_map->get_cell_source_id(tile_map_layer, coords) != TileSet::INVALID_SOURCE) {
 				Transform2D tile_xform;
-				tile_xform.set_origin(tile_map->map_to_world(coords));
+				tile_xform.set_origin(tile_map->map_to_local(coords));
 				tile_xform.set_scale(tile_shape_size);
 				tile_set->draw_tile_shape(p_overlay, xform * tile_xform, Color(1.0, 1.0, 1.0), false);
 			}
@@ -2981,15 +2982,15 @@ void TileMapEditorTerrainsPlugin::forward_canvas_draw_over_viewport(Control *p_o
 			bool expand_grid = false;
 			if (tool_buttons_group->get_pressed_button() == paint_tool_button && drag_type == DRAG_TYPE_NONE) {
 				// Preview for a single tile.
-				preview.insert(tile_map->world_to_map(drag_last_mouse_pos));
+				preview.insert(tile_map->local_to_map(drag_last_mouse_pos));
 				expand_grid = true;
 			} else if (tool_buttons_group->get_pressed_button() == line_tool_button || drag_type == DRAG_TYPE_LINE) {
 				if (drag_type == DRAG_TYPE_NONE) {
 					// Preview for a single tile.
-					preview.insert(tile_map->world_to_map(drag_last_mouse_pos));
+					preview.insert(tile_map->local_to_map(drag_last_mouse_pos));
 				} else if (drag_type == DRAG_TYPE_LINE) {
 					// Preview for a line.
-					Vector<Vector2i> line = TileMapEditor::get_line(tile_map, tile_map->world_to_map(drag_start_mouse_pos), tile_map->world_to_map(drag_last_mouse_pos));
+					Vector<Vector2i> line = TileMapEditor::get_line(tile_map, tile_map->local_to_map(drag_start_mouse_pos), tile_map->local_to_map(drag_last_mouse_pos));
 					for (int i = 0; i < line.size(); i++) {
 						preview.insert(line[i]);
 					}
@@ -2998,8 +2999,8 @@ void TileMapEditorTerrainsPlugin::forward_canvas_draw_over_viewport(Control *p_o
 			} else if (drag_type == DRAG_TYPE_RECT) {
 				// Preview for a rect.
 				Rect2i rect;
-				rect.set_position(tile_map->world_to_map(drag_start_mouse_pos));
-				rect.set_end(tile_map->world_to_map(drag_last_mouse_pos));
+				rect.set_position(tile_map->local_to_map(drag_start_mouse_pos));
+				rect.set_end(tile_map->local_to_map(drag_last_mouse_pos));
 				rect = rect.abs();
 
 				HashMap<Vector2i, TileSet::TerrainsPattern> to_draw;
@@ -3011,7 +3012,7 @@ void TileMapEditorTerrainsPlugin::forward_canvas_draw_over_viewport(Control *p_o
 				expand_grid = true;
 			} else if (tool_buttons_group->get_pressed_button() == bucket_tool_button && drag_type == DRAG_TYPE_NONE) {
 				// Preview for a fill.
-				preview = _get_cells_for_bucket_fill(tile_map->world_to_map(drag_last_mouse_pos), bucket_contiguous_checkbox->is_pressed());
+				preview = _get_cells_for_bucket_fill(tile_map->local_to_map(drag_last_mouse_pos), bucket_contiguous_checkbox->is_pressed());
 			}
 
 			// Expand the grid if needed
@@ -3044,7 +3045,7 @@ void TileMapEditorTerrainsPlugin::forward_canvas_draw_over_viewport(Control *p_o
 							float opacity = CLAMP(MIN(left_opacity, MIN(right_opacity, MIN(top_opacity, bottom_opacity))) + 0.1, 0.0f, 1.0f);
 
 							Transform2D tile_xform;
-							tile_xform.set_origin(tile_map->map_to_world(Vector2(x, y)));
+							tile_xform.set_origin(tile_map->map_to_local(Vector2(x, y)));
 							tile_xform.set_scale(tile_shape_size);
 							Color color = grid_color;
 							color.a = color.a * opacity;
@@ -3057,7 +3058,7 @@ void TileMapEditorTerrainsPlugin::forward_canvas_draw_over_viewport(Control *p_o
 			// Draw the preview.
 			for (const Vector2i &E : preview) {
 				Transform2D tile_xform;
-				tile_xform.set_origin(tile_map->map_to_world(E));
+				tile_xform.set_origin(tile_map->map_to_local(E));
 				tile_xform.set_scale(tile_set->get_tile_size());
 				if (drag_erasing || erase_button->is_pressed()) {
 					tile_set->draw_tile_shape(p_overlay, xform * tile_xform, Color(0.0, 0.0, 0.0, 0.5), true);
@@ -3322,7 +3323,7 @@ TileMapEditorTerrainsPlugin::TileMapEditorTerrainsPlugin() {
 	terrains_tree = memnew(Tree);
 	terrains_tree->set_h_size_flags(Control::SIZE_EXPAND_FILL);
 	terrains_tree->set_stretch_ratio(0.25);
-	terrains_tree->set_custom_minimum_size(Size2i(70, 0) * EDSCALE);
+	terrains_tree->set_custom_minimum_size(Size2(70, 0) * EDSCALE);
 	terrains_tree->set_texture_filter(CanvasItem::TEXTURE_FILTER_NEAREST);
 	terrains_tree->set_hide_root(true);
 	terrains_tree->connect("item_selected", callable_mp(this, &TileMapEditorTerrainsPlugin::_update_tiles_list));
@@ -3617,7 +3618,7 @@ void TileMapEditor::_tab_changed(int p_tab_id) {
 	}
 
 	// Graphical update.
-	tabs_data[tabs_bar->get_current_tab()].panel->update();
+	tabs_data[tabs_bar->get_current_tab()].panel->queue_redraw();
 	CanvasItemEditor::get_singleton()->update_viewport();
 }
 
@@ -3676,6 +3677,7 @@ void TileMapEditor::_update_layers_selection() {
 		tile_map_layer = -1;
 	}
 	tile_map->set_selected_layer(toggle_highlight_selected_layer_button->is_pressed() ? tile_map_layer : -1);
+	tileset_changed_needs_update = false; // Update is not needed here and actually causes problems.
 
 	layers_selection_button->clear();
 	if (tile_map->get_layers_count() > 0) {
@@ -3697,8 +3699,8 @@ void TileMapEditor::_update_layers_selection() {
 }
 
 void TileMapEditor::_move_tile_map_array_element(Object *p_undo_redo, Object *p_edited, String p_array_prefix, int p_from_index, int p_to_pos) {
-	UndoRedo *undo_redo = Object::cast_to<UndoRedo>(p_undo_redo);
-	ERR_FAIL_COND(!undo_redo);
+	Ref<EditorUndoRedoManager> undo_redo = Object::cast_to<EditorUndoRedoManager>(p_undo_redo);
+	ERR_FAIL_COND(undo_redo.is_null());
 
 	TileMap *tile_map = Object::cast_to<TileMap>(p_edited);
 	if (!tile_map) {
@@ -3837,7 +3839,7 @@ void TileMapEditor::forward_canvas_draw_over_viewport(Control *p_overlay) {
 
 						// Draw the scaled tile.
 						Transform2D tile_xform;
-						tile_xform.set_origin(tile_map->map_to_world(coords));
+						tile_xform.set_origin(tile_map->map_to_local(coords));
 						tile_xform.set_scale(tile_shape_size);
 						tile_set->draw_tile_shape(p_overlay, xform * tile_xform, color, true, warning_pattern_texture);
 					}
@@ -3847,7 +3849,7 @@ void TileMapEditor::forward_canvas_draw_over_viewport(Control *p_overlay) {
 					Vector2 icon_size;
 					icon_size[min_axis] = tile_set->get_tile_size()[min_axis] / 3;
 					icon_size[(min_axis + 1) % 2] = (icon_size[min_axis] * missing_tile_texture->get_size()[(min_axis + 1) % 2] / missing_tile_texture->get_size()[min_axis]);
-					Rect2 rect = Rect2(xform.xform(tile_map->map_to_world(coords)) - (icon_size * xform.get_scale() / 2), icon_size * xform.get_scale());
+					Rect2 rect = Rect2(xform.xform(tile_map->map_to_local(coords)) - (icon_size * xform.get_scale() / 2), icon_size * xform.get_scale());
 					p_overlay->draw_texture_rect(missing_tile_texture, rect);
 				}
 			}
@@ -3860,10 +3862,10 @@ void TileMapEditor::forward_canvas_draw_over_viewport(Control *p_overlay) {
 	// Determine the drawn area.
 	Size2 screen_size = p_overlay->get_size();
 	Rect2i screen_rect;
-	screen_rect.position = tile_map->world_to_map(xform_inv.xform(Vector2()));
-	screen_rect.expand_to(tile_map->world_to_map(xform_inv.xform(Vector2(0, screen_size.height))));
-	screen_rect.expand_to(tile_map->world_to_map(xform_inv.xform(Vector2(screen_size.width, 0))));
-	screen_rect.expand_to(tile_map->world_to_map(xform_inv.xform(screen_size)));
+	screen_rect.position = tile_map->local_to_map(xform_inv.xform(Vector2()));
+	screen_rect.expand_to(tile_map->local_to_map(xform_inv.xform(Vector2(0, screen_size.height))));
+	screen_rect.expand_to(tile_map->local_to_map(xform_inv.xform(Vector2(screen_size.width, 0))));
+	screen_rect.expand_to(tile_map->local_to_map(xform_inv.xform(screen_size)));
 	screen_rect = screen_rect.grow(1);
 
 	Rect2i tilemap_used_rect = tile_map->get_used_rect();
@@ -3896,7 +3898,7 @@ void TileMapEditor::forward_canvas_draw_over_viewport(Control *p_overlay) {
 				float opacity = CLAMP(MIN(left_opacity, MIN(right_opacity, MIN(top_opacity, bottom_opacity))) + 0.1, 0.0f, 1.0f);
 
 				Transform2D tile_xform;
-				tile_xform.set_origin(tile_map->map_to_world(Vector2(x, y)));
+				tile_xform.set_origin(tile_map->map_to_local(Vector2(x, y)));
 				tile_xform.set_scale(tile_shape_size);
 				Color color = grid_color;
 				color.a = color.a * opacity;
@@ -3909,7 +3911,7 @@ void TileMapEditor::forward_canvas_draw_over_viewport(Control *p_overlay) {
 	/*Ref<Font> font = get_theme_font(SNAME("font"), SNAME("Label"));
 	for (int x = displayed_rect.position.x; x < (displayed_rect.position.x + displayed_rect.size.x); x++) {
 		for (int y = displayed_rect.position.y; y < (displayed_rect.position.y + displayed_rect.size.y); y++) {
-			p_overlay->draw_string(font, xform.xform(tile_map->map_to_world(Vector2(x, y))) + Vector2i(-tile_shape_size.x / 2, 0), vformat("%s", Vector2(x, y)));
+			p_overlay->draw_string(font, xform.xform(tile_map->map_to_local(Vector2(x, y))) + Vector2i(-tile_shape_size.x / 2, 0), vformat("%s", Vector2(x, y)));
 		}
 	}*/
 
@@ -4002,7 +4004,7 @@ TileMapEditor::TileMapEditor() {
 	layers_selection_button = memnew(OptionButton);
 	layers_selection_button->set_custom_minimum_size(Size2(200, 0));
 	layers_selection_button->set_text_overrun_behavior(TextServer::OVERRUN_TRIM_ELLIPSIS);
-	layers_selection_button->set_tooltip(TTR("TileMap Layers"));
+	layers_selection_button->set_tooltip_text(TTR("TileMap Layers"));
 	layers_selection_button->connect("item_selected", callable_mp(this, &TileMapEditor::_layers_selection_item_selected));
 	tile_map_toolbar->add_child(layers_selection_button);
 
@@ -4011,7 +4013,7 @@ TileMapEditor::TileMapEditor() {
 	toggle_highlight_selected_layer_button->set_toggle_mode(true);
 	toggle_highlight_selected_layer_button->set_pressed(true);
 	toggle_highlight_selected_layer_button->connect("pressed", callable_mp(this, &TileMapEditor::_update_layers_selection));
-	toggle_highlight_selected_layer_button->set_tooltip(TTR("Highlight Selected TileMap Layer"));
+	toggle_highlight_selected_layer_button->set_tooltip_text(TTR("Highlight Selected TileMap Layer"));
 	tile_map_toolbar->add_child(toggle_highlight_selected_layer_button);
 
 	tile_map_toolbar->add_child(memnew(VSeparator));
@@ -4020,7 +4022,7 @@ TileMapEditor::TileMapEditor() {
 	toggle_grid_button = memnew(Button);
 	toggle_grid_button->set_flat(true);
 	toggle_grid_button->set_toggle_mode(true);
-	toggle_grid_button->set_tooltip(TTR("Toggle grid visibility."));
+	toggle_grid_button->set_tooltip_text(TTR("Toggle grid visibility."));
 	toggle_grid_button->connect("toggled", callable_mp(this, &TileMapEditor::_on_grid_toggled));
 	tile_map_toolbar->add_child(toggle_grid_button);
 

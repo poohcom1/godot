@@ -110,7 +110,7 @@ private:
 	void _propagate_visibility_changed(bool p_parent_visible_in_tree);
 	void _handle_visibility_change(bool p_visible);
 
-	void _update_callback();
+	void _redraw_callback();
 
 	void _enter_canvas();
 	void _exit_canvas();
@@ -197,7 +197,8 @@ public:
 	void show();
 	void hide();
 
-	void update();
+	void queue_redraw();
+	void move_to_front();
 
 	void set_clip_children(bool p_enabled);
 	bool is_clipping_children() const;
@@ -226,6 +227,7 @@ public:
 	void draw_texture_rect(const Ref<Texture2D> &p_texture, const Rect2 &p_rect, bool p_tile = false, const Color &p_modulate = Color(1, 1, 1), bool p_transpose = false);
 	void draw_texture_rect_region(const Ref<Texture2D> &p_texture, const Rect2 &p_rect, const Rect2 &p_src_rect, const Color &p_modulate = Color(1, 1, 1), bool p_transpose = false, bool p_clip_uv = false);
 	void draw_msdf_texture_rect_region(const Ref<Texture2D> &p_texture, const Rect2 &p_rect, const Rect2 &p_src_rect, const Color &p_modulate = Color(1, 1, 1), double p_outline = 0.0, double p_pixel_range = 4.0);
+	void draw_lcd_texture_rect_region(const Ref<Texture2D> &p_texture, const Rect2 &p_rect, const Rect2 &p_src_rect, const Color &p_modulate = Color(1, 1, 1));
 	void draw_style_box(const Ref<StyleBox> &p_style_box, const Rect2 &p_rect);
 	void draw_primitive(const Vector<Point2> &p_points, const Vector<Color> &p_colors, const Vector<Point2> &p_uvs, Ref<Texture2D> p_texture = Ref<Texture2D>(), real_t p_width = 1);
 	void draw_polygon(const Vector<Point2> &p_points, const Vector<Color> &p_colors, const Vector<Point2> &p_uvs = Vector<Point2>(), Ref<Texture2D> p_texture = Ref<Texture2D>());

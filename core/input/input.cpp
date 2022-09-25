@@ -169,11 +169,10 @@ void Input::_bind_methods() {
 
 void Input::get_argument_options(const StringName &p_function, int p_idx, List<String> *r_options) const {
 	String pf = p_function;
-	if (p_idx == 0 &&
-			(pf == "is_action_pressed" || pf == "action_press" || pf == "action_release" ||
-					pf == "is_action_just_pressed" || pf == "is_action_just_released" ||
-					pf == "get_action_strength" || pf == "get_action_raw_strength" ||
-					pf == "get_axis" || pf == "get_vector")) {
+
+	if ((p_idx == 0 && (pf == "is_action_pressed" || pf == "action_press" || pf == "action_release" || pf == "is_action_just_pressed" || pf == "is_action_just_released" || pf == "get_action_strength" || pf == "get_action_raw_strength")) ||
+			(p_idx < 2 && pf == "get_axis") ||
+			(p_idx < 4 && pf == "get_vector")) {
 		List<PropertyInfo> pinfo;
 		ProjectSettings::get_singleton()->get_property_list(&pinfo);
 
@@ -767,9 +766,6 @@ Point2i Input::warp_mouse_motion(const Ref<InputEventMouseMotion> &p_motion, con
 	return rel_warped;
 }
 
-void Input::iteration(float p_step) {
-}
-
 void Input::action_press(const StringName &p_action, float p_strength) {
 	Action action;
 
@@ -974,11 +970,9 @@ void Input::joy_axis(int p_device, JoyAxis p_axis, float p_value) {
 
 	if (map.type == TYPE_BUTTON) {
 		bool pressed = map.value > 0.5;
-		if (pressed == joy_buttons_pressed.has(_combine_device((JoyButton)map.index, p_device))) {
-			// Button already pressed or released; so ignore.
-			return;
+		if (pressed != joy_buttons_pressed.has(_combine_device((JoyButton)map.index, p_device))) {
+			_button_event(p_device, (JoyButton)map.index, pressed);
 		}
-		_button_event(p_device, (JoyButton)map.index, pressed);
 
 		// Ensure opposite D-Pad button is also released.
 		switch ((JoyButton)map.index) {
@@ -1129,7 +1123,7 @@ Input::JoyEvent Input::_get_mapped_axis_event(const JoyDeviceMapping &mapping, J
 				value = -value;
 			}
 			if (binding.input.axis.range == FULL_AXIS ||
-					(binding.input.axis.range == POSITIVE_HALF_AXIS && value > 0) ||
+					(binding.input.axis.range == POSITIVE_HALF_AXIS && value >= 0) ||
 					(binding.input.axis.range == NEGATIVE_HALF_AXIS && value < 0)) {
 				event.type = binding.outputType;
 				float shifted_positive_value = 0;

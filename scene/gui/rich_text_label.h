@@ -82,7 +82,17 @@ public:
 		MENU_SELECT_ALL,
 	};
 
+	enum DefaultFont {
+		NORMAL_FONT,
+		BOLD_FONT,
+		ITALICS_FONT,
+		BOLD_ITALICS_FONT,
+		MONO_FONT,
+		CUSTOM_FONT,
+	};
+
 protected:
+	virtual void _update_theme_item_cache() override;
 	void _notification(int p_what);
 	static void _bind_methods();
 
@@ -177,6 +187,7 @@ private:
 	};
 
 	struct ItemFont : public Item {
+		DefaultFont def_font = CUSTOM_FONT;
 		Ref<Font> font;
 		int font_size = 0;
 		ItemFont() { type = ITEM_FONT; }
@@ -271,6 +282,7 @@ private:
 
 	struct ItemFX : public Item {
 		double elapsed_time = 0.f;
+		bool connected = true;
 	};
 
 	struct ItemShake : public ItemFX {
@@ -440,11 +452,11 @@ private:
 	void _menu_option(int p_option);
 
 	int visible_characters = -1;
-	float percent_visible = 1.0;
+	float visible_ratio = 1.0;
 	TextServer::VisibleCharactersBehavior visible_chars_behavior = TextServer::VC_CHARS_BEFORE_SHAPING;
 
 	bool _is_click_inside_selection() const;
-	void _find_click(ItemFrame *p_frame, const Point2i &p_click, ItemFrame **r_click_frame = nullptr, int *r_click_line = nullptr, Item **r_click_item = nullptr, int *r_click_char = nullptr, bool *r_outside = nullptr);
+	void _find_click(ItemFrame *p_frame, const Point2i &p_click, ItemFrame **r_click_frame = nullptr, int *r_click_line = nullptr, Item **r_click_item = nullptr, int *r_click_char = nullptr, bool *r_outside = nullptr, bool p_meta = false);
 
 	String _get_line_text(ItemFrame *p_frame, int p_line, Selection p_sel) const;
 	bool _search_line(ItemFrame *p_frame, int p_line, const String &p_string, int p_char_idx, bool p_reverse_search);
@@ -455,7 +467,7 @@ private:
 
 	void _update_line_font(ItemFrame *p_frame, int p_line, const Ref<Font> &p_base_font, int p_base_font_size);
 	int _draw_line(ItemFrame *p_frame, int p_line, const Vector2 &p_ofs, int p_width, const Color &p_base_color, int p_outline_size, const Color &p_outline_color, const Color &p_font_shadow_color, int p_shadow_outline_size, const Point2 &p_shadow_ofs, int &r_processed_glyphs);
-	float _find_click_in_line(ItemFrame *p_frame, int p_line, const Vector2 &p_ofs, int p_width, const Point2i &p_click, ItemFrame **r_click_frame = nullptr, int *r_click_line = nullptr, Item **r_click_item = nullptr, int *r_click_char = nullptr, bool p_table = false);
+	float _find_click_in_line(ItemFrame *p_frame, int p_line, const Vector2 &p_ofs, int p_width, const Point2i &p_click, ItemFrame **r_click_frame = nullptr, int *r_click_line = nullptr, Item **r_click_item = nullptr, int *r_click_char = nullptr, bool p_table = false, bool p_meta = false);
 
 	String _roman(int p_num, bool p_capitalize) const;
 	String _letters(int p_num, bool p_capitalize) const;
@@ -512,6 +524,46 @@ private:
 
 	bool fit_content_height = false;
 
+	struct ThemeCache {
+		Ref<StyleBox> normal_style;
+		Ref<StyleBox> focus_style;
+		Ref<StyleBox> progress_bg_style;
+		Ref<StyleBox> progress_fg_style;
+
+		int line_separation;
+
+		Ref<Font> normal_font;
+		int normal_font_size;
+
+		Color default_color;
+		Color font_selected_color;
+		Color selection_color;
+		Color font_outline_color;
+		Color font_shadow_color;
+		int shadow_outline_size;
+		int shadow_offset_x;
+		int shadow_offset_y;
+		int outline_size;
+		Color outline_color;
+
+		Ref<Font> bold_font;
+		int bold_font_size;
+		Ref<Font> bold_italics_font;
+		int bold_italics_font_size;
+		Ref<Font> italics_font;
+		int italics_font_size;
+		Ref<Font> mono_font;
+		int mono_font_size;
+
+		int table_h_separation;
+		int table_v_separation;
+		Color table_odd_row_bg;
+		Color table_even_row_bg;
+		Color table_border;
+
+		float base_scale = 1.0;
+	} theme_cache;
+
 public:
 	String get_parsed_text() const;
 	void add_text(const String &p_text);
@@ -519,6 +571,7 @@ public:
 	void add_newline();
 	bool remove_line(const int p_line);
 	void push_dropcap(const String &p_string, const Ref<Font> &p_font, int p_size, const Rect2 &p_dropcap_margins = Rect2(), const Color &p_color = Color(1, 1, 1), int p_ol_size = 0, const Color &p_ol_color = Color(0, 0, 0, 0));
+	void _push_def_font(DefaultFont p_font);
 	void push_font(const Ref<Font> &p_font, int p_size = 0);
 	void push_font_size(int p_font_size);
 	void push_outline_size(int p_font_size);
@@ -538,9 +591,9 @@ public:
 	void push_hint(const String &p_string);
 	void push_table(int p_columns, InlineAlignment p_alignment = INLINE_ALIGNMENT_TOP);
 	void push_fade(int p_start_index, int p_length);
-	void push_shake(int p_strength, float p_rate);
-	void push_wave(float p_frequency, float p_amplitude);
-	void push_tornado(float p_frequency, float p_radius);
+	void push_shake(int p_strength, float p_rate, bool p_connected);
+	void push_wave(float p_frequency, float p_amplitude, bool p_connected);
+	void push_tornado(float p_frequency, float p_radius, bool p_connected);
 	void push_rainbow(float p_saturation, float p_value, float p_frequency);
 	void push_bgcolor(const Color &p_color);
 	void push_fgcolor(const Color &p_color);
@@ -660,8 +713,8 @@ public:
 	int get_total_character_count() const;
 	int get_total_glyph_count() const;
 
-	void set_percent_visible(float p_percent);
-	float get_percent_visible() const;
+	void set_visible_ratio(float p_ratio);
+	float get_visible_ratio() const;
 
 	TextServer::VisibleCharactersBehavior get_visible_characters_behavior() const;
 	void set_visible_characters_behavior(TextServer::VisibleCharactersBehavior p_behavior);

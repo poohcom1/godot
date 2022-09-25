@@ -32,6 +32,7 @@
 
 #include "editor/editor_node.h"
 #include "editor/editor_scale.h"
+#include "editor/editor_undo_redo_manager.h"
 #include "scene/gui/box_container.h"
 #include "scene/gui/flow_container.h"
 #include "scene/gui/separator.h"
@@ -88,17 +89,17 @@ void GradientTexture2DEditorRect::gui_input(const Ref<InputEvent> &p_event) {
 
 void GradientTexture2DEditorRect::set_texture(Ref<GradientTexture2D> &p_texture) {
 	texture = p_texture;
-	texture->connect("changed", callable_mp((CanvasItem *)this, &CanvasItem::update));
+	texture->connect("changed", callable_mp((CanvasItem *)this, &CanvasItem::queue_redraw));
 }
 
 void GradientTexture2DEditorRect::set_snap_enabled(bool p_snap_enabled) {
 	snap_enabled = p_snap_enabled;
-	update();
+	queue_redraw();
 }
 
 void GradientTexture2DEditorRect::set_snap_size(float p_snap_size) {
 	snap_size = p_snap_size;
-	update();
+	queue_redraw();
 }
 
 void GradientTexture2DEditorRect::_notification(int p_what) {
@@ -175,7 +176,7 @@ void GradientTexture2DEditorRect::_notification(int p_what) {
 }
 
 GradientTexture2DEditorRect::GradientTexture2DEditorRect() {
-	undo_redo = EditorNode::get_singleton()->get_undo_redo();
+	undo_redo = EditorNode::get_undo_redo();
 
 	checkerboard = memnew(TextureRect);
 	checkerboard->set_stretch_mode(TextureRect::STRETCH_TILE);
@@ -222,20 +223,20 @@ void GradientTexture2DEditor::_notification(int p_what) {
 }
 
 GradientTexture2DEditor::GradientTexture2DEditor() {
-	undo_redo = EditorNode::get_singleton()->get_undo_redo();
+	undo_redo = EditorNode::get_undo_redo();
 
 	HFlowContainer *toolbar = memnew(HFlowContainer);
 	add_child(toolbar);
 
 	reverse_button = memnew(Button);
-	reverse_button->set_tooltip(TTR("Swap Gradient Fill Points"));
+	reverse_button->set_tooltip_text(TTR("Swap Gradient Fill Points"));
 	toolbar->add_child(reverse_button);
 	reverse_button->connect("pressed", callable_mp(this, &GradientTexture2DEditor::_reverse_button_pressed));
 
 	toolbar->add_child(memnew(VSeparator));
 
 	snap_button = memnew(Button);
-	snap_button->set_tooltip(TTR("Toggle Grid Snap"));
+	snap_button->set_tooltip_text(TTR("Toggle Grid Snap"));
 	snap_button->set_toggle_mode(true);
 	toolbar->add_child(snap_button);
 	snap_button->connect("toggled", callable_mp(this, &GradientTexture2DEditor::_set_snap_enabled));

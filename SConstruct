@@ -55,6 +55,7 @@ _helper_module("modules.modules_builders", "modules/modules_builders.py")
 import methods
 import glsl_builders
 import gles3_builders
+from platform_methods import architectures, architecture_aliases
 
 if methods.get_cmdline_bool("tools", True):
     _helper_module("editor.editor_builders", "editor/editor_builders.py")
@@ -105,7 +106,7 @@ platform_arg = ARGUMENTS.get("platform", ARGUMENTS.get("p", False))
 
 if platform_arg == "android":
     custom_tools = ["clang", "clang++", "as", "ar", "link"]
-elif platform_arg == "javascript":
+elif platform_arg == "web":
     # Use generic POSIX build toolchain for Emscripten.
     custom_tools = ["cc", "c++", "ar", "link", "textfile", "zip"]
 elif os.name == "nt" and methods.get_cmdline_bool("use_mingw", False):
@@ -161,16 +162,15 @@ if profile:
 opts = Variables(customs, ARGUMENTS)
 
 # Target build options
-opts.Add("p", "Platform (alias for 'platform')", "")
 opts.Add("platform", "Target platform (%s)" % ("|".join(platform_list),), "")
+opts.Add("p", "Platform (alias for 'platform')", "")
 opts.Add(BoolVariable("tools", "Build the tools (a.k.a. the Godot editor)", True))
 opts.Add(EnumVariable("target", "Compilation target", "debug", ("debug", "release_debug", "release")))
-opts.Add("arch", "Platform-dependent architecture (arm/arm64/x86/x64/mips/...)", "")
-opts.Add(EnumVariable("bits", "Target platform bits", "default", ("default", "32", "64")))
-opts.Add(EnumVariable("float", "Floating-point precision", "default", ("default", "32", "64")))
+opts.Add(EnumVariable("arch", "CPU architecture", "auto", ["auto"] + architectures, architecture_aliases))
+opts.Add(EnumVariable("float", "Floating-point precision", "32", ("32", "64")))
 opts.Add(EnumVariable("optimize", "Optimization type", "speed", ("speed", "size", "none")))
 opts.Add(BoolVariable("production", "Set defaults to build Godot for use in production", False))
-opts.Add(BoolVariable("use_lto", "Use link-time optimization", False))
+opts.Add(EnumVariable("lto", "Link-time optimization (for production buids)", "none", ("none", "auto", "thin", "full")))
 
 # Components
 opts.Add(BoolVariable("deprecated", "Enable compatibility code for deprecated and removed features", True))
@@ -386,6 +386,9 @@ if env_base["target"] == "debug":
     # DEV_ENABLED enables *engine developer* code which should only be compiled for those
     # working on the engine itself.
     env_base.Append(CPPDEFINES=["DEV_ENABLED"])
+else:
+    # Disable assert() for production targets (only used in thirdparty code).
+    env_base.Append(CPPDEFINES=["NDEBUG"])
 
 # SCons speed optimization controlled by the `fast_unsafe` option, which provide
 # more than 10 s speed up for incremental rebuilds.
@@ -438,45 +441,6 @@ if selected_platform in platform_list:
             )
             env.SetOption("num_jobs", safer_cpu_count)
 
-    if env["compiledb"]:
-        # Generating the compilation DB (`compile_commands.json`) requires SCons 4.0.0 or later.
-        from SCons import __version__ as scons_raw_version
-
-        scons_ver = env._get_major_minor_revision(scons_raw_version)
-
-        if scons_ver >= (4, 0, 0):
-            env.Tool("compilation_db")
-            env.Alias("compiledb", env.CompilationDatabase())
-
-    # 'dev' and 'production' are aliases to set default options if they haven't been set
-    # manually by the user.
-    if env["dev"]:
-        env["verbose"] = methods.get_cmdline_bool("verbose", True)
-        env["warnings"] = ARGUMENTS.get("warnings", "extra")
-        env["werror"] = methods.get_cmdline_bool("werror", True)
-        if env["tools"]:
-            env["tests"] = methods.get_cmdline_bool("tests", True)
-    if env["production"]:
-        env["use_static_cpp"] = methods.get_cmdline_bool("use_static_cpp", True)
-        env["use_lto"] = methods.get_cmdline_bool("use_lto", True)
-        env["debug_symbols"] = methods.get_cmdline_bool("debug_symbols", False)
-        if not env["tools"] and env["target"] == "debug":
-            print(
-                "WARNING: Requested `production` build with `tools=no target=debug`, "
-                "this will give you a full debug template (use `target=release_debug` "
-                "for an optimized template with debug features)."
-            )
-        if env.msvc:
-            print(
-                "WARNING: For `production` Windows builds, you should use MinGW with GCC "
-                "or Clang instead of Visual Studio, as they can better optimize the "
-                "GDScript VM in a very significant way. MSVC LTO also doesn't work "
-                "reliably for our use case."
-                "If you want to use MSVC nevertheless for production builds, set "
-                "`debug_symbols=no use_lto=no` instead of the `production=yes` option."
-            )
-            Exit(255)
-
     env.extra_suffix = ""
 
     if env["extra_suffix"] != "":
@@ -499,14 +463,42 @@ if selected_platform in platform_list:
     env["LINKFLAGS"] = ""
     env.Append(LINKFLAGS=str(LINKFLAGS).split())
 
-    # Platform specific flags
+    # Platform specific flags.
+    # These can sometimes override default options.
     flag_list = platform_flags[selected_platform]
     for f in flag_list:
-        if not (f[0] in ARGUMENTS):  # allow command line to override platform flags
+        if not (f[0] in ARGUMENTS) or ARGUMENTS[f[0]] == "auto":  # Allow command line to override platform flags
             env[f[0]] = f[1]
 
-    # Must happen after the flags' definition, so that they can be used by platform detect
+    # 'dev' and 'production' are aliases to set default options if they haven't been
+    # set manually by the user.
+    # These need to be checked *after* platform specific flags so that different
+    # default values can be set (e.g. to keep LTO off for `production` on some platforms).
+    if env["dev"]:
+        env["verbose"] = methods.get_cmdline_bool("verbose", True)
+        env["warnings"] = ARGUMENTS.get("warnings", "extra")
+        env["werror"] = methods.get_cmdline_bool("werror", True)
+        if env["tools"]:
+            env["tests"] = methods.get_cmdline_bool("tests", True)
+    if env["production"]:
+        env["use_static_cpp"] = methods.get_cmdline_bool("use_static_cpp", True)
+        env["debug_symbols"] = methods.get_cmdline_bool("debug_symbols", False)
+        # LTO "auto" means we handle the preferred option in each platform detect.py.
+        env["lto"] = ARGUMENTS.get("lto", "auto")
+        if not env["tools"] and env["target"] == "debug":
+            print(
+                "WARNING: Requested `production` build with `tools=no target=debug`, "
+                "this will give you a full debug template (use `target=release_debug` "
+                "for an optimized template with debug features)."
+            )
+
+    # Must happen after the flags' definition, as configure is when most flags
+    # are actually handled to change compile options, etc.
     detect.configure(env)
+
+    # Needs to happen after configure to handle "auto".
+    if env["lto"] != "none":
+        print("Using LTO: " + env["lto"])
 
     # Set our C and C++ standard requirements.
     # C++17 is required as we need guaranteed copy elision as per GH-36436.
@@ -521,6 +513,11 @@ if selected_platform in platform_list:
         # MSVC doesn't have clear C standard support, /std only covers C++.
         # We apply it to CCFLAGS (both C and C++ code) in case it impacts C features.
         env.Prepend(CCFLAGS=["/std:c++17"])
+
+    print(
+        'Building for platform "%s", architecture "%s", %s, target "%s".'
+        % (selected_platform, env["arch"], "editor" if env["tools"] else "template", env["target"])
+    )
 
     # Enforce our minimal compiler version requirements
     cc_version = methods.get_compiler_version(env) or {
@@ -675,7 +672,6 @@ if selected_platform in platform_list:
             print("       Use `tools=no target=release` to build a release export template.")
             Exit(255)
         suffix += ".opt"
-        env.Append(CPPDEFINES=["NDEBUG"])
     elif env["target"] == "release_debug":
         if env["tools"]:
             suffix += ".opt.tools"
@@ -693,13 +689,7 @@ if selected_platform in platform_list:
             )
             suffix += ".debug"
 
-    if env["arch"] != "":
-        suffix += "." + env["arch"]
-    elif env["bits"] == "32":
-        suffix += ".32"
-    elif env["bits"] == "64":
-        suffix += ".64"
-
+    suffix += "." + env["arch"]
     suffix += env.extra_suffix
 
     sys.path.remove(tmppath)
@@ -746,7 +736,7 @@ if selected_platform in platform_list:
     env.module_list = modules_enabled
     methods.sort_module_list(env)
 
-    methods.update_version(env.module_version_string)
+    methods.generate_version_header(env.module_version_string)
 
     env["PROGSUFFIX"] = suffix + env.module_version_string + env["PROGSUFFIX"]
     env["OBJSUFFIX"] = suffix + env["OBJSUFFIX"]
@@ -837,6 +827,19 @@ if selected_platform in platform_list:
     if env["vsproj"]:
         env.vs_incs = []
         env.vs_srcs = []
+
+    if env["compiledb"]:
+        # Generating the compilation DB (`compile_commands.json`) requires SCons 4.0.0 or later.
+        from SCons import __version__ as scons_raw_version
+
+        scons_ver = env._get_major_minor_revision(scons_raw_version)
+
+        if scons_ver < (4, 0, 0):
+            print("The `compiledb=yes` option requires SCons 4.0 or later, but your version is %s." % scons_raw_version)
+            Exit(255)
+
+        env.Tool("compilation_db")
+        env.Alias("compiledb", env.CompilationDatabase())
 
     Export("env")
 

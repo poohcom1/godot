@@ -46,6 +46,7 @@
 class EditorData;
 class CanvasItemEditorViewport;
 class ViewPanner;
+class EditorUndoRedoManager;
 
 class CanvasItemEditorSelectedItem : public Object {
 	GDCLASS(CanvasItemEditorSelectedItem, Object);
@@ -221,7 +222,7 @@ private:
 	int primary_grid_steps = 8;
 	int grid_step_multiplier = 0;
 
-	real_t snap_rotation_step = Math::deg2rad(15.0);
+	real_t snap_rotation_step = Math::deg_to_rad(15.0);
 	real_t snap_rotation_offset = 0.0;
 	real_t snap_scale_step = 0.1f;
 	bool smart_snap_active = false;
@@ -412,7 +413,7 @@ private:
 	void _prepare_grid_menu();
 	void _on_grid_menu_id_pressed(int p_id);
 
-	UndoRedo *undo_redo = nullptr;
+	Ref<EditorUndoRedoManager> undo_redo;
 
 	bool _build_bones_list(Node *p_node);
 	bool _get_bone_shape(Vector<Vector2> *shape, Vector<Vector2> *outline_shape, const KeyValue<BoneKey,BoneList> &bone);
@@ -570,7 +571,7 @@ public:
 	Tool get_current_tool() { return tool; }
 	void set_current_tool(Tool p_tool);
 
-	void set_undo_redo(UndoRedo *p_undo_redo) { undo_redo = p_undo_redo; }
+	void set_undo_redo(Ref<EditorUndoRedoManager> p_undo_redo);
 	void edit(CanvasItem *p_canvas_item);
 
 	void focus_selection();
@@ -639,8 +640,6 @@ class CanvasItemEditorViewport : public Control {
 	void _perform_drop_data();
 	void _show_resource_type_selector();
 	void _update_theme();
-
-	static void _bind_methods();
 
 protected:
 	void _notification(int p_what);

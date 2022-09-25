@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<class name="SkeletonModification2DCCDIK" inherits="SkeletonModification2D" version="4.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+<class name="SkeletonModification2DCCDIK" inherits="SkeletonModification2D" is_experimental="true" version="4.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
 	<brief_description>
 		A modification that uses CCDIK to manipulate a series of bones to reach a target in 2D.
 	</brief_description>
@@ -121,7 +121,7 @@
 	</methods>
 	<members>
 		<member name="ccdik_data_chain_length" type="int" setter="set_ccdik_data_chain_length" getter="get_ccdik_data_chain_length" default="0">
-			The amount of CCDIK joints in the CCDIK modification.
+			The number of CCDIK joints in the CCDIK modification.
 		</member>
 		<member name="target_nodepath" type="NodePath" setter="set_target_node" getter="get_target_node" default="NodePath(&quot;&quot;)">
 			The NodePath to the node that is the target for the CCDIK modification. This node is what the CCDIK chain will attempt to rotate the bone chain to.

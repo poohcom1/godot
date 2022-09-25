@@ -1787,7 +1787,7 @@ String stringify_vector(const T &vec, int recursion_count) {
 String Variant::stringify(int recursion_count) const {
 	switch (type) {
 		case NIL:
-			return "null";
+			return "<null>";
 		case BOOL:
 			return _data._bool ? "true" : "false";
 		case INT:
@@ -1904,12 +1904,12 @@ String Variant::stringify(int recursion_count) const {
 		case OBJECT: {
 			if (_get_obj().obj) {
 				if (!_get_obj().id.is_ref_counted() && ObjectDB::get_instance(_get_obj().id) == nullptr) {
-					return "[Freed Object]";
+					return "<Freed Object>";
 				}
 
 				return _get_obj().obj->to_string();
 			} else {
-				return "[Object:null]";
+				return "<Object#null>";
 			}
 
 		} break;
@@ -1926,7 +1926,7 @@ String Variant::stringify(int recursion_count) const {
 			return "RID(" + itos(s.get_id()) + ")";
 		} break;
 		default: {
-			return "[" + get_type_name(type) + "]";
+			return "<" + get_type_name(type) + ">";
 		}
 	}
 
@@ -3725,36 +3725,6 @@ String Variant::get_call_error_text(Object *p_base, const StringName &p_method, 
 
 String Variant::get_callable_error_text(const Callable &p_callable, const Variant **p_argptrs, int p_argcount, const Callable::CallError &ce) {
 	return get_call_error_text(p_callable.get_object(), p_callable.get_method(), p_argptrs, p_argcount, ce);
-}
-
-String vformat(const String &p_text, const Variant &p1, const Variant &p2, const Variant &p3, const Variant &p4, const Variant &p5) {
-	Array args;
-	if (p1.get_type() != Variant::NIL) {
-		args.push_back(p1);
-
-		if (p2.get_type() != Variant::NIL) {
-			args.push_back(p2);
-
-			if (p3.get_type() != Variant::NIL) {
-				args.push_back(p3);
-
-				if (p4.get_type() != Variant::NIL) {
-					args.push_back(p4);
-
-					if (p5.get_type() != Variant::NIL) {
-						args.push_back(p5);
-					}
-				}
-			}
-		}
-	}
-
-	bool error = false;
-	String fmt = p_text.sprintf(args, &error);
-
-	ERR_FAIL_COND_V_MSG(error, String(), fmt);
-
-	return fmt;
 }
 
 void Variant::register_types() {

@@ -41,6 +41,7 @@
 class Viewport;
 class Label;
 class Panel;
+class ThemeOwner;
 
 class Control : public CanvasItem {
 	GDCLASS(Control, CanvasItem);
@@ -170,6 +171,9 @@ private:
 
 		// Positioning and sizing.
 
+		LayoutMode stored_layout_mode = LayoutMode::LAYOUT_MODE_POSITION;
+		bool stored_use_custom_anchors = false;
+
 		real_t offset[4] = { 0.0, 0.0, 0.0, 0.0 };
 		real_t anchor[4] = { ANCHOR_BEGIN, ANCHOR_BEGIN, ANCHOR_BEGIN, ANCHOR_BEGIN };
 		FocusMode focus_mode = FOCUS_NONE;
@@ -196,7 +200,7 @@ private:
 		int h_size_flags = SIZE_FILL;
 		int v_size_flags = SIZE_FILL;
 		real_t expand = 1.0;
-		Point2 custom_minimum_size;
+		Point2i custom_minimum_size;
 
 		// Input events and rendering.
 
@@ -216,9 +220,8 @@ private:
 
 		// Theming.
 
+		ThemeOwner *theme_owner = nullptr;
 		Ref<Theme> theme;
-		Control *theme_owner = nullptr;
-		Window *theme_owner_window = nullptr;
 		StringName theme_type_variation;
 
 		bool bulk_theme_override = false;
@@ -258,7 +261,6 @@ private:
 	// Global relations.
 
 	friend class Viewport;
-	friend class Window;
 
 	// Positioning and sizing.
 
@@ -275,6 +277,7 @@ private:
 
 	void _set_layout_mode(LayoutMode p_mode);
 	LayoutMode _get_layout_mode() const;
+	LayoutMode _get_default_layout_mode() const;
 	void _set_anchors_layout_preset(int p_preset);
 	int _get_anchors_layout_preset() const;
 
@@ -296,20 +299,12 @@ private:
 	// Theming.
 
 	void _theme_changed();
-	void _theme_property_override_changed();
-	void _notify_theme_changed();
+	void _notify_theme_override_changed();
 	void _invalidate_theme_cache();
-
-	static void _propagate_theme_changed(Node *p_at, Control *p_owner, Window *p_owner_window, bool p_assign = true);
-
-	template <class T>
-	static T get_theme_item_in_types(Control *p_theme_owner, Window *p_theme_owner_window, Theme::DataType p_data_type, const StringName &p_name, List<StringName> p_theme_types);
-	static bool has_theme_item_in_types(Control *p_theme_owner, Window *p_theme_owner_window, Theme::DataType p_data_type, const StringName &p_name, List<StringName> p_theme_types);
-	_FORCE_INLINE_ void _get_theme_type_dependencies(const StringName &p_theme_type, List<StringName> *p_list) const;
 
 	// Extra properties.
 
-	String _get_tooltip() const;
+	String get_tooltip_text() const;
 
 protected:
 	// Dynamic properties.
@@ -317,16 +312,20 @@ protected:
 	bool _set(const StringName &p_name, const Variant &p_value);
 	bool _get(const StringName &p_name, Variant &r_ret) const;
 	void _get_property_list(List<PropertyInfo> *p_list) const;
-	virtual void _validate_property(PropertyInfo &property) const override;
+	void _validate_property(PropertyInfo &p_property) const;
+
+	bool _property_can_revert(const StringName &p_name) const;
+	bool _property_get_revert(const StringName &p_name, Variant &r_property) const;
+
+	// Theming.
+
+	virtual void _update_theme_item_cache();
 
 	// Internationalization.
 
-	virtual Array structured_text_parser(TextServer::StructuredTextParser p_parser_type, const Array &p_args, const String &p_text) const;
+	virtual TypedArray<Vector2i> structured_text_parser(TextServer::StructuredTextParser p_parser_type, const Array &p_args, const String &p_text) const;
 
 	// Base object overrides.
-
-	virtual void add_child_notify(Node *p_child) override;
-	virtual void remove_child_notify(Node *p_child) override;
 
 	void _notification(int p_notification);
 	static void _bind_methods();
@@ -334,7 +333,7 @@ protected:
 	// Exposed virtual methods.
 
 	GDVIRTUAL1RC(bool, _has_point, Vector2)
-	GDVIRTUAL2RC(Array, _structured_text_parser, Array, String)
+	GDVIRTUAL2RC(TypedArray<Vector2i>, _structured_text_parser, Array, String)
 	GDVIRTUAL0RC(Vector2, _get_minimum_size)
 
 	GDVIRTUAL1RC(Variant, _get_drag_data, Vector2)
@@ -388,7 +387,7 @@ public:
 	// Editor integration.
 
 	virtual void get_argument_options(const StringName &p_function, int p_idx, List<String> *r_options) const override;
-	TypedArray<String> get_configuration_warnings() const override;
+	PackedStringArray get_configuration_warnings() const override;
 
 	virtual bool is_text_field() const;
 
@@ -461,8 +460,8 @@ public:
 	virtual Size2 get_minimum_size() const;
 	virtual Size2 get_combined_minimum_size() const;
 
-	void set_custom_minimum_size(const Size2 &p_custom);
-	Size2 get_custom_minimum_size() const;
+	void set_custom_minimum_size(const Size2i &p_custom);
+	Size2i get_custom_minimum_size() const;
 
 	// Container sizing.
 
@@ -532,6 +531,10 @@ public:
 
 	// Theming.
 
+	void set_theme_owner_node(Node *p_node);
+	Node *get_theme_owner_node() const;
+	bool has_theme_owner_node() const;
+
 	void set_theme(const Ref<Theme> &p_theme);
 	Ref<Theme> get_theme() const;
 
@@ -576,10 +579,6 @@ public:
 	bool has_theme_color(const StringName &p_name, const StringName &p_theme_type = StringName()) const;
 	bool has_theme_constant(const StringName &p_name, const StringName &p_theme_type = StringName()) const;
 
-	static float fetch_theme_default_base_scale(Control *p_theme_owner, Window *p_theme_owner_window);
-	static Ref<Font> fetch_theme_default_font(Control *p_theme_owner, Window *p_theme_owner_window);
-	static int fetch_theme_default_font_size(Control *p_theme_owner, Window *p_theme_owner_window);
-
 	float get_theme_default_base_scale() const;
 	Ref<Font> get_theme_default_font() const;
 	int get_theme_default_font_size() const;
@@ -598,11 +597,12 @@ public:
 
 	// Extra properties.
 
-	void set_tooltip(const String &p_tooltip);
+	void set_tooltip_text(const String &text);
 	virtual String get_tooltip(const Point2 &p_pos) const;
 	virtual Control *make_custom_tooltip(const String &p_text) const;
 
-	Control() {}
+	Control();
+	~Control();
 };
 
 VARIANT_ENUM_CAST(Control::FocusMode);

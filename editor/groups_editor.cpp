@@ -32,6 +32,7 @@
 
 #include "editor/editor_node.h"
 #include "editor/editor_scale.h"
+#include "editor/editor_undo_redo_manager.h"
 #include "editor/scene_tree_dock.h"
 #include "editor/scene_tree_editor.h"
 #include "scene/gui/box_container.h"
@@ -88,7 +89,7 @@ void GroupDialog::_load_nodes(Node *p_current) {
 	if (keep) {
 		node->set_text(0, item_name);
 		node->set_metadata(0, path);
-		node->set_tooltip(0, path);
+		node->set_tooltip_text(0, path);
 
 		Ref<Texture2D> icon = EditorNode::get_singleton()->get_object_icon(p_current, "Node");
 		node->set_icon(0, icon);
@@ -397,6 +398,10 @@ void GroupDialog::_notification(int p_what) {
 	}
 }
 
+void GroupDialog::set_undo_redo(Ref<EditorUndoRedoManager> p_undo_redo) {
+	undo_redo = p_undo_redo;
+}
+
 void GroupDialog::edit() {
 	popup_centered();
 
@@ -694,6 +699,10 @@ void GroupsEditor::update_tree() {
 			item->set_selectable(0, false);
 		}
 	}
+}
+
+void GroupsEditor::set_undo_redo(Ref<EditorUndoRedoManager> p_undo_redo) {
+	undo_redo = p_undo_redo;
 }
 
 void GroupsEditor::set_current(Node *p_node) {

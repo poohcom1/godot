@@ -52,7 +52,6 @@
 #include "editor/plugins/node_3d_editor_plugin.h"
 #include "main/performance.h"
 #include "scene/3d/camera_3d.h"
-#include "scene/debugger/scene_debugger.h"
 #include "scene/gui/dialogs.h"
 #include "scene/gui/label.h"
 #include "scene/gui/line_edit.h"
@@ -317,7 +316,7 @@ void ScriptEditorDebugger::_parse_message(const String &p_msg, const Array &p_da
 		if (!error.is_empty()) {
 			tabs->set_current_tab(0);
 		}
-		profiler->set_enabled(false);
+		profiler->set_enabled(false, false);
 		inspector->clear_cache(); // Take a chance to force remote objects update.
 
 	} else if (p_msg == "debug_exit") {
@@ -327,7 +326,7 @@ void ScriptEditorDebugger::_parse_message(const String &p_msg, const Array &p_da
 		_update_buttons_state();
 		_set_reason_text(TTR("Execution resumed."), MESSAGE_SUCCESS);
 		emit_signal(SNAME("breaked"), false, false, "", false);
-		profiler->set_enabled(true);
+		profiler->set_enabled(true, false);
 		profiler->disable_seeking();
 	} else if (p_msg == "set_pid") {
 		ERR_FAIL_COND(p_data.size() < 1);
@@ -369,7 +368,7 @@ void ScriptEditorDebugger::_parse_message(const String &p_msg, const Array &p_da
 			}
 		}
 
-		vmem_total->set_tooltip(TTR("Bytes:") + " " + itos(total));
+		vmem_total->set_tooltip_text(TTR("Bytes:") + " " + itos(total));
 		vmem_total->set_text(String::humanize_size(total));
 
 	} else if (p_msg == "stack_dump") {
@@ -580,8 +579,8 @@ void ScriptEditorDebugger::_parse_message(const String &p_msg, const Array &p_da
 			stack_trace->set_text(1, frame_txt);
 		}
 
-		error->set_tooltip(0, tooltip);
-		error->set_tooltip(1, tooltip);
+		error->set_tooltip_text(0, tooltip);
+		error->set_tooltip_text(1, tooltip);
 
 		if (warning_count == 0 && error_count == 0) {
 			expand_all_button->set_disabled(false);
@@ -776,7 +775,7 @@ void ScriptEditorDebugger::_set_reason_text(const String &p_reason, MessageType 
 			reason->add_theme_color_override("font_color", get_theme_color(SNAME("success_color"), SNAME("Editor")));
 	}
 	reason->set_text(p_reason);
-	reason->set_tooltip(p_reason.word_wrap(80));
+	reason->set_tooltip_text(p_reason.word_wrap(80));
 }
 
 void ScriptEditorDebugger::_notification(int p_what) {
@@ -916,6 +915,8 @@ void ScriptEditorDebugger::start(Ref<RemoteDebuggerPeer> p_peer) {
 	_clear_errors_list();
 	stop();
 
+	profiler->set_enabled(true, true);
+
 	peer = p_peer;
 	ERR_FAIL_COND(p_peer.is_null());
 
@@ -964,12 +965,14 @@ void ScriptEditorDebugger::stop() {
 		peer->close();
 		peer.unref();
 		reason->set_text("");
-		reason->set_tooltip("");
+		reason->set_tooltip_text("");
 	}
 
 	node_path_cache.clear();
 	res_path_cache.clear();
 	profiler_signature.clear();
+
+	profiler->set_enabled(true, false);
 
 	inspector->edit(nullptr);
 	_update_buttons_state();
@@ -1706,7 +1709,7 @@ ScriptEditorDebugger::ScriptEditorDebugger() {
 		skip_breakpoints = memnew(Button);
 		skip_breakpoints->set_flat(true);
 		hbc->add_child(skip_breakpoints);
-		skip_breakpoints->set_tooltip(TTR("Skip Breakpoints"));
+		skip_breakpoints->set_tooltip_text(TTR("Skip Breakpoints"));
 		skip_breakpoints->connect("pressed", callable_mp(this, &ScriptEditorDebugger::debug_skip_breakpoints));
 
 		hbc->add_child(memnew(VSeparator));
@@ -1714,7 +1717,7 @@ ScriptEditorDebugger::ScriptEditorDebugger() {
 		copy = memnew(Button);
 		copy->set_flat(true);
 		hbc->add_child(copy);
-		copy->set_tooltip(TTR("Copy Error"));
+		copy->set_tooltip_text(TTR("Copy Error"));
 		copy->connect("pressed", callable_mp(this, &ScriptEditorDebugger::debug_copy));
 
 		hbc->add_child(memnew(VSeparator));
@@ -1722,14 +1725,14 @@ ScriptEditorDebugger::ScriptEditorDebugger() {
 		step = memnew(Button);
 		step->set_flat(true);
 		hbc->add_child(step);
-		step->set_tooltip(TTR("Step Into"));
+		step->set_tooltip_text(TTR("Step Into"));
 		step->set_shortcut(ED_GET_SHORTCUT("debugger/step_into"));
 		step->connect("pressed", callable_mp(this, &ScriptEditorDebugger::debug_step));
 
 		next = memnew(Button);
 		next->set_flat(true);
 		hbc->add_child(next);
-		next->set_tooltip(TTR("Step Over"));
+		next->set_tooltip_text(TTR("Step Over"));
 		next->set_shortcut(ED_GET_SHORTCUT("debugger/step_over"));
 		next->connect("pressed", callable_mp(this, &ScriptEditorDebugger::debug_next));
 
@@ -1738,14 +1741,14 @@ ScriptEditorDebugger::ScriptEditorDebugger() {
 		dobreak = memnew(Button);
 		dobreak->set_flat(true);
 		hbc->add_child(dobreak);
-		dobreak->set_tooltip(TTR("Break"));
+		dobreak->set_tooltip_text(TTR("Break"));
 		dobreak->set_shortcut(ED_GET_SHORTCUT("debugger/break"));
 		dobreak->connect("pressed", callable_mp(this, &ScriptEditorDebugger::debug_break));
 
 		docontinue = memnew(Button);
 		docontinue->set_flat(true);
 		hbc->add_child(docontinue);
-		docontinue->set_tooltip(TTR("Continue"));
+		docontinue->set_tooltip_text(TTR("Continue"));
 		docontinue->set_shortcut(ED_GET_SHORTCUT("debugger/continue"));
 		docontinue->connect("pressed", callable_mp(this, &ScriptEditorDebugger::debug_continue));
 
@@ -1917,7 +1920,7 @@ ScriptEditorDebugger::ScriptEditorDebugger() {
 		vmem_hb->add_child(vmem_refresh);
 		vmem_export = memnew(Button);
 		vmem_export->set_flat(true);
-		vmem_export->set_tooltip(TTR("Export list to a CSV file"));
+		vmem_export->set_tooltip_text(TTR("Export list to a CSV file"));
 		vmem_hb->add_child(vmem_export);
 		vmem_vb->add_child(vmem_hb);
 		vmem_refresh->connect("pressed", callable_mp(this, &ScriptEditorDebugger::_video_mem_request));
@@ -1959,15 +1962,18 @@ ScriptEditorDebugger::ScriptEditorDebugger() {
 		info_left->set_columns(2);
 		misc->add_child(info_left);
 		clicked_ctrl = memnew(LineEdit);
+		clicked_ctrl->set_editable(false);
 		clicked_ctrl->set_h_size_flags(SIZE_EXPAND_FILL);
 		info_left->add_child(memnew(Label(TTR("Clicked Control:"))));
 		info_left->add_child(clicked_ctrl);
 		clicked_ctrl_type = memnew(LineEdit);
+		clicked_ctrl_type->set_editable(false);
 		info_left->add_child(memnew(Label(TTR("Clicked Control Type:"))));
 		info_left->add_child(clicked_ctrl_type);
 
 		scene_tree = memnew(SceneDebuggerTree);
 		live_edit_root = memnew(LineEdit);
+		live_edit_root->set_editable(false);
 		live_edit_root->set_h_size_flags(SIZE_EXPAND_FILL);
 
 		{

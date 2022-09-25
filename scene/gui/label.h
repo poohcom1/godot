@@ -59,22 +59,36 @@ private:
 	TextServer::StructuredTextParser st_parser = TextServer::STRUCTURED_TEXT_DEFAULT;
 	Array st_args;
 
-	float percent_visible = 1.0;
-
 	TextServer::VisibleCharactersBehavior visible_chars_behavior = TextServer::VC_CHARS_BEFORE_SHAPING;
 	int visible_chars = -1;
+	float visible_ratio = 1.0;
 	int lines_skipped = 0;
 	int max_lines_visible = -1;
 
 	Ref<LabelSettings> settings;
+
+	struct ThemeCache {
+		Ref<StyleBox> normal_style;
+		Ref<Font> font;
+
+		int font_size = 0;
+		int line_spacing = 0;
+		Color font_color;
+		Color font_shadow_color;
+		Point2 font_shadow_offset;
+		Color font_outline_color;
+		int font_outline_size;
+		int font_shadow_outline_size;
+	} theme_cache;
 
 	void _update_visible();
 	void _shape();
 	void _invalidate();
 
 protected:
-	void _notification(int p_what);
+	virtual void _update_theme_item_cache() override;
 
+	void _notification(int p_what);
 	static void _bind_methods();
 
 public:
@@ -110,21 +124,21 @@ public:
 	void set_uppercase(bool p_uppercase);
 	bool is_uppercase() const;
 
-	TextServer::VisibleCharactersBehavior get_visible_characters_behavior() const;
 	void set_visible_characters_behavior(TextServer::VisibleCharactersBehavior p_behavior);
+	TextServer::VisibleCharactersBehavior get_visible_characters_behavior() const;
 
 	void set_visible_characters(int p_amount);
 	int get_visible_characters() const;
 	int get_total_character_count() const;
+
+	void set_visible_ratio(float p_ratio);
+	float get_visible_ratio() const;
 
 	void set_clip_text(bool p_clip);
 	bool is_clipping_text() const;
 
 	void set_text_overrun_behavior(TextServer::OverrunBehavior p_behavior);
 	TextServer::OverrunBehavior get_text_overrun_behavior() const;
-
-	void set_percent_visible(float p_percent);
-	float get_percent_visible() const;
 
 	void set_lines_skipped(int p_lines);
 	int get_lines_skipped() const;

@@ -29,6 +29,7 @@
 /*************************************************************************/
 
 #include "camera_server.h"
+#include "core/variant/typed_array.h"
 #include "rendering_server.h"
 #include "servers/camera/camera_feed.h"
 
@@ -104,10 +105,7 @@ void CameraServer::add_feed(const Ref<CameraFeed> &p_feed) {
 	// add our feed
 	feeds.push_back(p_feed);
 
-// record for debugging
-#ifdef DEBUG_ENABLED
-	print_line("Registered camera " + p_feed->get_name() + " with id " + itos(p_feed->get_id()) + " position " + itos(p_feed->get_position()) + " at index " + itos(feeds.size() - 1));
-#endif
+	print_verbose("CameraServer: Registered camera " + p_feed->get_name() + " with ID " + itos(p_feed->get_id()) + " and position " + itos(p_feed->get_position()) + " at index " + itos(feeds.size() - 1));
 
 	// let whomever is interested know
 	emit_signal(SNAME("camera_feed_added"), p_feed->get_id());
@@ -118,10 +116,7 @@ void CameraServer::remove_feed(const Ref<CameraFeed> &p_feed) {
 		if (feeds[i] == p_feed) {
 			int feed_id = p_feed->get_id();
 
-// record for debugging
-#ifdef DEBUG_ENABLED
-			print_line("Removed camera " + p_feed->get_name() + " with id " + itos(feed_id) + " position " + itos(p_feed->get_position()));
-#endif
+			print_verbose("CameraServer: Removed camera " + p_feed->get_name() + " with ID " + itos(feed_id) + " and position " + itos(p_feed->get_position()));
 
 			// remove it from our array, if this results in our feed being unreferenced it will be destroyed
 			feeds.remove_at(i);
@@ -143,8 +138,8 @@ int CameraServer::get_feed_count() {
 	return feeds.size();
 };
 
-Array CameraServer::get_feeds() {
-	Array return_feeds;
+TypedArray<CameraFeed> CameraServer::get_feeds() {
+	TypedArray<CameraFeed> return_feeds;
 	int cc = get_feed_count();
 	return_feeds.resize(cc);
 

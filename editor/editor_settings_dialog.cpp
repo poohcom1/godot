@@ -40,6 +40,7 @@
 #include "editor/editor_property_name_processor.h"
 #include "editor/editor_scale.h"
 #include "editor/editor_settings.h"
+#include "editor/editor_undo_redo_manager.h"
 #include "scene/gui/margin_container.h"
 
 void EditorSettingsDialog::ok_pressed() {
@@ -124,9 +125,9 @@ void EditorSettingsDialog::_notification(int p_what) {
 		} break;
 
 		case NOTIFICATION_READY: {
-			undo_redo->set_method_notify_callback(EditorDebuggerNode::_method_changeds, nullptr);
-			undo_redo->set_property_notify_callback(EditorDebuggerNode::_property_changeds, nullptr);
-			undo_redo->set_commit_notify_callback(_undo_redo_callback, this);
+			undo_redo->get_or_create_history(EditorUndoRedoManager::GLOBAL_HISTORY).undo_redo->set_method_notify_callback(EditorDebuggerNode::_method_changeds, nullptr);
+			undo_redo->get_or_create_history(EditorUndoRedoManager::GLOBAL_HISTORY).undo_redo->set_property_notify_callback(EditorDebuggerNode::_property_changeds, nullptr);
+			undo_redo->get_or_create_history(EditorUndoRedoManager::GLOBAL_HISTORY).undo_redo->set_commit_notify_callback(_undo_redo_callback, this);
 		} break;
 
 		case NOTIFICATION_ENTER_TREE: {
@@ -174,7 +175,7 @@ void EditorSettingsDialog::shortcut_input(const Ref<InputEvent> &p_event) {
 			handled = true;
 		}
 
-		if (k->get_keycode_with_modifiers() == (KeyModifierMask::CMD | Key::F)) {
+		if (k->is_match(InputEventKey::create_reference(KeyModifierMask::CMD_OR_CTRL | Key::F))) {
 			_focus_current_search_box();
 			handled = true;
 		}
@@ -192,7 +193,7 @@ void EditorSettingsDialog::_update_icons() {
 	shortcut_search_box->set_clear_button_enabled(true);
 
 	restart_close_button->set_icon(shortcuts->get_theme_icon(SNAME("Close"), SNAME("EditorIcons")));
-	restart_container->add_theme_style_override("panel", shortcuts->get_theme_stylebox(SNAME("bg"), SNAME("Tree")));
+	restart_container->add_theme_style_override("panel", shortcuts->get_theme_stylebox(SNAME("panel"), SNAME("Tree")));
 	restart_icon->set_texture(shortcuts->get_theme_icon(SNAME("StatusWarning"), SNAME("EditorIcons")));
 	restart_label->add_theme_color_override("font_color", shortcuts->get_theme_color(SNAME("warning_color"), SNAME("Editor")));
 }
@@ -415,45 +416,50 @@ void EditorSettingsDialog::_update_shortcuts() {
 
 	List<String> slist;
 	EditorSettings::get_singleton()->get_shortcut_list(&slist);
+	slist.sort(); // Sort alphabetically.
 
 	const EditorPropertyNameProcessor::Style name_style = EditorPropertyNameProcessor::get_settings_style();
 	const EditorPropertyNameProcessor::Style tooltip_style = EditorPropertyNameProcessor::get_tooltip_style(name_style);
 
+	// Create all sections first.
+	for (const String &E : slist) {
+		Ref<Shortcut> sc = EditorSettings::get_singleton()->get_shortcut(E);
+		String section_name = E.get_slice("/", 0);
+
+		if (sections.has(section_name)) {
+			continue;
+		}
+
+		TreeItem *section = shortcuts->create_item(root);
+
+		const String item_name = EditorPropertyNameProcessor::get_singleton()->process_name(section_name, name_style);
+		const String tooltip = EditorPropertyNameProcessor::get_singleton()->process_name(section_name, tooltip_style);
+
+		section->set_text(0, item_name);
+		section->set_tooltip_text(0, tooltip);
+		section->set_selectable(0, false);
+		section->set_selectable(1, false);
+		section->set_custom_bg_color(0, shortcuts->get_theme_color(SNAME("prop_subsection"), SNAME("Editor")));
+		section->set_custom_bg_color(1, shortcuts->get_theme_color(SNAME("prop_subsection"), SNAME("Editor")));
+
+		if (collapsed.has(item_name)) {
+			section->set_collapsed(collapsed[item_name]);
+		}
+
+		sections[section_name] = section;
+	}
+
+	// Add shortcuts to sections.
 	for (const String &E : slist) {
 		Ref<Shortcut> sc = EditorSettings::get_singleton()->get_shortcut(E);
 		if (!sc->has_meta("original")) {
 			continue;
 		}
 
-		// Shortcut Section
-
-		TreeItem *section;
 		String section_name = E.get_slice("/", 0);
-
-		if (sections.has(section_name)) {
-			section = sections[section_name];
-		} else {
-			section = shortcuts->create_item(root);
-
-			const String item_name = EditorPropertyNameProcessor::get_singleton()->process_name(section_name, name_style);
-			const String tooltip = EditorPropertyNameProcessor::get_singleton()->process_name(section_name, tooltip_style);
-
-			section->set_text(0, item_name);
-			section->set_tooltip(0, tooltip);
-			section->set_selectable(0, false);
-			section->set_selectable(1, false);
-			section->set_custom_bg_color(0, shortcuts->get_theme_color(SNAME("prop_subsection"), SNAME("Editor")));
-			section->set_custom_bg_color(1, shortcuts->get_theme_color(SNAME("prop_subsection"), SNAME("Editor")));
-
-			if (collapsed.has(item_name)) {
-				section->set_collapsed(collapsed[item_name]);
-			}
-
-			sections[section_name] = section;
-		}
+		TreeItem *section = sections[section_name];
 
 		// Shortcut Item
-
 		if (!shortcut_filter.is_subsequence_ofn(sc->get_name())) {
 			continue;
 		}
@@ -551,6 +557,10 @@ void EditorSettingsDialog::_shortcut_cell_double_clicked() {
 	const ShortcutButton edit_btn_id = EditorSettingsDialog::SHORTCUT_EDIT;
 	const int edit_btn_col = 1;
 	TreeItem *ti = shortcuts->get_selected();
+	if (ti == nullptr) {
+		return;
+	}
+
 	String type = ti->get_meta("type");
 	int col = shortcuts->get_selected_column();
 	if (type == "shortcut" && col == 0) {
@@ -680,7 +690,7 @@ void EditorSettingsDialog::_bind_methods() {
 EditorSettingsDialog::EditorSettingsDialog() {
 	set_title(TTR("Editor Settings"));
 
-	undo_redo = memnew(UndoRedo);
+	undo_redo = EditorNode::get_undo_redo();
 
 	tabs = memnew(TabContainer);
 	tabs->set_theme_type_variation("TabContainerOdd");
@@ -762,6 +772,7 @@ EditorSettingsDialog::EditorSettingsDialog() {
 	shortcut_editor = memnew(InputEventConfigurationDialog);
 	shortcut_editor->connect("confirmed", callable_mp(this, &EditorSettingsDialog::_event_config_confirmed));
 	shortcut_editor->set_allowed_input_types(InputEventConfigurationDialog::InputType::INPUT_KEY);
+	shortcut_editor->set_close_on_escape(false);
 	add_child(shortcut_editor);
 
 	set_hide_on_ok(true);
@@ -776,5 +787,4 @@ EditorSettingsDialog::EditorSettingsDialog() {
 }
 
 EditorSettingsDialog::~EditorSettingsDialog() {
-	memdelete(undo_redo);
 }

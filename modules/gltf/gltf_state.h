@@ -78,6 +78,8 @@ class GLTFState : public Resource {
 	Vector<int> root_nodes;
 	Vector<Ref<GLTFTexture>> textures;
 	Vector<Ref<Texture2D>> images;
+	Vector<String> extensions_used;
+	Vector<String> extensions_required;
 
 	Vector<Ref<GLTFSkin>> skins;
 	Vector<Ref<GLTFCamera>> cameras;
@@ -97,6 +99,8 @@ protected:
 	static void _bind_methods();
 
 public:
+	void add_used_extension(const String &p_extension, bool p_required = false);
+
 	Dictionary get_json();
 	void set_json(Dictionary p_json);
 
@@ -115,23 +119,23 @@ public:
 	bool get_discard_meshes_and_materials();
 	void set_discard_meshes_and_materials(bool p_discard_meshes_and_materials);
 
-	Array get_nodes();
-	void set_nodes(Array p_nodes);
+	TypedArray<GLTFNode> get_nodes();
+	void set_nodes(TypedArray<GLTFNode> p_nodes);
 
-	Array get_buffers();
-	void set_buffers(Array p_buffers);
+	TypedArray<PackedByteArray> get_buffers();
+	void set_buffers(TypedArray<PackedByteArray> p_buffers);
 
-	Array get_buffer_views();
-	void set_buffer_views(Array p_buffer_views);
+	TypedArray<GLTFBufferView> get_buffer_views();
+	void set_buffer_views(TypedArray<GLTFBufferView> p_buffer_views);
 
-	Array get_accessors();
-	void set_accessors(Array p_accessors);
+	TypedArray<GLTFAccessor> get_accessors();
+	void set_accessors(TypedArray<GLTFAccessor> p_accessors);
 
-	Array get_meshes();
-	void set_meshes(Array p_meshes);
+	TypedArray<GLTFMesh> get_meshes();
+	void set_meshes(TypedArray<GLTFMesh> p_meshes);
 
-	Array get_materials();
-	void set_materials(Array p_materials);
+	TypedArray<BaseMaterial3D> get_materials();
+	void set_materials(TypedArray<BaseMaterial3D> p_materials);
 
 	String get_scene_name();
 	void set_scene_name(String p_scene_name);
@@ -139,32 +143,32 @@ public:
 	String get_base_path();
 	void set_base_path(String p_base_path);
 
-	Array get_root_nodes();
-	void set_root_nodes(Array p_root_nodes);
+	PackedInt32Array get_root_nodes();
+	void set_root_nodes(PackedInt32Array p_root_nodes);
 
-	Array get_textures();
-	void set_textures(Array p_textures);
+	TypedArray<GLTFTexture> get_textures();
+	void set_textures(TypedArray<GLTFTexture> p_textures);
 
-	Array get_images();
-	void set_images(Array p_images);
+	TypedArray<Texture2D> get_images();
+	void set_images(TypedArray<Texture2D> p_images);
 
-	Array get_skins();
-	void set_skins(Array p_skins);
+	TypedArray<GLTFSkin> get_skins();
+	void set_skins(TypedArray<GLTFSkin> p_skins);
 
-	Array get_cameras();
-	void set_cameras(Array p_cameras);
+	TypedArray<GLTFCamera> get_cameras();
+	void set_cameras(TypedArray<GLTFCamera> p_cameras);
 
-	Array get_lights();
-	void set_lights(Array p_lights);
+	TypedArray<GLTFLight> get_lights();
+	void set_lights(TypedArray<GLTFLight> p_lights);
 
-	Array get_unique_names();
-	void set_unique_names(Array p_unique_names);
+	TypedArray<String> get_unique_names();
+	void set_unique_names(TypedArray<String> p_unique_names);
 
-	Array get_unique_animation_names();
-	void set_unique_animation_names(Array p_unique_names);
+	TypedArray<String> get_unique_animation_names();
+	void set_unique_animation_names(TypedArray<String> p_unique_names);
 
-	Array get_skeletons();
-	void set_skeletons(Array p_skeletons);
+	TypedArray<GLTFSkeleton> get_skeletons();
+	void set_skeletons(TypedArray<GLTFSkeleton> p_skeletons);
 
 	Dictionary get_skeleton_to_node();
 	void set_skeleton_to_node(Dictionary p_skeleton_to_node);
@@ -172,8 +176,8 @@ public:
 	bool get_create_animations();
 	void set_create_animations(bool p_create_animations);
 
-	Array get_animations();
-	void set_animations(Array p_animations);
+	TypedArray<GLTFAnimation> get_animations();
+	void set_animations(TypedArray<GLTFAnimation> p_animations);
 
 	Node *get_scene_node(GLTFNodeIndex idx);
 

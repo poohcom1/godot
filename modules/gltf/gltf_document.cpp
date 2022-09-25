@@ -50,7 +50,6 @@
 #include "core/version.h"
 #include "drivers/png/png_driver_common.h"
 #include "scene/2d/node_2d.h"
-#include "scene/3d/camera_3d.h"
 #include "scene/3d/mesh_instance_3d.h"
 #include "scene/3d/multimesh_instance_3d.h"
 #include "scene/3d/node_3d.h"
@@ -192,14 +191,14 @@ Error GLTFDocument::_serialize(Ref<GLTFState> state, const String &p_path) {
 		return Error::FAILED;
 	}
 
-	/* STEP SERIALIZE SCENE */
+	/* STEP SERIALIZE LIGHTS */
 	err = _serialize_lights(state);
 	if (err != OK) {
 		return Error::FAILED;
 	}
 
 	/* STEP SERIALIZE EXTENSIONS */
-	err = _serialize_extensions(state);
+	err = _serialize_gltf_extensions(state);
 	if (err != OK) {
 		return Error::FAILED;
 	}
@@ -220,9 +219,9 @@ Error GLTFDocument::_serialize(Ref<GLTFState> state, const String &p_path) {
 	return OK;
 }
 
-Error GLTFDocument::_serialize_extensions(Ref<GLTFState> state) const {
-	Array extensions_used;
-	Array extensions_required;
+Error GLTFDocument::_serialize_gltf_extensions(Ref<GLTFState> state) const {
+	Vector<String> extensions_used = state->extensions_used;
+	Vector<String> extensions_required = state->extensions_required;
 	if (!state->lights.is_empty()) {
 		extensions_used.push_back("KHR_lights_punctual");
 	}
@@ -231,9 +230,11 @@ Error GLTFDocument::_serialize_extensions(Ref<GLTFState> state) const {
 		extensions_required.push_back("KHR_texture_transform");
 	}
 	if (!extensions_used.is_empty()) {
+		extensions_used.sort();
 		state->json["extensionsUsed"] = extensions_used;
 	}
 	if (!extensions_required.is_empty()) {
+		extensions_required.sort();
 		state->json["extensionsRequired"] = extensions_required;
 	}
 	return OK;
@@ -402,47 +403,47 @@ Error GLTFDocument::_serialize_nodes(Ref<GLTFState> state) {
 	Array nodes;
 	for (int i = 0; i < state->nodes.size(); i++) {
 		Dictionary node;
-		Ref<GLTFNode> n = state->nodes[i];
+		Ref<GLTFNode> gltf_node = state->nodes[i];
 		Dictionary extensions;
 		node["extensions"] = extensions;
-		if (!n->get_name().is_empty()) {
-			node["name"] = n->get_name();
+		if (!gltf_node->get_name().is_empty()) {
+			node["name"] = gltf_node->get_name();
 		}
-		if (n->camera != -1) {
-			node["camera"] = n->camera;
+		if (gltf_node->camera != -1) {
+			node["camera"] = gltf_node->camera;
 		}
-		if (n->light != -1) {
+		if (gltf_node->light != -1) {
 			Dictionary lights_punctual;
 			extensions["KHR_lights_punctual"] = lights_punctual;
-			lights_punctual["light"] = n->light;
+			lights_punctual["light"] = gltf_node->light;
 		}
-		if (n->mesh != -1) {
-			node["mesh"] = n->mesh;
+		if (gltf_node->mesh != -1) {
+			node["mesh"] = gltf_node->mesh;
 		}
-		if (n->skin != -1) {
-			node["skin"] = n->skin;
+		if (gltf_node->skin != -1) {
+			node["skin"] = gltf_node->skin;
 		}
-		if (n->skeleton != -1 && n->skin < 0) {
+		if (gltf_node->skeleton != -1 && gltf_node->skin < 0) {
 		}
-		if (n->xform != Transform3D()) {
-			node["matrix"] = _xform_to_array(n->xform);
-		}
-
-		if (!n->rotation.is_equal_approx(Quaternion())) {
-			node["rotation"] = _quaternion_to_array(n->rotation);
+		if (gltf_node->xform != Transform3D()) {
+			node["matrix"] = _xform_to_array(gltf_node->xform);
 		}
 
-		if (!n->scale.is_equal_approx(Vector3(1.0f, 1.0f, 1.0f))) {
-			node["scale"] = _vec3_to_arr(n->scale);
+		if (!gltf_node->rotation.is_equal_approx(Quaternion())) {
+			node["rotation"] = _quaternion_to_array(gltf_node->rotation);
 		}
 
-		if (!n->position.is_equal_approx(Vector3())) {
-			node["translation"] = _vec3_to_arr(n->position);
+		if (!gltf_node->scale.is_equal_approx(Vector3(1.0f, 1.0f, 1.0f))) {
+			node["scale"] = _vec3_to_arr(gltf_node->scale);
 		}
-		if (n->children.size()) {
+
+		if (!gltf_node->position.is_zero_approx()) {
+			node["translation"] = _vec3_to_arr(gltf_node->position);
+		}
+		if (gltf_node->children.size()) {
 			Array children;
-			for (int j = 0; j < n->children.size(); j++) {
-				children.push_back(n->children[j]);
+			for (int j = 0; j < gltf_node->children.size(); j++) {
+				children.push_back(gltf_node->children[j]);
 			}
 			node["children"] = children;
 		}
@@ -451,7 +452,7 @@ Error GLTFDocument::_serialize_nodes(Ref<GLTFState> state) {
 			Ref<GLTFDocumentExtension> ext = document_extensions[ext_i];
 			ERR_CONTINUE(ext.is_null());
 			ERR_CONTINUE(!state->scene_nodes.find(i));
-			Error err = ext->export_node(state, n, state->json, state->scene_nodes[i]);
+			Error err = ext->export_node(state, gltf_node, node, state->scene_nodes[i]);
 			ERR_CONTINUE(err != OK);
 		}
 
@@ -787,7 +788,7 @@ Error GLTFDocument::_parse_buffers(Ref<GLTFState> state, const String &p_base_pa
 				} else { // Relative path to an external image file.
 					ERR_FAIL_COND_V(p_base_path.is_empty(), ERR_INVALID_PARAMETER);
 					uri = uri.uri_decode();
-					uri = p_base_path.plus_file(uri).replace("\\", "/"); // Fix for Windows.
+					uri = p_base_path.path_join(uri).replace("\\", "/"); // Fix for Windows.
 					buffer_data = FileAccess::get_file_as_array(uri);
 					ERR_FAIL_COND_V_MSG(buffer.size() == 0, ERR_PARSE_ERROR, "glTF: Couldn't load binary file as an array: " + uri);
 				}
@@ -2674,7 +2675,7 @@ Error GLTFDocument::_parse_meshes(Ref<GLTFState> state) {
 			} else if (a.has("JOINTS_0") && a.has("JOINTS_1")) {
 				PackedInt32Array joints_0 = _decode_accessor_as_ints(state, a["JOINTS_0"], true);
 				PackedInt32Array joints_1 = _decode_accessor_as_ints(state, a["JOINTS_1"], true);
-				ERR_FAIL_COND_V(joints_0.size() != joints_0.size(), ERR_INVALID_DATA);
+				ERR_FAIL_COND_V(joints_0.size() != joints_1.size(), ERR_INVALID_DATA);
 				int32_t weight_8_count = JOINT_GROUP_SIZE * 2;
 				Vector<int> joints;
 				joints.resize(vertex_num * weight_8_count);
@@ -3040,8 +3041,8 @@ Error GLTFDocument::_serialize_images(Ref<GLTFState> state, const String &p_path
 			if (!da->dir_exists(new_texture_dir)) {
 				da->make_dir(new_texture_dir);
 			}
-			image->save_png(new_texture_dir.plus_file(name));
-			d["uri"] = texture_dir.plus_file(name).uri_encode();
+			image->save_png(new_texture_dir.path_join(name));
+			d["uri"] = texture_dir.path_join(name).uri_encode();
 		}
 		images.push_back(d);
 	}
@@ -3119,7 +3120,7 @@ Error GLTFDocument::_parse_images(Ref<GLTFState> state, const String &p_base_pat
 			} else { // Relative path to an external image file.
 				ERR_FAIL_COND_V(p_base_path.is_empty(), ERR_INVALID_PARAMETER);
 				uri = uri.uri_decode();
-				uri = p_base_path.plus_file(uri).replace("\\", "/"); // Fix for Windows.
+				uri = p_base_path.path_join(uri).replace("\\", "/"); // Fix for Windows.
 				// ResourceLoader will rely on the file extension to use the relevant loader.
 				// The spec says that if mimeType is defined, it should take precedence (e.g.
 				// there could be a `.png` image which is actually JPEG), but there's no easy
@@ -4535,28 +4536,7 @@ Error GLTFDocument::_serialize_lights(Ref<GLTFState> state) {
 	}
 	Array lights;
 	for (GLTFLightIndex i = 0; i < state->lights.size(); i++) {
-		Dictionary d;
-		Ref<GLTFLight> light = state->lights[i];
-		Array color;
-		color.resize(3);
-		color[0] = light->color.r;
-		color[1] = light->color.g;
-		color[2] = light->color.b;
-		d["color"] = color;
-		d["type"] = light->light_type;
-		if (light->light_type == "spot") {
-			Dictionary s;
-			float inner_cone_angle = light->inner_cone_angle;
-			s["innerConeAngle"] = inner_cone_angle;
-			float outer_cone_angle = light->outer_cone_angle;
-			s["outerConeAngle"] = outer_cone_angle;
-			d["spot"] = s;
-		}
-		float intensity = light->intensity;
-		d["intensity"] = intensity;
-		float range = light->range;
-		d["range"] = range;
-		lights.push_back(d);
+		lights.push_back(state->lights[i]->to_dictionary());
 	}
 
 	Dictionary extensions;
@@ -4578,28 +4558,7 @@ Error GLTFDocument::_serialize_cameras(Ref<GLTFState> state) {
 	Array cameras;
 	cameras.resize(state->cameras.size());
 	for (GLTFCameraIndex i = 0; i < state->cameras.size(); i++) {
-		Dictionary d;
-
-		Ref<GLTFCamera> camera = state->cameras[i];
-
-		if (camera->get_perspective() == false) {
-			Dictionary og;
-			og["ymag"] = Math::deg2rad(camera->get_fov_size());
-			og["xmag"] = Math::deg2rad(camera->get_fov_size());
-			og["zfar"] = camera->get_depth_far();
-			og["znear"] = camera->get_depth_near();
-			d["orthographic"] = og;
-			d["type"] = "orthographic";
-		} else if (camera->get_perspective()) {
-			Dictionary ppt;
-			// GLTF spec is in radians, Godot's camera is in degrees.
-			ppt["yfov"] = Math::deg2rad(camera->get_fov_size());
-			ppt["zfar"] = camera->get_depth_far();
-			ppt["znear"] = camera->get_depth_near();
-			d["perspective"] = ppt;
-			d["type"] = "perspective";
-		}
-		cameras[i] = d;
+		cameras[i] = state->cameras[i]->to_dictionary();
 	}
 
 	if (!state->cameras.size()) {
@@ -4629,35 +4588,10 @@ Error GLTFDocument::_parse_lights(Ref<GLTFState> state) {
 	const Array &lights = lights_punctual["lights"];
 
 	for (GLTFLightIndex light_i = 0; light_i < lights.size(); light_i++) {
-		const Dictionary &d = lights[light_i];
-
-		Ref<GLTFLight> light;
-		light.instantiate();
-		ERR_FAIL_COND_V(!d.has("type"), ERR_PARSE_ERROR);
-		const String &type = d["type"];
-		light->light_type = type;
-
-		if (d.has("color")) {
-			const Array &arr = d["color"];
-			ERR_FAIL_COND_V(arr.size() != 3, ERR_PARSE_ERROR);
-			const Color c = Color(arr[0], arr[1], arr[2]).linear_to_srgb();
-			light->color = c;
+		Ref<GLTFLight> light = GLTFLight::from_dictionary(lights[light_i]);
+		if (light.is_null()) {
+			return Error::ERR_PARSE_ERROR;
 		}
-		if (d.has("intensity")) {
-			light->intensity = d["intensity"];
-		}
-		if (d.has("range")) {
-			light->range = d["range"];
-		}
-		if (type == "spot") {
-			const Dictionary &spot = d["spot"];
-			light->inner_cone_angle = spot["innerConeAngle"];
-			light->outer_cone_angle = spot["outerConeAngle"];
-			ERR_CONTINUE_MSG(light->inner_cone_angle >= light->outer_cone_angle, "The inner angle must be smaller than the outer angle.");
-		} else if (type != "point" && type != "directional") {
-			ERR_CONTINUE_MSG(true, "Light type is unknown.");
-		}
-
 		state->lights.push_back(light);
 	}
 
@@ -4674,39 +4608,7 @@ Error GLTFDocument::_parse_cameras(Ref<GLTFState> state) {
 	const Array cameras = state->json["cameras"];
 
 	for (GLTFCameraIndex i = 0; i < cameras.size(); i++) {
-		const Dictionary &d = cameras[i];
-
-		Ref<GLTFCamera> camera;
-		camera.instantiate();
-		ERR_FAIL_COND_V(!d.has("type"), ERR_PARSE_ERROR);
-		const String &type = d["type"];
-		if (type == "orthographic") {
-			camera->set_perspective(false);
-			if (d.has("orthographic")) {
-				const Dictionary &og = d["orthographic"];
-				// GLTF spec is in radians, Godot's camera is in degrees.
-				camera->set_fov_size(Math::rad2deg(real_t(og["ymag"])));
-				camera->set_depth_far(og["zfar"]);
-				camera->set_depth_near(og["znear"]);
-			} else {
-				camera->set_fov_size(10);
-			}
-		} else if (type == "perspective") {
-			camera->set_perspective(true);
-			if (d.has("perspective")) {
-				const Dictionary &ppt = d["perspective"];
-				// GLTF spec is in radians, Godot's camera is in degrees.
-				camera->set_fov_size(Math::rad2deg(real_t(ppt["yfov"])));
-				camera->set_depth_far(ppt["zfar"]);
-				camera->set_depth_near(ppt["znear"]);
-			} else {
-				camera->set_fov_size(10);
-			}
-		} else {
-			ERR_FAIL_V_MSG(ERR_PARSE_ERROR, "Camera3D should be in 'orthographic' or 'perspective'");
-		}
-
-		state->cameras.push_back(camera);
+		state->cameras.push_back(GLTFCamera::from_dictionary(cameras[i]));
 	}
 
 	print_verbose("glTF: Total cameras: " + itos(state->cameras.size()));
@@ -5107,7 +5009,7 @@ GLTFMeshIndex GLTFDocument::_convert_mesh_to_gltf(Ref<GLTFState> state, MeshInst
 
 	Ref<GLTFMesh> gltf_mesh;
 	gltf_mesh.instantiate();
-	Array instance_materials;
+	TypedArray<Material> instance_materials;
 	for (int32_t surface_i = 0; surface_i < current_mesh->get_surface_count(); surface_i++) {
 		Ref<Material> mat = current_mesh->get_surface_material(surface_i);
 		if (p_mesh_instance->get_surface_override_material(surface_i).is_valid()) {
@@ -5146,7 +5048,7 @@ ImporterMeshInstance3D *GLTFDocument::_generate_mesh_instance(Ref<GLTFState> sta
 	return mi;
 }
 
-Node3D *GLTFDocument::_generate_light(Ref<GLTFState> state, const GLTFNodeIndex node_index) {
+Light3D *GLTFDocument::_generate_light(Ref<GLTFState> state, const GLTFNodeIndex node_index) {
 	Ref<GLTFNode> gltf_node = state->nodes[node_index];
 
 	ERR_FAIL_INDEX_V(gltf_node->light, state->lights.size(), nullptr);
@@ -5154,45 +5056,7 @@ Node3D *GLTFDocument::_generate_light(Ref<GLTFState> state, const GLTFNodeIndex 
 	print_verbose("glTF: Creating light for: " + gltf_node->get_name());
 
 	Ref<GLTFLight> l = state->lights[gltf_node->light];
-
-	float intensity = l->intensity;
-	if (intensity > 10) {
-		// GLTF spec has the default around 1, but Blender defaults lights to 100.
-		// The only sane way to handle this is to check where it came from and
-		// handle it accordingly. If it's over 10, it probably came from Blender.
-		intensity /= 100;
-	}
-
-	if (l->light_type == "directional") {
-		DirectionalLight3D *light = memnew(DirectionalLight3D);
-		light->set_param(Light3D::PARAM_ENERGY, intensity);
-		light->set_color(l->color);
-		return light;
-	}
-
-	const float range = CLAMP(l->range, 0, 4096);
-	if (l->light_type == "point") {
-		OmniLight3D *light = memnew(OmniLight3D);
-		light->set_param(OmniLight3D::PARAM_ENERGY, intensity);
-		light->set_param(OmniLight3D::PARAM_RANGE, range);
-		light->set_color(l->color);
-		return light;
-	}
-	if (l->light_type == "spot") {
-		SpotLight3D *light = memnew(SpotLight3D);
-		light->set_param(SpotLight3D::PARAM_ENERGY, intensity);
-		light->set_param(SpotLight3D::PARAM_RANGE, range);
-		light->set_param(SpotLight3D::PARAM_SPOT_ANGLE, Math::rad2deg(l->outer_cone_angle));
-		light->set_color(l->color);
-
-		// Line of best fit derived from guessing, see https://www.desmos.com/calculator/biiflubp8b
-		// The points in desmos are not exact, except for (1, infinity).
-		float angle_ratio = l->inner_cone_angle / l->outer_cone_angle;
-		float angle_attenuation = 0.2 / (1 - angle_ratio) - 0.1;
-		light->set_param(SpotLight3D::PARAM_SPOT_ATTENUATION, angle_attenuation);
-		return light;
-	}
-	return memnew(Node3D);
+	return l->to_node();
 }
 
 Camera3D *GLTFDocument::_generate_camera(Ref<GLTFState> state, const GLTFNodeIndex node_index) {
@@ -5200,31 +5064,16 @@ Camera3D *GLTFDocument::_generate_camera(Ref<GLTFState> state, const GLTFNodeInd
 
 	ERR_FAIL_INDEX_V(gltf_node->camera, state->cameras.size(), nullptr);
 
-	Camera3D *camera = memnew(Camera3D);
 	print_verbose("glTF: Creating camera for: " + gltf_node->get_name());
 
 	Ref<GLTFCamera> c = state->cameras[gltf_node->camera];
-	if (c->get_perspective()) {
-		camera->set_perspective(c->get_fov_size(), c->get_depth_near(), c->get_depth_far());
-	} else {
-		camera->set_orthogonal(c->get_fov_size(), c->get_depth_near(), c->get_depth_far());
-	}
-
-	return camera;
+	return c->to_node();
 }
 
 GLTFCameraIndex GLTFDocument::_convert_camera(Ref<GLTFState> state, Camera3D *p_camera) {
 	print_verbose("glTF: Converting camera: " + p_camera->get_name());
 
-	Ref<GLTFCamera> c;
-	c.instantiate();
-
-	if (p_camera->get_projection() == Camera3D::ProjectionType::PROJECTION_PERSPECTIVE) {
-		c->set_perspective(true);
-	}
-	c->set_fov_size(p_camera->get_fov());
-	c->set_depth_far(p_camera->get_far());
-	c->set_depth_near(p_camera->get_near());
+	Ref<GLTFCamera> c = GLTFCamera::from_node(p_camera);
 	GLTFCameraIndex camera_index = state->cameras.size();
 	state->cameras.push_back(c);
 	return camera_index;
@@ -5233,31 +5082,7 @@ GLTFCameraIndex GLTFDocument::_convert_camera(Ref<GLTFState> state, Camera3D *p_
 GLTFLightIndex GLTFDocument::_convert_light(Ref<GLTFState> state, Light3D *p_light) {
 	print_verbose("glTF: Converting light: " + p_light->get_name());
 
-	Ref<GLTFLight> l;
-	l.instantiate();
-	l->color = p_light->get_color();
-	if (cast_to<DirectionalLight3D>(p_light)) {
-		l->light_type = "directional";
-		DirectionalLight3D *light = cast_to<DirectionalLight3D>(p_light);
-		l->intensity = light->get_param(DirectionalLight3D::PARAM_ENERGY);
-		l->range = FLT_MAX; // Range for directional lights is infinite in Godot.
-	} else if (cast_to<OmniLight3D>(p_light)) {
-		l->light_type = "point";
-		OmniLight3D *light = cast_to<OmniLight3D>(p_light);
-		l->range = light->get_param(OmniLight3D::PARAM_RANGE);
-		l->intensity = light->get_param(OmniLight3D::PARAM_ENERGY);
-	} else if (cast_to<SpotLight3D>(p_light)) {
-		l->light_type = "spot";
-		SpotLight3D *light = cast_to<SpotLight3D>(p_light);
-		l->range = light->get_param(SpotLight3D::PARAM_RANGE);
-		l->intensity = light->get_param(SpotLight3D::PARAM_ENERGY);
-		l->outer_cone_angle = Math::deg2rad(light->get_param(SpotLight3D::PARAM_SPOT_ANGLE));
-
-		// This equation is the inverse of the import equation (which has a desmos link).
-		float angle_ratio = 1 - (0.2 / (0.1 + light->get_param(SpotLight3D::PARAM_SPOT_ATTENUATION)));
-		angle_ratio = MAX(0, angle_ratio);
-		l->inner_cone_angle = l->outer_cone_angle * angle_ratio;
-	}
+	Ref<GLTFLight> l = GLTFLight::from_node(p_light);
 
 	GLTFLightIndex light_index = state->lights.size();
 	state->lights.push_back(l);
@@ -5279,6 +5104,7 @@ Node3D *GLTFDocument::_generate_spatial(Ref<GLTFState> state, const GLTFNodeInde
 
 	return spatial;
 }
+
 void GLTFDocument::_convert_scene_node(Ref<GLTFState> state, Node *p_current, const GLTFNodeIndex p_gltf_parent, const GLTFNodeIndex p_gltf_root) {
 	bool retflag = true;
 	_check_visibility(p_current, retflag);
@@ -5442,13 +5268,13 @@ void GLTFDocument::_convert_grid_map_to_gltf(GridMap *p_grid_map, GLTFNodeIndex 
 		int32_t cell = p_grid_map->get_cell_item(
 				Vector3(cell_location.x, cell_location.y, cell_location.z));
 		Transform3D cell_xform;
-		cell_xform.basis.set_orthogonal_index(
+		cell_xform.basis = p_grid_map->get_basis_with_orthogonal_index(
 				p_grid_map->get_cell_item_orientation(
 						Vector3(cell_location.x, cell_location.y, cell_location.z)));
 		cell_xform.basis.scale(Vector3(p_grid_map->get_cell_scale(),
 				p_grid_map->get_cell_scale(),
 				p_grid_map->get_cell_scale()));
-		cell_xform.set_origin(p_grid_map->map_to_world(
+		cell_xform.set_origin(p_grid_map->map_to_local(
 				Vector3(cell_location.x, cell_location.y, cell_location.z)));
 		Ref<GLTFMesh> gltf_mesh;
 		gltf_mesh.instantiate();
@@ -7093,12 +6919,32 @@ Error GLTFDocument::append_from_file(String p_path, Ref<GLTFState> r_state, uint
 
 Error GLTFDocument::_parse_gltf_extensions(Ref<GLTFState> state) {
 	ERR_FAIL_NULL_V(state, ERR_PARSE_ERROR);
-	if (state->json.has("extensionsRequired") && state->json["extensionsRequired"].get_type() == Variant::ARRAY) {
-		Array extensions_required = state->json["extensionsRequired"];
-		if (extensions_required.find("KHR_draco_mesh_compression") != -1) {
-			ERR_PRINT("glTF2 extension KHR_draco_mesh_compression is not supported.");
-			return ERR_UNAVAILABLE;
+	if (state->json.has("extensionsUsed")) {
+		Vector<String> ext_array = state->json["extensionsUsed"];
+		state->extensions_used = ext_array;
+	}
+	if (state->json.has("extensionsRequired")) {
+		Vector<String> ext_array = state->json["extensionsRequired"];
+		state->extensions_required = ext_array;
+	}
+	HashSet<String> supported_extensions;
+	supported_extensions.insert("KHR_lights_punctual");
+	supported_extensions.insert("KHR_materials_pbrSpecularGlossiness");
+	supported_extensions.insert("KHR_texture_transform");
+	for (int ext_i = 0; ext_i < document_extensions.size(); ext_i++) {
+		Ref<GLTFDocumentExtension> ext = document_extensions[ext_i];
+		ERR_CONTINUE(ext.is_null());
+		Vector<String> ext_supported_extensions = ext->get_supported_extensions();
+		for (int i = 0; i < ext_supported_extensions.size(); ++i) {
+			supported_extensions.insert(ext_supported_extensions[i]);
 		}
 	}
-	return OK;
+	Error ret = Error::OK;
+	for (int i = 0; i < state->extensions_required.size(); i++) {
+		if (!supported_extensions.has(state->extensions_required[i])) {
+			ERR_PRINT("GLTF: Can't import file '" + state->filename + "', required extension '" + String(state->extensions_required[i]) + "' is not supported. Are you missing a GLTFDocumentExtension plugin?");
+			ret = ERR_UNAVAILABLE;
+		}
+	}
+	return ret;
 }

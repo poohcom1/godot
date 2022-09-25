@@ -104,6 +104,10 @@ void EditorProfiler::clear() {
 	updating_frame = false;
 	hover_metric = -1;
 	seeking = false;
+
+	// Ensure button text (start, stop) is correct
+	_set_button_text();
+	emit_signal(SNAME("enable_profiling"), activate->is_pressed());
 }
 
 static String _get_percent_txt(float p_value, float p_total) {
@@ -318,7 +322,7 @@ void EditorProfiler::_update_plot() {
 	graph_texture->update(img);
 
 	graph->set_texture(graph_texture);
-	graph->update();
+	graph->queue_redraw();
 }
 
 void EditorProfiler::_update_frame() {
@@ -356,7 +360,7 @@ void EditorProfiler::_update_frame() {
 			item->set_metadata(1, it.script);
 			item->set_metadata(2, it.line);
 			item->set_text_alignment(2, HORIZONTAL_ALIGNMENT_RIGHT);
-			item->set_tooltip(0, it.name + "\n" + it.script + ":" + itos(it.line));
+			item->set_tooltip_text(0, it.name + "\n" + it.script + ":" + itos(it.line));
 
 			float time = dtime == DISPLAY_SELF_TIME ? it.self : it.total;
 
@@ -374,15 +378,23 @@ void EditorProfiler::_update_frame() {
 	updating_frame = false;
 }
 
-void EditorProfiler::_activate_pressed() {
+void EditorProfiler::_set_button_text() {
 	if (activate->is_pressed()) {
 		activate->set_icon(get_theme_icon(SNAME("Stop"), SNAME("EditorIcons")));
 		activate->set_text(TTR("Stop"));
-		_clear_pressed();
 	} else {
 		activate->set_icon(get_theme_icon(SNAME("Play"), SNAME("EditorIcons")));
 		activate->set_text(TTR("Start"));
 	}
+}
+
+void EditorProfiler::_activate_pressed() {
+	_set_button_text();
+
+	if (activate->is_pressed()) {
+		_clear_pressed();
+	}
+
 	emit_signal(SNAME("enable_profiling"), activate->is_pressed());
 }
 
@@ -421,7 +433,7 @@ void EditorProfiler::_graph_tex_draw() {
 
 void EditorProfiler::_graph_tex_mouse_exit() {
 	hover_metric = -1;
-	graph->update();
+	graph->queue_redraw();
 }
 
 void EditorProfiler::_cursor_metric_changed(double) {
@@ -429,7 +441,7 @@ void EditorProfiler::_cursor_metric_changed(double) {
 		return;
 	}
 
-	graph->update();
+	graph->queue_redraw();
 	_update_frame();
 }
 
@@ -480,13 +492,13 @@ void EditorProfiler::_graph_tex_input(const Ref<InputEvent> &p_ev) {
 			}
 		}
 
-		graph->update();
+		graph->queue_redraw();
 	}
 }
 
 void EditorProfiler::disable_seeking() {
 	seeking = false;
-	graph->update();
+	graph->queue_redraw();
 }
 
 void EditorProfiler::_combo_changed(int) {
@@ -499,8 +511,12 @@ void EditorProfiler::_bind_methods() {
 	ADD_SIGNAL(MethodInfo("break_request"));
 }
 
-void EditorProfiler::set_enabled(bool p_enable) {
+void EditorProfiler::set_enabled(bool p_enable, bool p_clear) {
+	activate->set_pressed(false);
 	activate->set_disabled(!p_enable);
+	if (p_clear) {
+		clear();
+	}
 }
 
 bool EditorProfiler::is_profiling() {
@@ -607,7 +623,7 @@ EditorProfiler::EditorProfiler() {
 	display_time = memnew(OptionButton);
 	display_time->add_item(TTR("Inclusive"));
 	display_time->add_item(TTR("Self"));
-	display_time->set_tooltip(TTR("Inclusive: Includes time from other functions called by this function.\nUse this to spot bottlenecks.\n\nSelf: Only count the time spent in the function itself, not in other functions called by that function.\nUse this to find individual functions to optimize."));
+	display_time->set_tooltip_text(TTR("Inclusive: Includes time from other functions called by this function.\nUse this to spot bottlenecks.\n\nSelf: Only count the time spent in the function itself, not in other functions called by that function.\nUse this to find individual functions to optimize."));
 	display_time->connect("item_selected", callable_mp(this, &EditorProfiler::_combo_changed));
 
 	hb->add_child(display_time);

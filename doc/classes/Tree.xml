@@ -312,6 +312,9 @@
 			The drop mode as an OR combination of flags. See [enum DropModeFlags] constants. Once dropping is done, reverts to [constant DROP_MODE_DISABLED]. Setting this during [method Control._can_drop_data] is recommended.
 			This controls the drop sections, i.e. the decision and drawing of possible drop locations based on the mouse position.
 		</member>
+		<member name="enable_recursive_folding" type="bool" setter="set_enable_recursive_folding" getter="is_recursive_folding_enabled" default="true">
+			If [code]true[/code], recursive folding is enabled for this [Tree]. Holding down Shift while clicking the fold arrow collapses or uncollapses the [TreeItem] and all its descendants.
+		</member>
 		<member name="focus_mode" type="int" setter="set_focus_mode" getter="get_focus_mode" overrides="Control" enum="Control.FocusMode" default="2" />
 		<member name="hide_folding" type="bool" setter="set_hide_folding" getter="is_folding_hidden" default="false">
 			If [code]true[/code], the folding arrow is hidden.
@@ -351,10 +354,11 @@
 				Emitted when [method TreeItem.propagate_check] is called. Connect to this signal to process the items that are affected when [method TreeItem.propagate_check] is invoked. The order that the items affected will be processed is as follows: the item that invoked the method, children of that item, and finally parents of that item.
 			</description>
 		</signal>
-		<signal name="column_title_pressed">
+		<signal name="column_title_clicked">
 			<param index="0" name="column" type="int" />
+			<param index="1" name="mouse_button_index" type="int" />
 			<description>
-				Emitted when a column's title is pressed.
+				Emitted when a column's title is clicked with either [constant MOUSE_BUTTON_LEFT] or [constant MOUSE_BUTTON_RIGHT].
 			</description>
 		</signal>
 		<signal name="custom_item_clicked">
@@ -557,12 +561,6 @@
 		<theme_item name="updown" data_type="icon" type="Texture2D">
 			The updown arrow icon to display for the [constant TreeItem.CELL_MODE_RANGE] mode cell.
 		</theme_item>
-		<theme_item name="bg" data_type="style" type="StyleBox">
-			Default [StyleBox] for the [Tree], i.e. used when the control is not being focused.
-		</theme_item>
-		<theme_item name="bg_focus" data_type="style" type="StyleBox">
-			[StyleBox] used when the [Tree] is being focused.
-		</theme_item>
 		<theme_item name="button_pressed" data_type="style" type="StyleBox">
 			[StyleBox] used when a button in the tree is pressed.
 		</theme_item>
@@ -580,6 +578,12 @@
 		</theme_item>
 		<theme_item name="custom_button_pressed" data_type="style" type="StyleBox">
 			[StyleBox] for a [constant TreeItem.CELL_MODE_CUSTOM] mode cell when it's pressed.
+		</theme_item>
+		<theme_item name="focus" data_type="style" type="StyleBox">
+			The focused style for the [Tree], drawn on top of everything.
+		</theme_item>
+		<theme_item name="panel" data_type="style" type="StyleBox">
+			The background style for the [Tree].
 		</theme_item>
 		<theme_item name="selected" data_type="style" type="StyleBox">
 			[StyleBox] for the selected items, used when the [Tree] is not being focused.

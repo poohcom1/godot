@@ -69,7 +69,7 @@
 #endif
 #endif
 
-#if !defined(IOS_ENABLED) && !defined(JAVASCRIPT_ENABLED)
+#if !defined(IOS_ENABLED) && !defined(WEB_ENABLED)
 // We include EGL below to get debug callback on GLES2 platforms,
 // but EGL is not available on iOS.
 #define CAN_DEBUG
@@ -108,19 +108,6 @@ void RasterizerGLES3::begin_frame(double frame_step) {
 }
 
 void RasterizerGLES3::end_frame(bool p_swap_buffers) {
-	//	if (OS::get_singleton()->is_layered_allowed()) {
-	//		if (!OS::get_singleton()->get_window_per_pixel_transparency_enabled()) {
-	//clear alpha
-	//			glColorMask(false, false, false, true);
-	//			glClearColor(0.5, 0, 0, 1);
-	//			glClear(GL_COLOR_BUFFER_BIT);
-	//			glColorMask(true, true, true, true);
-	//		}
-	//	}
-
-	//	glClearColor(1, 0, 0, 1);
-	//	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_ACCUM_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
-
 	if (p_swap_buffers) {
 		DisplayServer::get_singleton()->swap_buffers();
 	} else {
@@ -293,11 +280,6 @@ void RasterizerGLES3::_blit_render_target_to_screen(RID p_render_target, Display
 	GLES3::RenderTarget *rt = texture_storage->get_render_target(p_render_target);
 	ERR_FAIL_COND(!rt);
 
-	// TODO: do we need a keep 3d linear option?
-
-	// Make sure we are drawing to the right context.
-	DisplayServer::get_singleton()->gl_window_make_current(p_screen);
-
 	if (rt->external.fbo != 0) {
 		glBindFramebuffer(GL_READ_FRAMEBUFFER, rt->external.fbo);
 	} else {
@@ -311,9 +293,6 @@ void RasterizerGLES3::_blit_render_target_to_screen(RID p_render_target, Display
 
 // is this p_screen useless in a multi window environment?
 void RasterizerGLES3::blit_render_targets_to_screen(DisplayServer::WindowID p_screen, const BlitToScreen *p_render_targets, int p_amount) {
-	// All blits are going to the system framebuffer, so just bind once.
-	glBindFramebuffer(GL_FRAMEBUFFER, GLES3::TextureStorage::system_fbo);
-
 	for (int i = 0; i < p_amount; i++) {
 		const BlitToScreen &blit = p_render_targets[i];
 

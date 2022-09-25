@@ -355,7 +355,7 @@ void ShaderTextEditor::_check_shader_mode() {
 }
 
 static ShaderLanguage::DataType _get_global_shader_uniform_type(const StringName &p_variable) {
-	RS::GlobalShaderUniformType gvt = RS::get_singleton()->global_shader_uniform_get_type(p_variable);
+	RS::GlobalShaderParameterType gvt = RS::get_singleton()->global_shader_parameter_get_type(p_variable);
 	return (ShaderLanguage::DataType)RS::global_shader_uniform_type_get_shader_datatype(gvt);
 }
 
@@ -994,7 +994,7 @@ void ShaderEditor::_update_bookmark_list() {
 	bookmarks_menu->add_shortcut(ED_GET_SHORTCUT("script_text_editor/goto_next_bookmark"), BOOKMARK_GOTO_NEXT);
 	bookmarks_menu->add_shortcut(ED_GET_SHORTCUT("script_text_editor/goto_previous_bookmark"), BOOKMARK_GOTO_PREV);
 
-	Array bookmark_list = shader_editor->get_text_editor()->get_bookmarked_lines();
+	PackedInt32Array bookmark_list = shader_editor->get_text_editor()->get_bookmarked_lines();
 	if (bookmark_list.size() == 0) {
 		return;
 	}
@@ -1257,6 +1257,17 @@ void ShaderEditorPlugin::_update_shader_list_status() {
 	}
 }
 
+void ShaderEditorPlugin::_move_shader_tab(int p_from, int p_to) {
+	if (p_from == p_to) {
+		return;
+	}
+	EditedShader es = edited_shaders[p_from];
+	edited_shaders.remove_at(p_from);
+	edited_shaders.insert(p_to, es);
+	shader_tabs->move_child(shader_tabs->get_tab_control(p_from), p_to);
+	_update_shader_list();
+}
+
 void ShaderEditorPlugin::edit(Object *p_object) {
 	EditedShader es;
 
@@ -1355,6 +1366,7 @@ void ShaderEditorPlugin::_shader_selected(int p_index) {
 		edited_shaders[p_index].shader_editor->validate_script();
 	}
 	shader_tabs->set_current_tab(p_index);
+	shader_list->select(p_index);
 }
 
 void ShaderEditorPlugin::_shader_list_clicked(int p_item, Vector2 p_local_mouse_pos, MouseButton p_mouse_button_index) {
@@ -1364,11 +1376,10 @@ void ShaderEditorPlugin::_shader_list_clicked(int p_item, Vector2 p_local_mouse_
 }
 
 void ShaderEditorPlugin::_close_shader(int p_index) {
-	int index = shader_tabs->get_current_tab();
-	ERR_FAIL_INDEX(index, shader_tabs->get_tab_count());
-	Control *c = shader_tabs->get_tab_control(index);
+	ERR_FAIL_INDEX(p_index, shader_tabs->get_tab_count());
+	Control *c = shader_tabs->get_tab_control(p_index);
 	memdelete(c);
-	edited_shaders.remove_at(index);
+	edited_shaders.remove_at(p_index);
 	_update_shader_list();
 	EditorNode::get_singleton()->get_undo_redo()->clear_history(); // To prevent undo on deleted graphs.
 }
@@ -1387,12 +1398,12 @@ void ShaderEditorPlugin::_menu_item_pressed(int p_index) {
 	switch (p_index) {
 		case FILE_NEW: {
 			String base_path = FileSystemDock::get_singleton()->get_current_path().get_base_dir();
-			shader_create_dialog->config(base_path.plus_file("new_shader"), false, false, 0);
+			shader_create_dialog->config(base_path.path_join("new_shader"), false, false, 0);
 			shader_create_dialog->popup_centered();
 		} break;
 		case FILE_NEW_INCLUDE: {
 			String base_path = FileSystemDock::get_singleton()->get_current_path().get_base_dir();
-			shader_create_dialog->config(base_path.plus_file("new_shader"), false, false, 2);
+			shader_create_dialog->config(base_path.path_join("new_shader"), false, false, 2);
 			shader_create_dialog->popup_centered();
 		} break;
 		case FILE_OPEN: {
@@ -1451,6 +1462,109 @@ void ShaderEditorPlugin::_shader_include_created(Ref<ShaderInclude> p_shader_inc
 	EditorNode::get_singleton()->push_item(p_shader_inc.ptr());
 }
 
+Variant ShaderEditorPlugin::get_drag_data_fw(const Point2 &p_point, Control *p_from) {
+	if (shader_list->get_item_count() == 0) {
+		return Variant();
+	}
+
+	int idx = shader_list->get_item_at_position(p_point);
+	if (idx < 0) {
+		return Variant();
+	}
+
+	HBoxContainer *drag_preview = memnew(HBoxContainer);
+	String preview_name = shader_list->get_item_text(idx);
+	Ref<Texture2D> preview_icon = shader_list->get_item_icon(idx);
+
+	if (!preview_icon.is_null()) {
+		TextureRect *tf = memnew(TextureRect);
+		tf->set_texture(preview_icon);
+		tf->set_stretch_mode(TextureRect::STRETCH_KEEP_CENTERED);
+		drag_preview->add_child(tf);
+	}
+	Label *label = memnew(Label(preview_name));
+	drag_preview->add_child(label);
+	main_split->set_drag_preview(drag_preview);
+
+	Dictionary drag_data;
+	drag_data["type"] = "shader_list_element";
+	drag_data["shader_list_element"] = idx;
+
+	return drag_data;
+}
+
+bool ShaderEditorPlugin::can_drop_data_fw(const Point2 &p_point, const Variant &p_data, Control *p_from) const {
+	Dictionary d = p_data;
+	if (!d.has("type")) {
+		return false;
+	}
+
+	if (String(d["type"]) == "shader_list_element") {
+		return true;
+	}
+
+	if (String(d["type"]) == "files") {
+		Vector<String> files = d["files"];
+
+		if (files.size() == 0) {
+			return false;
+		}
+
+		for (int i = 0; i < files.size(); i++) {
+			String file = files[i];
+			if (ResourceLoader::exists(file, "Shader")) {
+				Ref<Shader> shader = ResourceLoader::load(file);
+				if (shader.is_valid()) {
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
+	return false;
+}
+
+void ShaderEditorPlugin::drop_data_fw(const Point2 &p_point, const Variant &p_data, Control *p_from) {
+	if (!can_drop_data_fw(p_point, p_data, p_from)) {
+		return;
+	}
+
+	Dictionary d = p_data;
+	if (!d.has("type")) {
+		return;
+	}
+
+	if (String(d["type"]) == "shader_list_element") {
+		int idx = d["shader_list_element"];
+		int new_idx = shader_list->get_item_at_position(p_point);
+		_move_shader_tab(idx, new_idx);
+		return;
+	}
+
+	if (String(d["type"]) == "files") {
+		Vector<String> files = d["files"];
+
+		for (int i = 0; i < files.size(); i++) {
+			String file = files[i];
+			if (!ResourceLoader::exists(file, "Shader")) {
+				continue;
+			}
+
+			Ref<Resource> res = ResourceLoader::load(file);
+			if (res.is_valid()) {
+				edit(res.ptr());
+			}
+		}
+	}
+}
+
+void ShaderEditorPlugin::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("_get_drag_data_fw", "point", "from"), &ShaderEditorPlugin::get_drag_data_fw);
+	ClassDB::bind_method(D_METHOD("_can_drop_data_fw", "point", "data", "from"), &ShaderEditorPlugin::can_drop_data_fw);
+	ClassDB::bind_method(D_METHOD("_drop_data_fw", "point", "data", "from"), &ShaderEditorPlugin::drop_data_fw);
+}
+
 ShaderEditorPlugin::ShaderEditorPlugin() {
 	main_split = memnew(HSplitContainer);
 
@@ -1483,6 +1597,7 @@ ShaderEditorPlugin::ShaderEditorPlugin() {
 	vb->add_child(shader_list);
 	shader_list->connect("item_selected", callable_mp(this, &ShaderEditorPlugin::_shader_selected));
 	shader_list->connect("item_clicked", callable_mp(this, &ShaderEditorPlugin::_shader_list_clicked));
+	shader_list->set_drag_forwarding(this);
 
 	main_split->add_child(vb);
 	vb->set_custom_minimum_size(Size2(200, 300) * EDSCALE);

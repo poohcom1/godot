@@ -36,7 +36,7 @@
 #include "scene/resources/convex_polygon_shape_2d.h"
 
 void CollisionShape2D::_shape_changed() {
-	update();
+	queue_redraw();
 }
 
 void CollisionShape2D::_update_in_shape_owner(bool p_xform_only) {
@@ -140,7 +140,7 @@ void CollisionShape2D::set_shape(const Ref<Shape2D> &p_shape) {
 		shape->disconnect("changed", callable_mp(this, &CollisionShape2D::_shape_changed));
 	}
 	shape = p_shape;
-	update();
+	queue_redraw();
 	if (parent) {
 		parent->shape_owner_clear_shapes(owner_id);
 		if (shape.is_valid()) {
@@ -168,11 +168,11 @@ bool CollisionShape2D::_edit_is_selected_on_click(const Point2 &p_point, double 
 	return shape->_edit_is_selected_on_click(p_point, p_tolerance);
 }
 
-TypedArray<String> CollisionShape2D::get_configuration_warnings() const {
-	TypedArray<String> warnings = Node::get_configuration_warnings();
+PackedStringArray CollisionShape2D::get_configuration_warnings() const {
+	PackedStringArray warnings = Node::get_configuration_warnings();
 
 	if (!Object::cast_to<CollisionObject2D>(get_parent())) {
-		warnings.push_back(RTR("CollisionShape2D only serves to provide a collision shape to a CollisionObject2D derived node. Please only use it as a child of Area2D, StaticBody2D, RigidDynamicBody2D, CharacterBody2D, etc. to give them a shape."));
+		warnings.push_back(RTR("CollisionShape2D only serves to provide a collision shape to a CollisionObject2D derived node. Please only use it as a child of Area2D, StaticBody2D, RigidBody2D, CharacterBody2D, etc. to give them a shape."));
 	}
 	if (!shape.is_valid()) {
 		warnings.push_back(RTR("A shape must be provided for CollisionShape2D to function. Please create a shape resource for it!"));
@@ -192,7 +192,7 @@ TypedArray<String> CollisionShape2D::get_configuration_warnings() const {
 
 void CollisionShape2D::set_disabled(bool p_disabled) {
 	disabled = p_disabled;
-	update();
+	queue_redraw();
 	if (parent) {
 		parent->shape_owner_set_disabled(owner_id, p_disabled);
 	}
@@ -204,7 +204,7 @@ bool CollisionShape2D::is_disabled() const {
 
 void CollisionShape2D::set_one_way_collision(bool p_enable) {
 	one_way_collision = p_enable;
-	update();
+	queue_redraw();
 	if (parent) {
 		parent->shape_owner_set_one_way_collision(owner_id, p_enable);
 	}

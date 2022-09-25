@@ -30,8 +30,8 @@
 
 #include "range.h"
 
-TypedArray<String> Range::get_configuration_warnings() const {
-	TypedArray<String> warnings = Node::get_configuration_warnings();
+PackedStringArray Range::get_configuration_warnings() const {
+	PackedStringArray warnings = Node::get_configuration_warnings();
 
 	if (shared->exp_ratio && shared->min <= 0) {
 		warnings.push_back(RTR("If \"Exp Edit\" is enabled, \"Min Value\" must be greater than 0."));
@@ -46,7 +46,7 @@ void Range::_value_changed(double p_value) {
 void Range::_value_changed_notify() {
 	_value_changed(shared->val);
 	emit_signal(SNAME("value_changed"), shared->val);
-	update();
+	queue_redraw();
 }
 
 void Range::Shared::emit_value_changed() {
@@ -61,7 +61,7 @@ void Range::Shared::emit_value_changed() {
 
 void Range::_changed_notify(const char *p_what) {
 	emit_signal(SNAME("changed"));
-	update();
+	queue_redraw();
 }
 
 void Range::_validate_values() {
@@ -106,6 +106,10 @@ void Range::set_value(double p_val) {
 }
 
 void Range::set_min(double p_min) {
+	if (shared->min == p_min) {
+		return;
+	}
+
 	shared->min = p_min;
 	set_value(shared->val);
 	_validate_values();
@@ -116,6 +120,10 @@ void Range::set_min(double p_min) {
 }
 
 void Range::set_max(double p_max) {
+	if (shared->max == p_max) {
+		return;
+	}
+
 	shared->max = p_max;
 	set_value(shared->val);
 	_validate_values();
@@ -124,11 +132,19 @@ void Range::set_max(double p_max) {
 }
 
 void Range::set_step(double p_step) {
+	if (shared->step == p_step) {
+		return;
+	}
+
 	shared->step = p_step;
 	shared->emit_changed("step");
 }
 
 void Range::set_page(double p_page) {
+	if (shared->page == p_page) {
+		return;
+	}
+
 	shared->page = p_page;
 	set_value(shared->val);
 	_validate_values();
@@ -300,6 +316,10 @@ bool Range::is_using_rounded_values() const {
 }
 
 void Range::set_exp_ratio(bool p_enable) {
+	if (shared->exp_ratio == p_enable) {
+		return;
+	}
+
 	shared->exp_ratio = p_enable;
 
 	update_configuration_warnings();

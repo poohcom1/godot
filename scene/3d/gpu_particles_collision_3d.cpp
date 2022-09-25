@@ -503,8 +503,8 @@ Ref<Image> GPUParticlesCollisionSDF3D::bake() {
 	return ret;
 }
 
-TypedArray<String> GPUParticlesCollisionSDF3D::get_configuration_warnings() const {
-	TypedArray<String> warnings = Node::get_configuration_warnings();
+PackedStringArray GPUParticlesCollisionSDF3D::get_configuration_warnings() const {
+	PackedStringArray warnings = Node::get_configuration_warnings();
 
 	if (bake_mask == 0) {
 		warnings.push_back(RTR("The Bake Mask has no bits enabled, which means baking will not produce any collision for this GPUParticlesCollisionSDF3D.\nTo resolve this, enable at least one bit in the Bake Mask property."));
@@ -807,7 +807,7 @@ void GPUParticlesAttractor3D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_directionality", "amount"), &GPUParticlesAttractor3D::set_directionality);
 	ClassDB::bind_method(D_METHOD("get_directionality"), &GPUParticlesAttractor3D::get_directionality);
 
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "strength", PROPERTY_HINT_RANGE, "-128,128,0.01,or_greater,or_lesser"), "set_strength", "get_strength");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "strength", PROPERTY_HINT_RANGE, "-128,128,0.01,or_greater,or_less"), "set_strength", "get_strength");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "attenuation", PROPERTY_HINT_EXP_EASING, "0,8,0.01"), "set_attenuation", "get_attenuation");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "directionality", PROPERTY_HINT_RANGE, "0,1,0.01"), "set_directionality", "get_directionality");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "cull_mask", PROPERTY_HINT_LAYERS_3D_RENDER), "set_cull_mask", "get_cull_mask");

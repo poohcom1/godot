@@ -62,7 +62,7 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <GodotRealTIsDouble Condition=" '$(GodotRealTIsDouble)' == '' ">false</GodotRealTIsDouble>
+    <GodotFloat64 Condition=" '$(GodotFloat64)' == '' ">false</GodotFloat64>
   </PropertyGroup>
 
   <!-- Godot DefineConstants. -->
@@ -77,12 +77,11 @@
     <GodotPlatformConstants Condition=" '$(GodotTargetPlatform)' == 'windows' ">GODOT_WINDOWS;GODOT_PC</GodotPlatformConstants>
     <GodotPlatformConstants Condition=" '$(GodotTargetPlatform)' == 'linuxbsd' ">GODOT_LINUXBSD;GODOT_PC</GodotPlatformConstants>
     <GodotPlatformConstants Condition=" '$(GodotTargetPlatform)' == 'macos' ">GODOT_OSX;GODOT_MACOS;GODOT_PC</GodotPlatformConstants>
-    <GodotPlatformConstants Condition=" '$(GodotTargetPlatform)' == 'server' ">GODOT_SERVER;GODOT_PC</GodotPlatformConstants>
     <GodotPlatformConstants Condition=" '$(GodotTargetPlatform)' == 'uwp' ">GODOT_UWP;GODOT_PC</GodotPlatformConstants>
     <GodotPlatformConstants Condition=" '$(GodotTargetPlatform)' == 'haiku' ">GODOT_HAIKU;GODOT_PC</GodotPlatformConstants>
     <GodotPlatformConstants Condition=" '$(GodotTargetPlatform)' == 'android' ">GODOT_ANDROID;GODOT_MOBILE</GodotPlatformConstants>
     <GodotPlatformConstants Condition=" '$(GodotTargetPlatform)' == 'ios' ">GODOT_IPHONE;GODOT_IOS;GODOT_MOBILE</GodotPlatformConstants>
-    <GodotPlatformConstants Condition=" '$(GodotTargetPlatform)' == 'javascript' ">GODOT_JAVASCRIPT;GODOT_HTML5;GODOT_WASM;GODOT_WEB</GodotPlatformConstants>
+    <GodotPlatformConstants Condition=" '$(GodotTargetPlatform)' == 'web' ">GODOT_JAVASCRIPT;GODOT_HTML5;GODOT_WASM;GODOT_WEB</GodotPlatformConstants>
 
     <GodotDefineConstants>$(GodotDefineConstants);$(GodotPlatformConstants)</GodotDefineConstants>
   </PropertyGroup>
@@ -95,21 +94,4 @@
 
     <DefineConstants>$(GodotDefineConstants);$(DefineConstants)</DefineConstants>
   </PropertyGroup>
-
-  <!-- Godot API references -->
-  <ItemGroup>
-    <!--
-    TODO:
-    We should consider a nuget package for reference assemblies. This is difficult because the
-    Godot scripting API is continuaslly breaking backwards compatibility even in patch releases.
-    -->
-    <Reference Include="GodotSharp">
-      <Private>false</Private>
-      <HintPath>$(GodotProjectDir).godot\mono\assemblies\$(GodotApiConfiguration)\GodotSharp.dll</HintPath>
-    </Reference>
-    <Reference Include="GodotSharpEditor" Condition=" '$(Configuration)' == 'Debug' ">
-      <Private>false</Private>
-      <HintPath>$(GodotProjectDir).godot\mono\assemblies\$(GodotApiConfiguration)\GodotSharpEditor.dll</HintPath>
-    </Reference>
-  </ItemGroup>
 </Project>

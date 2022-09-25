@@ -20,15 +20,6 @@
 				Adds a bone, with name [param name]. [method get_bone_count] will become the bone index.
 			</description>
 		</method>
-		<method name="add_bone_child">
-			<return type="void" />
-			<param index="0" name="bone_idx" type="int" />
-			<param index="1" name="child_bone_idx" type="int" />
-			<description>
-				Takes the given bone pose/transform and converts it to a world transform, relative to the [Skeleton3D] node.
-				This is useful for using the bone transform in calculations with transforms from [Node3D]-based nodes.
-			</description>
-		</method>
 		<method name="clear_bones">
 			<return type="void" />
 			<description>
@@ -41,9 +32,10 @@
 				Removes the global pose override on all bones in the skeleton.
 			</description>
 		</method>
-		<method name="clear_bones_local_pose_override">
+		<method name="clear_bones_local_pose_override" is_deprecated="true">
 			<return type="void" />
 			<description>
+				Deprecated. Local pose overrides will be removed.
 				Removes the local pose override on all bones in the skeleton.
 			</description>
 		</method>
@@ -52,7 +44,7 @@
 			<description>
 			</description>
 		</method>
-		<method name="execute_modifications">
+		<method name="execute_modifications" is_deprecated="true">
 			<return type="void" />
 			<param index="0" name="delta" type="float" />
 			<param index="1" name="execution_mode" type="int" />
@@ -67,7 +59,7 @@
 				Returns the bone index that matches [param name] as its name.
 			</description>
 		</method>
-		<method name="force_update_all_bone_transforms">
+		<method name="force_update_all_bone_transforms" is_deprecated="true">
 			<return type="void" />
 			<description>
 				Force updates the bone transforms/poses for all bones in the skeleton.
@@ -80,7 +72,7 @@
 				Force updates the bone transform for the bone at [param bone_idx] and all of its children.
 			</description>
 		</method>
-		<method name="get_bone_children">
+		<method name="get_bone_children" qualifiers="const">
 			<return type="PackedInt32Array" />
 			<param index="0" name="bone_idx" type="int" />
 			<description>
@@ -90,7 +82,7 @@
 		<method name="get_bone_count" qualifiers="const">
 			<return type="int" />
 			<description>
-				Returns the amount of bones in the skeleton.
+				Returns the number of bones in the skeleton.
 			</description>
 		</method>
 		<method name="get_bone_global_pose" qualifiers="const">
@@ -175,19 +167,19 @@
 				Returns the rest transform for a bone [param bone_idx].
 			</description>
 		</method>
-		<method name="get_modification_stack">
+		<method name="get_modification_stack" is_deprecated="true">
 			<return type="SkeletonModificationStack3D" />
 			<description>
 				Returns the modification stack attached to this skeleton, if one exists.
 			</description>
 		</method>
-		<method name="get_parentless_bones">
+		<method name="get_parentless_bones" qualifiers="const">
 			<return type="PackedInt32Array" />
 			<description>
 				Returns an array with all of the bones that are parentless. Another way to look at this is that it returns the indexes of all the bones that are not dependent or modified by other bones in the Skeleton.
 			</description>
 		</method>
-		<method name="global_pose_to_local_pose">
+		<method name="global_pose_to_local_pose" is_deprecated="true">
 			<return type="Transform3D" />
 			<param index="0" name="bone_idx" type="int" />
 			<param index="1" name="global_pose" type="Transform3D" />
@@ -196,15 +188,16 @@
 				This can be used to easily convert a global pose from [method get_bone_global_pose] to a global transform in [method set_bone_local_pose_override].
 			</description>
 		</method>
-		<method name="global_pose_to_world_transform">
+		<method name="global_pose_to_world_transform" is_deprecated="true">
 			<return type="Transform3D" />
 			<param index="0" name="global_pose" type="Transform3D" />
 			<description>
+				Deprecated. Use [Node3D] apis instead.
 				Takes the passed-in global pose and converts it to a world transform.
 				This can be used to easily convert a global pose from [method get_bone_global_pose] to a global transform usable with a node's transform, like [member Node3D.global_transform] for example.
 			</description>
 		</method>
-		<method name="global_pose_z_forward_to_bone_forward">
+		<method name="global_pose_z_forward_to_bone_forward" is_deprecated="true">
 			<return type="Basis" />
 			<param index="0" name="bone_idx" type="int" />
 			<param index="1" name="basis" type="Basis" />
@@ -220,7 +213,7 @@
 				Returns whether the bone pose for the bone at [param bone_idx] is enabled.
 			</description>
 		</method>
-		<method name="local_pose_to_global_pose">
+		<method name="local_pose_to_global_pose" is_deprecated="true">
 			<return type="Transform3D" />
 			<param index="0" name="bone_idx" type="int" />
 			<param index="1" name="local_pose" type="Transform3D" />
@@ -240,7 +233,7 @@
 			<param index="0" name="exception" type="RID" />
 			<description>
 				Adds a collision exception to the physical bone.
-				Works just like the [RigidDynamicBody3D] node.
+				Works just like the [RigidBody3D] node.
 			</description>
 		</method>
 		<method name="physical_bones_remove_collision_exception">
@@ -248,7 +241,7 @@
 			<param index="0" name="exception" type="RID" />
 			<description>
 				Removes a collision exception to the physical bone.
-				Works just like the [RigidDynamicBody3D] node.
+				Works just like the [RigidBody3D] node.
 			</description>
 		</method>
 		<method name="physical_bones_start_simulation">
@@ -272,21 +265,17 @@
 				Binds the given Skin to the Skeleton.
 			</description>
 		</method>
-		<method name="remove_bone_child">
+		<method name="reset_bone_pose">
 			<return type="void" />
 			<param index="0" name="bone_idx" type="int" />
-			<param index="1" name="child_bone_idx" type="int" />
 			<description>
-				Removes the passed in child bone index, [param child_bone_idx], from the passed-in bone, [param bone_idx], if it exists.
-				[b]Note:[/b] This does not remove the child bone, but instead it removes the connection it has to the parent bone.
+				Sets the bone pose to rest for [param bone_idx].
 			</description>
 		</method>
-		<method name="set_bone_children">
+		<method name="reset_bone_poses">
 			<return type="void" />
-			<param index="0" name="bone_idx" type="int" />
-			<param index="1" name="bone_children" type="PackedInt32Array" />
 			<description>
-				Sets the children for the passed in bone, [param bone_idx], to the passed-in array of bone indexes, [param bone_children].
+				Sets all bone poses to rests.
 			</description>
 		</method>
 		<method name="set_bone_enabled">
@@ -306,16 +295,17 @@
 			<description>
 				Sets the global pose transform, [param pose], for the bone at [param bone_idx].
 				[param amount] is the interpolation strength that will be used when applying the pose, and [param persistent] determines if the applied pose will remain.
-				[b]Note:[/b] The pose transform needs to be a global pose! Use [method world_transform_to_global_pose] to convert a world transform, like one you can get from a [Node3D], to a global pose.
+				[b]Note:[/b] The pose transform needs to be a global pose! To convert a world transform from a [Node3D] to a global bone pose, multiply the [method Transform3D.affine_inverse] of the node's [member Node3D.global_transform] by the desired world transform
 			</description>
 		</method>
-		<method name="set_bone_local_pose_override">
+		<method name="set_bone_local_pose_override" is_deprecated="true">
 			<return type="void" />
 			<param index="0" name="bone_idx" type="int" />
 			<param index="1" name="pose" type="Transform3D" />
 			<param index="2" name="amount" type="float" />
 			<param index="3" name="persistent" type="bool" default="false" />
 			<description>
+				Deprecated. Local pose overrides will be removed.
 				Sets the local pose transform, [param pose], for the bone at [param bone_idx].
 				[param amount] is the interpolation strength that will be used when applying the pose, and [param persistent] determines if the applied pose will remain.
 				[b]Note:[/b] The pose transform needs to be a local pose! Use [method global_pose_to_local_pose] to convert a global pose to a local pose.
@@ -366,7 +356,7 @@
 				Sets the rest transform for bone [param bone_idx].
 			</description>
 		</method>
-		<method name="set_modification_stack">
+		<method name="set_modification_stack" is_deprecated="true">
 			<return type="void" />
 			<param index="0" name="modification_stack" type="SkeletonModificationStack3D" />
 			<description>
@@ -380,10 +370,11 @@
 				Unparents the bone at [param bone_idx] and sets its rest position to that of its parent prior to being reset.
 			</description>
 		</method>
-		<method name="world_transform_to_global_pose">
+		<method name="world_transform_to_global_pose" is_deprecated="true">
 			<return type="Transform3D" />
 			<param index="0" name="world_transform" type="Transform3D" />
 			<description>
+				Deprecated. Use [Node3D] apis instead.
 				Takes the passed-in global transform and converts it to a global pose.
 				This can be used to easily convert a global transform from [member Node3D.global_transform] to a global pose usable with [method set_bone_global_pose_override], for example.
 			</description>

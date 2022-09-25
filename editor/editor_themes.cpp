@@ -32,7 +32,6 @@
 
 #include "core/error/error_macros.h"
 #include "core/io/resource_loader.h"
-#include "core/variant/dictionary.h"
 #include "editor/editor_fonts.h"
 #include "editor/editor_icons.gen.h"
 #include "editor/editor_scale.h"
@@ -43,27 +42,169 @@
 #include "modules/svg/image_loader_svg.h"
 #endif
 
+HashMap<Color, Color> EditorColorMap::color_conversion_map;
+HashSet<StringName> EditorColorMap::color_conversion_exceptions;
+
+void EditorColorMap::add_conversion_color_pair(const String p_from_color, const String p_to_color) {
+	color_conversion_map[Color::html(p_from_color)] = Color::html(p_to_color);
+}
+
+void EditorColorMap::add_conversion_exception(const StringName p_icon_name) {
+	color_conversion_exceptions.insert(p_icon_name);
+}
+
+void EditorColorMap::create() {
+	// Some of the colors below are listed for completeness sake.
+	// This can be a basis for proper palette validation later.
+
+	// Convert:    FROM       TO
+	add_conversion_color_pair("#478cbf", "#478cbf"); // Godot Blue
+	add_conversion_color_pair("#414042", "#414042"); // Godot Gray
+
+	add_conversion_color_pair("#ffffff", "#414141"); // Pure white
+	add_conversion_color_pair("#000000", "#bfbfbf"); // Pure black
+	// Keep pure RGB colors as is, but list them for explicitly.
+	add_conversion_color_pair("#ff0000", "#ff0000"); // Pure red
+	add_conversion_color_pair("#00ff00", "#00ff00"); // Pure green
+	add_conversion_color_pair("#0000ff", "#0000ff"); // Pure blue
+
+	// GUI Colors
+	add_conversion_color_pair("#e0e0e0", "#5a5a5a"); // Common icon color
+	add_conversion_color_pair("#fefefe", "#fefefe"); // Forced light color
+	add_conversion_color_pair("#808080", "#808080"); // GUI disabled color
+	add_conversion_color_pair("#b3b3b3", "#363636"); // GUI disabled light color
+	add_conversion_color_pair("#699ce8", "#699ce8"); // GUI highlight color
+	add_conversion_color_pair("#f9f9f9", "#606060"); // Scrollbar grabber highlight color
+
+	add_conversion_color_pair("#c38ef1", "#a85de9"); // Animation
+	add_conversion_color_pair("#fc7f7f", "#cd3838"); // Spatial
+	add_conversion_color_pair("#8da5f3", "#3d64dd"); // 2D
+	add_conversion_color_pair("#4b70ea", "#1a3eac"); // 2D Dark
+	add_conversion_color_pair("#8eef97", "#2fa139"); // Control
+
+	add_conversion_color_pair("#5fb2ff", "#0079f0"); // Selection (blue)
+	add_conversion_color_pair("#003e7a", "#2b74bb"); // Selection (darker blue)
+	add_conversion_color_pair("#f7f5cf", "#615f3a"); // Gizmo (yellow)
+
+	// Rainbow
+	add_conversion_color_pair("#ff4545", "#ff2929"); // Red
+	add_conversion_color_pair("#ffe345", "#ffe337"); // Yellow
+	add_conversion_color_pair("#80ff45", "#74ff34"); // Green
+	add_conversion_color_pair("#45ffa2", "#2cff98"); // Aqua
+	add_conversion_color_pair("#45d7ff", "#22ccff"); // Blue
+	add_conversion_color_pair("#8045ff", "#702aff"); // Purple
+	add_conversion_color_pair("#ff4596", "#ff2781"); // Pink
+
+	// Audio gradients
+	add_conversion_color_pair("#e1da5b", "#d6cf4b"); // Yellow
+
+	add_conversion_color_pair("#62aeff", "#1678e0"); // Frozen gradient top
+	add_conversion_color_pair("#75d1e6", "#41acc5"); // Frozen gradient middle
+	add_conversion_color_pair("#84ffee", "#49ccba"); // Frozen gradient bottom
+
+	add_conversion_color_pair("#f70000", "#c91616"); // Color track red
+	add_conversion_color_pair("#eec315", "#d58c0b"); // Color track orange
+	add_conversion_color_pair("#dbee15", "#b7d10a"); // Color track yellow
+	add_conversion_color_pair("#288027", "#218309"); // Color track green
+
+	// Resource groups
+	add_conversion_color_pair("#ffca5f", "#fea900"); // Mesh resource (orange)
+	add_conversion_color_pair("#2998ff", "#68b6ff"); // Shape resource (blue)
+	add_conversion_color_pair("#a2d2ff", "#4998e3"); // Shape resource (light blue)
+
+	// Animation editor tracks
+	// The property track icon color is set by the common icon color.
+	add_conversion_color_pair("#ea7940", "#bd5e2c"); // 3D Position track
+	add_conversion_color_pair("#ff2b88", "#bd165f"); // 3D Rotation track
+	add_conversion_color_pair("#eac840", "#bd9d1f"); // 3D Scale track
+	add_conversion_color_pair("#3cf34e", "#16a827"); // Call Method track
+	add_conversion_color_pair("#2877f6", "#236be6"); // Bezier Curve track
+	add_conversion_color_pair("#eae440", "#9f9722"); // Audio Playback track
+	add_conversion_color_pair("#a448f0", "#9853ce"); // Animation Playback track
+	add_conversion_color_pair("#5ad5c4", "#0a9c88"); // Blend Shape track
+
+	// Control layouts
+	add_conversion_color_pair("#d6d6d6", "#474747"); // Highlighted part
+	add_conversion_color_pair("#474747", "#d6d6d6"); // Background part
+	add_conversion_color_pair("#919191", "#6e6e6e"); // Border part
+
+	// TileSet editor icons
+	add_conversion_color_pair("#fce00e", "#aa8d24"); // New Single Tile
+	add_conversion_color_pair("#0e71fc", "#0350bd"); // New Autotile
+	add_conversion_color_pair("#c6ced4", "#828f9b"); // New Atlas
+
+	// Visual script
+	add_conversion_color_pair("#41ecad", "#25e3a0"); // VisualScript variant
+	add_conversion_color_pair("#6f91f0", "#6d8eeb"); // VisualScript bool
+	add_conversion_color_pair("#5abbef", "#4fb2e9"); // VisualScript int
+	add_conversion_color_pair("#35d4f4", "#27ccf0"); // VisualScript float
+	add_conversion_color_pair("#4593ec", "#4690e7"); // VisualScript String
+	add_conversion_color_pair("#ac73f1", "#ad76ee"); // VisualScript Vector2
+	add_conversion_color_pair("#f1738f", "#ee758e"); // VisualScript Rect2
+	add_conversion_color_pair("#de66f0", "#dc6aed"); // VisualScript Vector3
+	add_conversion_color_pair("#b9ec41", "#96ce1a"); // VisualScript Transform2D
+	add_conversion_color_pair("#f74949", "#f77070"); // VisualScript Plane
+	add_conversion_color_pair("#ec418e", "#ec69a3"); // VisualScript Quat
+	add_conversion_color_pair("#ee5677", "#ee7991"); // VisualScript AABB
+	add_conversion_color_pair("#e1ec41", "#b2bb19"); // VisualScript Basis
+	add_conversion_color_pair("#f68f45", "#f49047"); // VisualScript Transform
+	add_conversion_color_pair("#417aec", "#6993ec"); // VisualScript NodePath
+	add_conversion_color_pair("#41ec80", "#2ce573"); // VisualScript RID
+	add_conversion_color_pair("#55f3e3", "#12d5c3"); // VisualScript Object
+	add_conversion_color_pair("#54ed9e", "#57e99f"); // VisualScript Dictionary
+	// Visual shaders
+	add_conversion_color_pair("#77ce57", "#67c046"); // Vector funcs
+	add_conversion_color_pair("#ea686c", "#d95256"); // Vector transforms
+	add_conversion_color_pair("#eac968", "#d9b64f"); // Textures and cubemaps
+	add_conversion_color_pair("#cf68ea", "#c050dd"); // Functions and expressions
+
+	// These icons should not be converted.
+	add_conversion_exception("EditorPivot");
+	add_conversion_exception("EditorHandle");
+	add_conversion_exception("Editor3DHandle");
+	add_conversion_exception("EditorBoneHandle");
+	add_conversion_exception("Godot");
+	add_conversion_exception("Sky");
+	add_conversion_exception("EditorControlAnchor");
+	add_conversion_exception("DefaultProjectIcon");
+	add_conversion_exception("GuiChecked");
+	add_conversion_exception("GuiRadioChecked");
+	add_conversion_exception("GuiIndeterminate");
+	add_conversion_exception("GuiCloseCustomizable");
+	add_conversion_exception("GuiGraphNodePort");
+	add_conversion_exception("GuiResizer");
+	add_conversion_exception("ZoomMore");
+	add_conversion_exception("ZoomLess");
+	add_conversion_exception("ZoomReset");
+	add_conversion_exception("LockViewport");
+	add_conversion_exception("GroupViewport");
+	add_conversion_exception("StatusError");
+	add_conversion_exception("StatusSuccess");
+	add_conversion_exception("StatusWarning");
+	add_conversion_exception("OverbrightIndicator");
+	add_conversion_exception("GuiMiniCheckerboard");
+
+	/// Code Editor.
+	add_conversion_exception("GuiTab");
+	add_conversion_exception("GuiSpace");
+	add_conversion_exception("CodeFoldedRightArrow");
+	add_conversion_exception("CodeFoldDownArrow");
+	add_conversion_exception("TextEditorPlay");
+	add_conversion_exception("Breakpoint");
+}
+
 static Ref<StyleBoxTexture> make_stylebox(Ref<Texture2D> p_texture, float p_left, float p_top, float p_right, float p_bottom, float p_margin_left = -1, float p_margin_top = -1, float p_margin_right = -1, float p_margin_bottom = -1, bool p_draw_center = true) {
 	Ref<StyleBoxTexture> style(memnew(StyleBoxTexture));
 	style->set_texture(p_texture);
-	style->set_margin_size(SIDE_LEFT, p_left * EDSCALE);
-	style->set_margin_size(SIDE_RIGHT, p_right * EDSCALE);
-	style->set_margin_size(SIDE_BOTTOM, p_bottom * EDSCALE);
-	style->set_margin_size(SIDE_TOP, p_top * EDSCALE);
-	style->set_default_margin(SIDE_LEFT, p_margin_left * EDSCALE);
-	style->set_default_margin(SIDE_RIGHT, p_margin_right * EDSCALE);
-	style->set_default_margin(SIDE_BOTTOM, p_margin_bottom * EDSCALE);
-	style->set_default_margin(SIDE_TOP, p_margin_top * EDSCALE);
+	style->set_margin_size_individual(p_left * EDSCALE, p_top * EDSCALE, p_right * EDSCALE, p_bottom * EDSCALE);
+	style->set_default_margin_individual(p_margin_left * EDSCALE, p_margin_top * EDSCALE, p_margin_right * EDSCALE, p_margin_bottom * EDSCALE);
 	style->set_draw_center(p_draw_center);
 	return style;
 }
 
 static Ref<StyleBoxEmpty> make_empty_stylebox(float p_margin_left = -1, float p_margin_top = -1, float p_margin_right = -1, float p_margin_bottom = -1) {
 	Ref<StyleBoxEmpty> style(memnew(StyleBoxEmpty));
-	style->set_default_margin(SIDE_LEFT, p_margin_left * EDSCALE);
-	style->set_default_margin(SIDE_RIGHT, p_margin_right * EDSCALE);
-	style->set_default_margin(SIDE_BOTTOM, p_margin_bottom * EDSCALE);
-	style->set_default_margin(SIDE_TOP, p_margin_top * EDSCALE);
+	style->set_default_margin_individual(p_margin_left * EDSCALE, p_margin_top * EDSCALE, p_margin_right * EDSCALE, p_margin_bottom * EDSCALE);
 	return style;
 }
 
@@ -71,12 +212,9 @@ static Ref<StyleBoxFlat> make_flat_stylebox(Color p_color, float p_margin_left =
 	Ref<StyleBoxFlat> style(memnew(StyleBoxFlat));
 	style->set_bg_color(p_color);
 	// Adjust level of detail based on the corners' effective sizes.
-	style->set_corner_detail(Math::ceil(1.5 * p_corner_width * EDSCALE));
+	style->set_corner_detail(Math::ceil(0.8 * p_corner_width * EDSCALE));
 	style->set_corner_radius_all(p_corner_width * EDSCALE);
-	style->set_default_margin(SIDE_LEFT, p_margin_left * EDSCALE);
-	style->set_default_margin(SIDE_RIGHT, p_margin_right * EDSCALE);
-	style->set_default_margin(SIDE_BOTTOM, p_margin_bottom * EDSCALE);
-	style->set_default_margin(SIDE_TOP, p_margin_top * EDSCALE);
+	style->set_default_margin_individual(p_margin_left * EDSCALE, p_margin_top * EDSCALE, p_margin_right * EDSCALE, p_margin_bottom * EDSCALE);
 	// Work around issue about antialiased edges being blurrier (GH-35279).
 	style->set_anti_aliased(false);
 	return style;
@@ -92,28 +230,9 @@ static Ref<StyleBoxLine> make_line_stylebox(Color p_color, int p_thickness = 1, 
 	return style;
 }
 
-static Ref<Texture2D> flip_icon(Ref<Texture2D> p_texture, bool p_flip_y = false, bool p_flip_x = false) {
-	if (!p_flip_y && !p_flip_x) {
-		return p_texture;
-	}
-
-	Ref<Image> img = p_texture->get_image();
-	ERR_FAIL_NULL_V(img, Ref<Texture2D>());
-	img = img->duplicate();
-
-	if (p_flip_y) {
-		img->flip_y();
-	}
-	if (p_flip_x) {
-		img->flip_x();
-	}
-
-	return ImageTexture::create_from_image(img);
-}
-
 #ifdef MODULE_SVG_ENABLED
 // See also `generate_icon()` in `scene/resources/default_theme.cpp`.
-static Ref<ImageTexture> editor_generate_icon(int p_index, bool p_convert_color, float p_scale = EDSCALE, float p_saturation = 1.0, Dictionary p_convert_colors = Dictionary()) {
+static Ref<ImageTexture> editor_generate_icon(int p_index, float p_scale, float p_saturation, const HashMap<Color, Color> &p_convert_colors = HashMap<Color, Color>()) {
 	Ref<Image> img = memnew(Image);
 
 	// Upsample icon generation only if the editor scale isn't an integer multiplier.
@@ -121,188 +240,61 @@ static Ref<ImageTexture> editor_generate_icon(int p_index, bool p_convert_color,
 	// with integer editor scales.
 	const bool upsample = !Math::is_equal_approx(Math::round(p_scale), p_scale);
 	ImageLoaderSVG img_loader;
-	img_loader.set_replace_colors(p_convert_colors);
-	img_loader.create_image_from_string(img, editor_icons_sources[p_index], p_scale, upsample, p_convert_color);
+	img_loader.create_image_from_string(img, editor_icons_sources[p_index], p_scale, upsample, p_convert_colors);
 	if (p_saturation != 1.0) {
 		img->adjust_bcs(1.0, 1.0, p_saturation);
 	}
 
-	// In this case filter really helps.
 	return ImageTexture::create_from_image(img);
 }
 #endif
 
-#ifndef ADD_CONVERT_COLOR
-#define ADD_CONVERT_COLOR(dictionary, old_color, new_color) dictionary[Color::html(old_color)] = Color::html(new_color)
-#endif
-
-void editor_register_and_generate_icons(Ref<Theme> p_theme, bool p_dark_theme = true, int p_thumb_size = 32, bool p_only_thumbs = false, float p_icon_saturation = 1.0) {
+void editor_register_and_generate_icons(Ref<Theme> p_theme, bool p_dark_theme, float p_icon_saturation, int p_thumb_size, bool p_only_thumbs = false) {
 #ifdef MODULE_SVG_ENABLED
-	// The default icon theme is designed to be used for a dark theme.
-	// This dictionary stores Color values to convert to other colors
-	// for better readability on a light theme.
-	// Godot Color values are used to avoid the ambiguity of strings
-	// (where "#ffffff", "fff", and "white" are all equivalent).
-	Dictionary dark_icon_color_dictionary;
+	// Before we register the icons, we adjust their colors and saturation.
+	// Most icons follow the standard rules for color conversion to follow the editor
+	// theme's polarity (dark/light). We also adjust the saturation for most icons,
+	// following the editor setting.
+	// Some icons are excluded from this conversion, and instead use the configured
+	// accent color to replace their innate accent color to match the editor theme.
+	// And then some icons are completely excluded from the conversion.
 
-	// The names of the icons to never convert, even if one of their colors
-	// are contained in the dictionary above.
-	HashSet<StringName> exceptions;
-
-	// Some of the colors below are listed for completeness sake.
-	// This can be a basis for proper palette validation later.
+	// Standard color conversion map.
+	HashMap<Color, Color> color_conversion_map;
+	// Icons by default are set up for the dark theme, so if the theme is light,
+	// we apply the dark-to-light color conversion map.
 	if (!p_dark_theme) {
-		// Convert color:                             FROM       TO
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#478cbf", "#478cbf"); // Godot Blue
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#414042", "#414042"); // Godot Gray
-
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#ffffff", "#414141"); // Pure white
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#000000", "#bfbfbf"); // Pure black
-		// Keep pure RGB colors as is, but list them for explicitly.
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#ff0000", "#ff0000"); // Pure red
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#00ff00", "#00ff00"); // Pure green
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#0000ff", "#0000ff"); // Pure blue
-
-		// GUI Colors
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#e0e0e0", "#5a5a5a"); // Common icon color
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#fefefe", "#fefefe"); // Forced light color
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#808080", "#808080"); // GUI disabled color
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#b3b3b3", "#363636"); // GUI disabled light color
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#699ce8", "#699ce8"); // GUI highlight color
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#f9f9f9", "#606060"); // Scrollbar grabber highlight color
-
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#c38ef1", "#a85de9"); // Animation
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#fc7f7f", "#cd3838"); // Spatial
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#8da5f3", "#3d64dd"); // 2D
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#4b70ea", "#1a3eac"); // 2D Dark
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#8eef97", "#2fa139"); // Control
-
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#5fb2ff", "#0079f0"); // Selection (blue)
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#003e7a", "#2b74bb"); // Selection (darker blue)
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#f7f5cf", "#615f3a"); // Gizmo (yellow)
-
-		// Rainbow
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#ff4545", "#ff2929"); // Red
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#ffe345", "#ffe337"); // Yellow
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#80ff45", "#74ff34"); // Green
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#45ffa2", "#2cff98"); // Aqua
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#45d7ff", "#22ccff"); // Blue
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#8045ff", "#702aff"); // Purple
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#ff4596", "#ff2781"); // Pink
-
-		// Audio gradients
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#e1da5b", "#d6cf4b"); // Yellow
-
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#62aeff", "#1678e0"); // Frozen gradient top
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#75d1e6", "#41acc5"); // Frozen gradient middle
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#84ffee", "#49ccba"); // Frozen gradient bottom
-
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#f70000", "#c91616"); // Color track red
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#eec315", "#d58c0b"); // Color track orange
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#dbee15", "#b7d10a"); // Color track yellow
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#288027", "#218309"); // Color track green
-
-		// Resource groups
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#ffca5f", "#fea900"); // Mesh resource (orange)
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#2998ff", "#68b6ff"); // Shape resource (blue)
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#a2d2ff", "#4998e3"); // Shape resource (light blue)
-
-		// Animation editor tracks
-		// The property track icon color is set by the common icon color.
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#ea7940", "#bd5e2c"); // 3D Position track
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#ff2b88", "#bd165f"); // 3D Rotation track
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#eac840", "#bd9d1f"); // 3D Scale track
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#3cf34e", "#16a827"); // Call Method track
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#2877f6", "#236be6"); // Bezier Curve track
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#eae440", "#9f9722"); // Audio Playback track
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#a448f0", "#9853ce"); // Animation Playback track
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#5ad5c4", "#0a9c88"); // Blend Shape track
-
-		// Control layouts
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#d6d6d6", "#474747"); // Highlighted part
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#474747", "#d6d6d6"); // Background part
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#919191", "#6e6e6e"); // Border part
-
-		// TileSet editor icons
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#fce00e", "#aa8d24"); // New Single Tile
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#0e71fc", "#0350bd"); // New Autotile
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#c6ced4", "#828f9b"); // New Atlas
-
-		// Visual script
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#41ecad", "#25e3a0"); // VisualScript variant
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#6f91f0", "#6d8eeb"); // VisualScript bool
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#5abbef", "#4fb2e9"); // VisualScript int
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#35d4f4", "#27ccf0"); // VisualScript float
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#4593ec", "#4690e7"); // VisualScript String
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#ac73f1", "#ad76ee"); // VisualScript Vector2
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#f1738f", "#ee758e"); // VisualScript Rect2
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#de66f0", "#dc6aed"); // VisualScript Vector3
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#b9ec41", "#96ce1a"); // VisualScript Transform2D
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#f74949", "#f77070"); // VisualScript Plane
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#ec418e", "#ec69a3"); // VisualScript Quat
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#ee5677", "#ee7991"); // VisualScript AABB
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#e1ec41", "#b2bb19"); // VisualScript Basis
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#f68f45", "#f49047"); // VisualScript Transform
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#417aec", "#6993ec"); // VisualScript NodePath
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#41ec80", "#2ce573"); // VisualScript RID
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#55f3e3", "#12d5c3"); // VisualScript Object
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#54ed9e", "#57e99f"); // VisualScript Dictionary
-		// Visual shaders
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#77ce57", "#67c046"); // Vector funcs
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#ea686c", "#d95256"); // Vector transforms
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#eac968", "#d9b64f"); // Textures and cubemaps
-		ADD_CONVERT_COLOR(dark_icon_color_dictionary, "#cf68ea", "#c050dd"); // Functions and expressions
-
-		exceptions.insert("EditorPivot");
-		exceptions.insert("EditorHandle");
-		exceptions.insert("Editor3DHandle");
-		exceptions.insert("EditorBoneHandle");
-		exceptions.insert("Godot");
-		exceptions.insert("Sky");
-		exceptions.insert("EditorControlAnchor");
-		exceptions.insert("DefaultProjectIcon");
-		exceptions.insert("GuiChecked");
-		exceptions.insert("GuiRadioChecked");
-		exceptions.insert("GuiIndeterminate");
-		exceptions.insert("GuiCloseCustomizable");
-		exceptions.insert("GuiGraphNodePort");
-		exceptions.insert("GuiResizer");
-		exceptions.insert("ZoomMore");
-		exceptions.insert("ZoomLess");
-		exceptions.insert("ZoomReset");
-		exceptions.insert("LockViewport");
-		exceptions.insert("GroupViewport");
-		exceptions.insert("StatusError");
-		exceptions.insert("StatusSuccess");
-		exceptions.insert("StatusWarning");
-		exceptions.insert("OverbrightIndicator");
-		exceptions.insert("GuiMiniCheckerboard");
-
-		// Prevents Code Editor icons from changing
-		exceptions.insert("GuiTab");
-		exceptions.insert("GuiSpace");
-		exceptions.insert("CodeFoldedRightArrow");
-		exceptions.insert("CodeFoldDownArrow");
-		exceptions.insert("TextEditorPlay");
-		exceptions.insert("Breakpoint");
+		for (KeyValue<Color, Color> &E : EditorColorMap::get_color_conversion_map()) {
+			color_conversion_map[E.key] = E.value;
+		}
 	}
-
-	// These ones should be converted even if we are using a dark theme.
+	// These colors should be converted even if we are using a dark theme.
 	const Color error_color = p_theme->get_color(SNAME("error_color"), SNAME("Editor"));
 	const Color success_color = p_theme->get_color(SNAME("success_color"), SNAME("Editor"));
 	const Color warning_color = p_theme->get_color(SNAME("warning_color"), SNAME("Editor"));
-	dark_icon_color_dictionary[Color::html("#ff5f5f")] = error_color;
-	dark_icon_color_dictionary[Color::html("#5fff97")] = success_color;
-	dark_icon_color_dictionary[Color::html("#ffdd65")] = warning_color;
+	color_conversion_map[Color::html("#ff5f5f")] = error_color;
+	color_conversion_map[Color::html("#5fff97")] = success_color;
+	color_conversion_map[Color::html("#ffdd65")] = warning_color;
 
-	// Use the accent color for some icons (checkbox, radio, toggle, etc.).
-	Dictionary accent_color_icon_color_dictionary;
+	// The names of the icons to exclude from the standard color conversion.
+	HashSet<StringName> conversion_exceptions = EditorColorMap::get_color_conversion_exceptions();
+
+	// The names of the icons to exclude when adjusting for saturation.
+	HashSet<StringName> saturation_exceptions;
+	saturation_exceptions.insert("DefaultProjectIcon");
+	saturation_exceptions.insert("Godot");
+	saturation_exceptions.insert("Logo");
+
+	// Accent color conversion map.
+	// It is used on soem icons (checkbox, radio, toggle, etc.), regardless of the dark
+	// or light mode.
+	HashMap<Color, Color> accent_color_map;
 	HashSet<StringName> accent_color_icons;
 
 	const Color accent_color = p_theme->get_color(SNAME("accent_color"), SNAME("Editor"));
-	accent_color_icon_color_dictionary[Color::html("699ce8")] = accent_color;
+	accent_color_map[Color::html("699ce8")] = accent_color;
 	if (accent_color.get_luminance() > 0.75) {
-		accent_color_icon_color_dictionary[Color::html("ffffff")] = Color(0.2, 0.2, 0.2);
+		accent_color_map[Color::html("ffffff")] = Color(0.2, 0.2, 0.2);
 	}
 
 	accent_color_icons.insert("GuiChecked");
@@ -318,16 +310,18 @@ void editor_register_and_generate_icons(Ref<Theme> p_theme, bool p_dark_theme = 
 			Ref<ImageTexture> icon;
 
 			if (accent_color_icons.has(editor_icons_names[i])) {
-				icon = editor_generate_icon(i, true, EDSCALE, 1.0, accent_color_icon_color_dictionary);
+				icon = editor_generate_icon(i, EDSCALE, 1.0, accent_color_map);
 			} else {
 				float saturation = p_icon_saturation;
-
-				if (strcmp(editor_icons_names[i], "DefaultProjectIcon") == 0 || strcmp(editor_icons_names[i], "Godot") == 0 || strcmp(editor_icons_names[i], "Logo") == 0) {
+				if (saturation_exceptions.has(editor_icons_names[i])) {
 					saturation = 1.0;
 				}
 
-				const int is_exception = exceptions.has(editor_icons_names[i]);
-				icon = editor_generate_icon(i, !is_exception, EDSCALE, saturation, dark_icon_color_dictionary);
+				if (conversion_exceptions.has(editor_icons_names[i])) {
+					icon = editor_generate_icon(i, EDSCALE, saturation);
+				} else {
+					icon = editor_generate_icon(i, EDSCALE, saturation, color_conversion_map);
+				}
 			}
 
 			p_theme->set_icon(editor_icons_names[i], SNAME("EditorIcons"), icon);
@@ -335,14 +329,27 @@ void editor_register_and_generate_icons(Ref<Theme> p_theme, bool p_dark_theme = 
 	}
 
 	// Generate thumbnail icons with the given thumbnail size.
-	// We don't need filtering when generating at one of the default resolutions.
-	const bool force_filter = p_thumb_size != 64 && p_thumb_size != 32;
+	// See editor\icons\editor_icons_builders.py for the code that determines which icons are thumbnails.
 	if (p_thumb_size >= 64) {
 		const float scale = (float)p_thumb_size / 64.0 * EDSCALE;
 		for (int i = 0; i < editor_bg_thumbs_count; i++) {
 			const int index = editor_bg_thumbs_indices[i];
-			const int is_exception = exceptions.has(editor_icons_names[index]);
-			const Ref<ImageTexture> icon = editor_generate_icon(index, !p_dark_theme && !is_exception, scale, force_filter, dark_icon_color_dictionary);
+			Ref<ImageTexture> icon;
+
+			if (accent_color_icons.has(editor_icons_names[index])) {
+				icon = editor_generate_icon(index, scale, 1.0, accent_color_map);
+			} else {
+				float saturation = p_icon_saturation;
+				if (saturation_exceptions.has(editor_icons_names[index])) {
+					saturation = 1.0;
+				}
+
+				if (conversion_exceptions.has(editor_icons_names[index])) {
+					icon = editor_generate_icon(index, scale, saturation);
+				} else {
+					icon = editor_generate_icon(index, scale, saturation, color_conversion_map);
+				}
+			}
 
 			p_theme->set_icon(editor_icons_names[index], SNAME("EditorIcons"), icon);
 		}
@@ -350,8 +357,22 @@ void editor_register_and_generate_icons(Ref<Theme> p_theme, bool p_dark_theme = 
 		const float scale = (float)p_thumb_size / 32.0 * EDSCALE;
 		for (int i = 0; i < editor_md_thumbs_count; i++) {
 			const int index = editor_md_thumbs_indices[i];
-			const bool is_exception = exceptions.has(editor_icons_names[index]);
-			const Ref<ImageTexture> icon = editor_generate_icon(index, !p_dark_theme && !is_exception, scale, force_filter, dark_icon_color_dictionary);
+			Ref<ImageTexture> icon;
+
+			if (accent_color_icons.has(editor_icons_names[index])) {
+				icon = editor_generate_icon(index, scale, 1.0, accent_color_map);
+			} else {
+				float saturation = p_icon_saturation;
+				if (saturation_exceptions.has(editor_icons_names[index])) {
+					saturation = 1.0;
+				}
+
+				if (conversion_exceptions.has(editor_icons_names[index])) {
+					icon = editor_generate_icon(index, scale, saturation);
+				} else {
+					icon = editor_generate_icon(index, scale, saturation, color_conversion_map);
+				}
+			}
 
 			p_theme->set_icon(editor_icons_names[index], SNAME("EditorIcons"), icon);
 		}
@@ -441,6 +462,14 @@ Ref<Theme> create_editor_theme(const Ref<Theme> p_theme) {
 	// Colors
 	bool dark_theme = EditorSettings::get_singleton()->is_dark_theme();
 
+#ifdef MODULE_SVG_ENABLED
+	if (dark_theme) {
+		ImageLoaderSVG::set_forced_color_map(HashMap<Color, Color>());
+	} else {
+		ImageLoaderSVG::set_forced_color_map(EditorColorMap::get_color_conversion_map());
+	}
+#endif
+
 	// Ensure base colors are in the 0..1 luminance range to avoid 8-bit integer overflow or text rendering issues.
 	// Some places in the editor use 8-bit integer colors.
 	const Color dark_color_1 = base_color.lerp(Color(0, 0, 0, 1), contrast).clamp();
@@ -458,6 +487,7 @@ Ref<Theme> create_editor_theme(const Ref<Theme> p_theme) {
 	const Color font_color = mono_color.lerp(base_color, 0.25);
 	const Color font_hover_color = mono_color.lerp(base_color, 0.125);
 	const Color font_focus_color = mono_color.lerp(base_color, 0.125);
+	const Color font_hover_pressed_color = font_hover_color.lerp(accent_color, 0.74);
 	const Color font_disabled_color = Color(mono_color.r, mono_color.g, mono_color.b, 0.3);
 	const Color font_readonly_color = Color(mono_color.r, mono_color.g, mono_color.b, 0.65);
 	const Color font_placeholder_color = Color(mono_color.r, mono_color.g, mono_color.b, 0.6);
@@ -479,9 +509,8 @@ Ref<Theme> create_editor_theme(const Ref<Theme> p_theme) {
 	const Color highlight_color = Color(accent_color.r, accent_color.g, accent_color.b, 0.275);
 	const Color disabled_highlight_color = highlight_color.lerp(dark_theme ? Color(0, 0, 0) : Color(1, 1, 1), 0.5);
 
-	float prev_icon_saturation = theme->has_color(SNAME("icon_saturation"), SNAME("Editor")) ? theme->get_color(SNAME("icon_saturation"), SNAME("Editor")).r : 1.0;
-
-	theme->set_color("icon_saturation", "Editor", Color(icon_saturation, icon_saturation, icon_saturation)); // can't save single float in theme, so using color
+	// Can't save single float in theme, so using Color.
+	theme->set_color("icon_saturation", "Editor", Color(icon_saturation, icon_saturation, icon_saturation));
 	theme->set_color("accent_color", "Editor", accent_color);
 	theme->set_color("highlight_color", "Editor", highlight_color);
 	theme->set_color("disabled_highlight_color", "Editor", disabled_highlight_color);
@@ -518,11 +547,11 @@ Ref<Theme> create_editor_theme(const Ref<Theme> p_theme) {
 	Color warning_color = Color(1, 0.87, 0.4);
 	Color error_color = Color(1, 0.47, 0.42);
 	Color property_color = font_color.lerp(Color(0.5, 0.5, 0.5), 0.5);
-	Color readonly_color = property_color.lerp(dark_theme ? Color(0, 0, 0) : Color(1, 1, 1), 0.5);
-	Color readonly_warning_color = error_color.lerp(dark_theme ? Color(0, 0, 0) : Color(1, 1, 1), 0.5);
+	Color readonly_color = property_color.lerp(dark_theme ? Color(0, 0, 0) : Color(1, 1, 1), 0.25);
+	Color readonly_warning_color = error_color.lerp(dark_theme ? Color(0, 0, 0) : Color(1, 1, 1), 0.25);
 
 	if (!dark_theme) {
-		// Darken some colors to be readable on a light background
+		// Darken some colors to be readable on a light background.
 		success_color = success_color.lerp(mono_color, 0.35);
 		warning_color = warning_color.lerp(mono_color, 0.35);
 		error_color = error_color.lerp(mono_color, 0.25);
@@ -545,22 +574,43 @@ Ref<Theme> create_editor_theme(const Ref<Theme> p_theme) {
 	theme->set_constant("dark_theme", "Editor", dark_theme);
 	theme->set_constant("color_picker_button_height", "Editor", 28 * EDSCALE);
 
-	// Register icons + font
+	// Register editor icons.
+	// If the settings are comparable to the old theme, then just copy them over.
+	// Otherwise, regenerate them. Also check if we need to regenerate "thumb" icons.
+	bool keep_old_icons = false;
+	bool regenerate_thumb_icons = true;
+	if (p_theme != nullptr) {
+		// We check editor scale, theme dark/light mode, icon saturation, and accent color.
 
-	// The editor scale, icon color (dark_theme bool), icon saturation, and accent color has not changed, so we do not regenerate the icons.
-	if (p_theme != nullptr && fabs(p_theme->get_constant(SNAME("scale"), SNAME("Editor")) - EDSCALE) < 0.00001 && (bool)p_theme->get_constant(SNAME("dark_theme"), SNAME("Editor")) == dark_theme && prev_icon_saturation == icon_saturation && p_theme->get_color(SNAME("accent_color"), SNAME("Editor")) == accent_color) {
-		// Register already generated icons.
+		// That doesn't really work as expected, since theme constants are integers, and scales are floats.
+		// So this check will never work when changing between 100-199% values.
+		const float prev_scale = (float)p_theme->get_constant(SNAME("scale"), SNAME("Editor"));
+		const bool prev_dark_theme = (bool)p_theme->get_constant(SNAME("dark_theme"), SNAME("Editor"));
+		const Color prev_accent_color = p_theme->get_color(SNAME("accent_color"), SNAME("Editor"));
+		const float prev_icon_saturation = p_theme->get_color(SNAME("icon_saturation"), SNAME("Editor")).r;
+
+		keep_old_icons = (Math::is_equal_approx(prev_scale, EDSCALE) &&
+				prev_dark_theme == dark_theme &&
+				prev_accent_color == accent_color &&
+				prev_icon_saturation == icon_saturation);
+
+		const double prev_thumb_size = (double)p_theme->get_constant(SNAME("thumb_size"), SNAME("Editor"));
+
+		regenerate_thumb_icons = !Math::is_equal_approx(prev_thumb_size, thumb_size);
+	}
+
+	if (keep_old_icons) {
 		for (int i = 0; i < editor_icons_count; i++) {
 			theme->set_icon(editor_icons_names[i], SNAME("EditorIcons"), p_theme->get_icon(editor_icons_names[i], SNAME("EditorIcons")));
 		}
 	} else {
-		editor_register_and_generate_icons(theme, dark_theme, thumb_size, false, icon_saturation);
+		editor_register_and_generate_icons(theme, dark_theme, icon_saturation, thumb_size, false);
 	}
-	// Thumbnail size has changed, so we regenerate the medium sizes
-	if (p_theme != nullptr && fabs((double)p_theme->get_constant(SNAME("thumb_size"), SNAME("Editor")) - thumb_size) > 0.00001) {
-		editor_register_and_generate_icons(p_theme, dark_theme, thumb_size, true);
+	if (regenerate_thumb_icons) {
+		editor_register_and_generate_icons(theme, dark_theme, icon_saturation, thumb_size, true);
 	}
 
+	// Register editor fonts.
 	editor_register_fonts(theme);
 
 	// Ensure borders are visible when using an editor scale below 100%.
@@ -574,7 +624,6 @@ Ref<Theme> create_editor_theme(const Ref<Theme> p_theme) {
 	Ref<StyleBoxFlat> style_default = make_flat_stylebox(base_color, default_margin_size, default_margin_size, default_margin_size, default_margin_size, corner_width);
 	style_default->set_border_width_all(border_width);
 	style_default->set_border_color(base_color);
-	style_default->set_draw_center(true);
 
 	// Button and widgets
 	const float extra_spacing = EDITOR_GET("interface/theme/additional_spacing");
@@ -582,10 +631,7 @@ Ref<Theme> create_editor_theme(const Ref<Theme> p_theme) {
 	const Vector2 widget_default_margin = Vector2(extra_spacing + 6, extra_spacing + default_margin_size + 1) * EDSCALE;
 
 	Ref<StyleBoxFlat> style_widget = style_default->duplicate();
-	style_widget->set_default_margin(SIDE_LEFT, widget_default_margin.x);
-	style_widget->set_default_margin(SIDE_TOP, widget_default_margin.y);
-	style_widget->set_default_margin(SIDE_RIGHT, widget_default_margin.x);
-	style_widget->set_default_margin(SIDE_BOTTOM, widget_default_margin.y);
+	style_widget->set_default_margin_individual(widget_default_margin.x, widget_default_margin.y, widget_default_margin.x, widget_default_margin.y);
 	style_widget->set_bg_color(dark_color_1);
 	style_widget->set_border_color(dark_color_2);
 
@@ -608,14 +654,14 @@ Ref<Theme> create_editor_theme(const Ref<Theme> p_theme) {
 	// Style for windows, popups, etc..
 	Ref<StyleBoxFlat> style_popup = style_default->duplicate();
 	const int popup_margin_size = default_margin_size * EDSCALE * 3;
-	style_popup->set_default_margin(SIDE_LEFT, popup_margin_size);
-	style_popup->set_default_margin(SIDE_TOP, popup_margin_size);
-	style_popup->set_default_margin(SIDE_RIGHT, popup_margin_size);
-	style_popup->set_default_margin(SIDE_BOTTOM, popup_margin_size);
+	style_popup->set_default_margin_all(popup_margin_size);
 	style_popup->set_border_color(contrast_color_1);
 	const Color shadow_color = Color(0, 0, 0, dark_theme ? 0.3 : 0.1);
 	style_popup->set_shadow_color(shadow_color);
 	style_popup->set_shadow_size(4 * EDSCALE);
+	// Popups are separate windows by default in the editor. Windows currently don't support per-pixel transparency
+	// in 4.0, and even if it was, it may not always work in practice (e.g. running with compositing disabled).
+	style_popup->set_corner_radius_all(0);
 
 	Ref<StyleBoxLine> style_popup_separator(memnew(StyleBoxLine));
 	style_popup_separator->set_color(separator_color);
@@ -637,45 +683,41 @@ Ref<Theme> create_editor_theme(const Ref<Theme> p_theme) {
 
 	// TabBar
 
-	Ref<StyleBoxFlat> style_tab_selected = style_widget->duplicate();
+	Ref<StyleBoxFlat> style_tab_base = style_widget->duplicate();
 
+	style_tab_base->set_border_width_all(0);
+	// Don't round the top corners to avoid creating a small blank space between the tabs and the main panel.
+	// This also makes the top highlight look better.
+	style_tab_base->set_corner_radius(CORNER_BOTTOM_LEFT, 0);
+	style_tab_base->set_corner_radius(CORNER_BOTTOM_RIGHT, 0);
+
+	// When using a border width greater than 0, visually line up the left of the selected tab with the underlying panel.
+	style_tab_base->set_expand_margin_size(SIDE_LEFT, -border_width);
+
+	style_tab_base->set_default_margin(SIDE_LEFT, widget_default_margin.x + 5 * EDSCALE);
+	style_tab_base->set_default_margin(SIDE_RIGHT, widget_default_margin.x + 5 * EDSCALE);
+	style_tab_base->set_default_margin(SIDE_BOTTOM, widget_default_margin.y);
+	style_tab_base->set_default_margin(SIDE_TOP, widget_default_margin.y);
+
+	Ref<StyleBoxFlat> style_tab_selected = style_tab_base->duplicate();
+
+	style_tab_selected->set_bg_color(base_color);
 	// Add a highlight line at the top of the selected tab.
-	style_tab_selected->set_border_width_all(0);
-	style_tab_selected->set_default_margin(SIDE_LEFT, widget_default_margin.x - border_width);
 	style_tab_selected->set_border_width(SIDE_TOP, Math::round(2 * EDSCALE));
 	// Make the highlight line prominent, but not too prominent as to not be distracting.
 	Color tab_highlight = dark_color_2.lerp(accent_color, 0.75);
 	style_tab_selected->set_border_color(tab_highlight);
-	// Don't round the top corners to avoid creating a small blank space between the tabs and the main panel.
-	// This also makes the top highlight look better.
 	style_tab_selected->set_corner_radius_all(0);
 
-	// Prevent visible artifacts and cover the top-left rounded corner of the panel below the tab if selected
-	// We can't prevent them with both rounded corners and non-zero border width, though
-	style_tab_selected->set_expand_margin_size(SIDE_BOTTOM, corner_width > 0 ? corner_width : border_width);
-
-	// When using a border width greater than 0, visually line up the left of the selected tab with the underlying panel.
-	style_tab_selected->set_expand_margin_size(SIDE_LEFT, -border_width);
-
-	style_tab_selected->set_default_margin(SIDE_LEFT, widget_default_margin.x + 2 * EDSCALE);
-	style_tab_selected->set_default_margin(SIDE_RIGHT, widget_default_margin.x + 2 * EDSCALE);
-	style_tab_selected->set_default_margin(SIDE_BOTTOM, widget_default_margin.y);
-	style_tab_selected->set_default_margin(SIDE_TOP, widget_default_margin.y);
-	style_tab_selected->set_bg_color(base_color);
-
-	Ref<StyleBoxFlat> style_tab_unselected = style_tab_selected->duplicate();
-	style_tab_unselected->set_bg_color(dark_color_1);
+	Ref<StyleBoxFlat> style_tab_unselected = style_tab_base->duplicate();
 	style_tab_unselected->set_expand_margin_size(SIDE_BOTTOM, 0);
+	style_tab_unselected->set_bg_color(dark_color_1);
 	// Add some spacing between unselected tabs to make them easier to distinguish from each other
 	style_tab_unselected->set_border_color(Color(0, 0, 0, 0));
-	style_tab_unselected->set_border_width(SIDE_LEFT, Math::round(1 * EDSCALE));
-	style_tab_unselected->set_border_width(SIDE_RIGHT, Math::round(1 * EDSCALE));
-	style_tab_unselected->set_default_margin(SIDE_LEFT, widget_default_margin.x + 2 * EDSCALE);
-	style_tab_unselected->set_default_margin(SIDE_RIGHT, widget_default_margin.x + 2 * EDSCALE);
 
-	Ref<StyleBoxFlat> style_tab_disabled = style_tab_selected->duplicate();
-	style_tab_disabled->set_bg_color(disabled_bg_color);
+	Ref<StyleBoxFlat> style_tab_disabled = style_tab_base->duplicate();
 	style_tab_disabled->set_expand_margin_size(SIDE_BOTTOM, 0);
+	style_tab_disabled->set_bg_color(disabled_bg_color);
 	style_tab_disabled->set_border_color(disabled_bg_color);
 
 	// Editor background
@@ -721,8 +763,26 @@ Ref<Theme> create_editor_theme(const Ref<Theme> p_theme) {
 	theme->set_stylebox("ScriptEditorPanel", "EditorStyles", make_empty_stylebox(default_margin_size, 0, default_margin_size, default_margin_size));
 	theme->set_stylebox("ScriptEditor", "EditorStyles", make_empty_stylebox(0, 0, 0, 0));
 
-	// Play button group
-	theme->set_stylebox("PlayButtonPanel", "EditorStyles", style_empty);
+	// Launch Pad and Play buttons
+	Ref<StyleBoxFlat> style_launch_pad = make_flat_stylebox(dark_color_1, 2 * EDSCALE, 0, 2 * EDSCALE, 0, corner_width);
+	style_launch_pad->set_corner_radius_all(corner_radius * EDSCALE);
+	theme->set_stylebox("LaunchPadNormal", "EditorStyles", style_launch_pad);
+	Ref<StyleBoxFlat> style_launch_pad_movie = style_launch_pad->duplicate();
+	style_launch_pad_movie->set_bg_color(accent_color * Color(1, 1, 1, 0.1));
+	style_launch_pad_movie->set_border_color(accent_color);
+	style_launch_pad_movie->set_border_width_all(Math::round(2 * EDSCALE));
+	theme->set_stylebox("LaunchPadMovieMode", "EditorStyles", style_launch_pad_movie);
+
+	theme->set_stylebox("MovieWriterButtonNormal", "EditorStyles", make_empty_stylebox(0, 0, 0, 0));
+	Ref<StyleBoxFlat> style_write_movie_button = style_widget_pressed->duplicate();
+	style_write_movie_button->set_bg_color(accent_color);
+	style_write_movie_button->set_corner_radius_all(corner_radius * EDSCALE);
+	style_write_movie_button->set_default_margin(SIDE_TOP, 0);
+	style_write_movie_button->set_default_margin(SIDE_BOTTOM, 0);
+	style_write_movie_button->set_default_margin(SIDE_LEFT, 0);
+	style_write_movie_button->set_default_margin(SIDE_RIGHT, 0);
+	style_write_movie_button->set_expand_margin_size(SIDE_RIGHT, 2 * EDSCALE);
+	theme->set_stylebox("MovieWriterButtonPressed", "EditorStyles", style_write_movie_button);
 
 	theme->set_stylebox("normal", "MenuButton", style_menu);
 	theme->set_stylebox("hover", "MenuButton", style_widget_hover);
@@ -732,6 +792,7 @@ Ref<Theme> create_editor_theme(const Ref<Theme> p_theme) {
 
 	theme->set_color("font_color", "MenuButton", font_color);
 	theme->set_color("font_hover_color", "MenuButton", font_hover_color);
+	theme->set_color("font_hover_pressed_color", "MenuButton", font_hover_pressed_color);
 	theme->set_color("font_focus_color", "MenuButton", font_focus_color);
 
 	theme->set_stylebox("MenuHover", "EditorStyles", style_widget_hover);
@@ -745,6 +806,7 @@ Ref<Theme> create_editor_theme(const Ref<Theme> p_theme) {
 
 	theme->set_color("font_color", "Button", font_color);
 	theme->set_color("font_hover_color", "Button", font_hover_color);
+	theme->set_color("font_hover_pressed_color", "Button", font_hover_pressed_color);
 	theme->set_color("font_focus_color", "Button", font_focus_color);
 	theme->set_color("font_pressed_color", "Button", accent_color);
 	theme->set_color("font_disabled_color", "Button", font_disabled_color);
@@ -788,6 +850,26 @@ Ref<Theme> create_editor_theme(const Ref<Theme> p_theme) {
 	editor_log_button_pressed->set_border_color(accent_color);
 	theme->set_stylebox("pressed", "EditorLogFilterButton", editor_log_button_pressed);
 
+	// MenuBar
+	theme->set_stylebox("normal", "MenuBar", style_widget);
+	theme->set_stylebox("hover", "MenuBar", style_widget_hover);
+	theme->set_stylebox("pressed", "MenuBar", style_widget_pressed);
+	theme->set_stylebox("focus", "MenuBar", style_widget_focus);
+	theme->set_stylebox("disabled", "MenuBar", style_widget_disabled);
+
+	theme->set_color("font_color", "MenuBar", font_color);
+	theme->set_color("font_hover_color", "MenuBar", font_hover_color);
+	theme->set_color("font_hover_pressed_color", "MenuBar", font_hover_pressed_color);
+	theme->set_color("font_focus_color", "MenuBar", font_focus_color);
+	theme->set_color("font_pressed_color", "MenuBar", accent_color);
+	theme->set_color("font_disabled_color", "MenuBar", font_disabled_color);
+
+	theme->set_color("icon_normal_color", "MenuBar", icon_normal_color);
+	theme->set_color("icon_hover_color", "MenuBar", icon_hover_color);
+	theme->set_color("icon_focus_color", "MenuBar", icon_focus_color);
+	theme->set_color("icon_pressed_color", "MenuBar", icon_pressed_color);
+	theme->set_color("icon_disabled_color", "MenuBar", icon_disabled_color);
+
 	// OptionButton
 	Ref<StyleBoxFlat> style_option_button_focus = style_widget_focus->duplicate();
 	Ref<StyleBoxFlat> style_option_button_normal = style_widget->duplicate();
@@ -814,6 +896,7 @@ Ref<Theme> create_editor_theme(const Ref<Theme> p_theme) {
 
 	theme->set_color("font_color", "OptionButton", font_color);
 	theme->set_color("font_hover_color", "OptionButton", font_hover_color);
+	theme->set_color("font_hover_pressed_color", "OptionButton", font_hover_pressed_color);
 	theme->set_color("font_focus_color", "OptionButton", font_focus_color);
 	theme->set_color("font_pressed_color", "OptionButton", accent_color);
 	theme->set_color("font_disabled_color", "OptionButton", font_disabled_color);
@@ -836,18 +919,19 @@ Ref<Theme> create_editor_theme(const Ref<Theme> p_theme) {
 	theme->set_stylebox("hover", "CheckButton", style_menu);
 	theme->set_stylebox("hover_pressed", "CheckButton", style_menu);
 
-	theme->set_icon("on", "CheckButton", theme->get_icon(SNAME("GuiToggleOn"), SNAME("EditorIcons")));
-	theme->set_icon("on_disabled", "CheckButton", theme->get_icon(SNAME("GuiToggleOnDisabled"), SNAME("EditorIcons")));
-	theme->set_icon("off", "CheckButton", theme->get_icon(SNAME("GuiToggleOff"), SNAME("EditorIcons")));
-	theme->set_icon("off_disabled", "CheckButton", theme->get_icon(SNAME("GuiToggleOffDisabled"), SNAME("EditorIcons")));
+	theme->set_icon("checked", "CheckButton", theme->get_icon(SNAME("GuiToggleOn"), SNAME("EditorIcons")));
+	theme->set_icon("checked_disabled", "CheckButton", theme->get_icon(SNAME("GuiToggleOnDisabled"), SNAME("EditorIcons")));
+	theme->set_icon("unchecked", "CheckButton", theme->get_icon(SNAME("GuiToggleOff"), SNAME("EditorIcons")));
+	theme->set_icon("unchecked_disabled", "CheckButton", theme->get_icon(SNAME("GuiToggleOffDisabled"), SNAME("EditorIcons")));
 
-	theme->set_icon("on_mirrored", "CheckButton", theme->get_icon(SNAME("GuiToggleOnMirrored"), SNAME("EditorIcons")));
-	theme->set_icon("on_disabled_mirrored", "CheckButton", theme->get_icon(SNAME("GuiToggleOnDisabledMirrored"), SNAME("EditorIcons")));
-	theme->set_icon("off_mirrored", "CheckButton", theme->get_icon(SNAME("GuiToggleOffMirrored"), SNAME("EditorIcons")));
-	theme->set_icon("off_disabled_mirrored", "CheckButton", theme->get_icon(SNAME("GuiToggleOffDisabledMirrored"), SNAME("EditorIcons")));
+	theme->set_icon("checked_mirrored", "CheckButton", theme->get_icon(SNAME("GuiToggleOnMirrored"), SNAME("EditorIcons")));
+	theme->set_icon("checked_disabled_mirrored", "CheckButton", theme->get_icon(SNAME("GuiToggleOnDisabledMirrored"), SNAME("EditorIcons")));
+	theme->set_icon("unchecked_mirrored", "CheckButton", theme->get_icon(SNAME("GuiToggleOffMirrored"), SNAME("EditorIcons")));
+	theme->set_icon("unchecked_disabled_mirrored", "CheckButton", theme->get_icon(SNAME("GuiToggleOffDisabledMirrored"), SNAME("EditorIcons")));
 
 	theme->set_color("font_color", "CheckButton", font_color);
 	theme->set_color("font_hover_color", "CheckButton", font_hover_color);
+	theme->set_color("font_hover_pressed_color", "CheckButton", font_hover_pressed_color);
 	theme->set_color("font_focus_color", "CheckButton", font_focus_color);
 	theme->set_color("font_pressed_color", "CheckButton", accent_color);
 	theme->set_color("font_disabled_color", "CheckButton", font_disabled_color);
@@ -859,14 +943,11 @@ Ref<Theme> create_editor_theme(const Ref<Theme> p_theme) {
 	theme->set_color("icon_disabled_color", "CheckButton", icon_disabled_color);
 
 	theme->set_constant("h_separation", "CheckButton", 8 * EDSCALE);
-	theme->set_constant("check_v_adjust", "CheckButton", 0 * EDSCALE);
+	theme->set_constant("check_v_offset", "CheckButton", 0 * EDSCALE);
 
 	// Checkbox
 	Ref<StyleBoxFlat> sb_checkbox = style_menu->duplicate();
-	sb_checkbox->set_default_margin(SIDE_LEFT, default_margin_size * EDSCALE);
-	sb_checkbox->set_default_margin(SIDE_RIGHT, default_margin_size * EDSCALE);
-	sb_checkbox->set_default_margin(SIDE_TOP, default_margin_size * EDSCALE);
-	sb_checkbox->set_default_margin(SIDE_BOTTOM, default_margin_size * EDSCALE);
+	sb_checkbox->set_default_margin_all(default_margin_size * EDSCALE);
 
 	theme->set_stylebox("normal", "CheckBox", sb_checkbox);
 	theme->set_stylebox("pressed", "CheckBox", sb_checkbox);
@@ -884,6 +965,7 @@ Ref<Theme> create_editor_theme(const Ref<Theme> p_theme) {
 
 	theme->set_color("font_color", "CheckBox", font_color);
 	theme->set_color("font_hover_color", "CheckBox", font_hover_color);
+	theme->set_color("font_hover_pressed_color", "CheckBox", font_hover_pressed_color);
 	theme->set_color("font_focus_color", "CheckBox", font_focus_color);
 	theme->set_color("font_pressed_color", "CheckBox", accent_color);
 	theme->set_color("font_disabled_color", "CheckBox", font_disabled_color);
@@ -895,7 +977,7 @@ Ref<Theme> create_editor_theme(const Ref<Theme> p_theme) {
 	theme->set_color("icon_disabled_color", "CheckBox", icon_disabled_color);
 
 	theme->set_constant("h_separation", "CheckBox", 8 * EDSCALE);
-	theme->set_constant("check_v_adjust", "CheckBox", 0 * EDSCALE);
+	theme->set_constant("check_v_offset", "CheckBox", 0 * EDSCALE);
 
 	// PopupDialog
 	theme->set_stylebox("panel", "PopupDialog", style_popup);
@@ -905,10 +987,7 @@ Ref<Theme> create_editor_theme(const Ref<Theme> p_theme) {
 	// Use 1 pixel for the sides, since if 0 is used, the highlight of hovered items is drawn
 	// on top of the popup border. This causes a 'gap' in the panel border when an item is highlighted,
 	// and it looks weird. 1px solves this.
-	style_popup_menu->set_default_margin(SIDE_LEFT, EDSCALE);
-	style_popup_menu->set_default_margin(SIDE_TOP, 2 * EDSCALE);
-	style_popup_menu->set_default_margin(SIDE_RIGHT, EDSCALE);
-	style_popup_menu->set_default_margin(SIDE_BOTTOM, 2 * EDSCALE);
+	style_popup_menu->set_default_margin_individual(EDSCALE, 2 * EDSCALE, EDSCALE, 2 * EDSCALE);
 	// Always display a border for PopupMenus so they can be distinguished from their background.
 	style_popup_menu->set_border_width_all(EDSCALE);
 	style_popup_menu->set_border_color(dark_color_2);
@@ -964,10 +1043,7 @@ Ref<Theme> create_editor_theme(const Ref<Theme> p_theme) {
 		sub_inspector_bg->set_bg_color(dark_color_1.lerp(si_base_color, 0.08));
 		sub_inspector_bg->set_border_width_all(2 * EDSCALE);
 		sub_inspector_bg->set_border_color(si_base_color * Color(0.7, 0.7, 0.7, 0.8));
-		sub_inspector_bg->set_default_margin(SIDE_LEFT, 4 * EDSCALE);
-		sub_inspector_bg->set_default_margin(SIDE_RIGHT, 4 * EDSCALE);
-		sub_inspector_bg->set_default_margin(SIDE_BOTTOM, 4 * EDSCALE);
-		sub_inspector_bg->set_default_margin(SIDE_TOP, 4 * EDSCALE);
+		sub_inspector_bg->set_default_margin_all(4 * EDSCALE);
 		sub_inspector_bg->set_corner_radius(CORNER_TOP_LEFT, 0);
 		sub_inspector_bg->set_corner_radius(CORNER_TOP_RIGHT, 0);
 
@@ -1035,7 +1111,7 @@ Ref<Theme> create_editor_theme(const Ref<Theme> p_theme) {
 	// Make Trees easier to distinguish from other controls by using a darker background color.
 	style_tree_bg->set_bg_color(dark_color_1.lerp(dark_color_2, 0.5));
 	style_tree_bg->set_border_color(dark_color_3);
-	theme->set_stylebox("bg", "Tree", style_tree_bg);
+	theme->set_stylebox("panel", "Tree", style_tree_bg);
 
 	// Tree
 	theme->set_icon("checked", "Tree", theme->get_icon(SNAME("GuiChecked"), SNAME("EditorIcons")));
@@ -1046,7 +1122,7 @@ Ref<Theme> create_editor_theme(const Ref<Theme> p_theme) {
 	theme->set_icon("arrow_collapsed_mirrored", "Tree", theme->get_icon(SNAME("GuiTreeArrowLeft"), SNAME("EditorIcons")));
 	theme->set_icon("updown", "Tree", theme->get_icon(SNAME("GuiTreeUpdown"), SNAME("EditorIcons")));
 	theme->set_icon("select_arrow", "Tree", theme->get_icon(SNAME("GuiDropdown"), SNAME("EditorIcons")));
-	theme->set_stylebox("bg_focus", "Tree", style_widget_focus);
+	theme->set_stylebox("focus", "Tree", style_widget_focus);
 	theme->set_stylebox("custom_button", "Tree", make_empty_stylebox());
 	theme->set_stylebox("custom_button_pressed", "Tree", make_empty_stylebox());
 	theme->set_stylebox("custom_button_hover", "Tree", style_widget);
@@ -1137,21 +1213,26 @@ Ref<Theme> create_editor_theme(const Ref<Theme> p_theme) {
 	style_itemlist_cursor->set_draw_center(false);
 	style_itemlist_cursor->set_border_width_all(border_width);
 	style_itemlist_cursor->set_border_color(highlight_color);
+	theme->set_stylebox("panel", "ItemList", style_itemlist_bg);
+	theme->set_stylebox("focus", "ItemList", style_widget_focus);
 	theme->set_stylebox("cursor", "ItemList", style_itemlist_cursor);
 	theme->set_stylebox("cursor_unfocused", "ItemList", style_itemlist_cursor);
 	theme->set_stylebox("selected_focus", "ItemList", style_tree_focus);
 	theme->set_stylebox("selected", "ItemList", style_tree_selected);
-	theme->set_stylebox("bg_focus", "ItemList", style_widget_focus);
-	theme->set_stylebox("bg", "ItemList", style_itemlist_bg);
 	theme->set_color("font_color", "ItemList", font_color);
 	theme->set_color("font_selected_color", "ItemList", mono_color);
 	theme->set_color("guide_color", "ItemList", guide_color);
-	theme->set_constant("v_separation", "ItemList", widget_default_margin.y - EDSCALE);
+	theme->set_constant("v_separation", "ItemList", force_even_vsep * 0.5 * EDSCALE);
 	theme->set_constant("h_separation", "ItemList", 6 * EDSCALE);
 	theme->set_constant("icon_margin", "ItemList", 6 * EDSCALE);
 	theme->set_constant("line_separation", "ItemList", 3 * EDSCALE);
 
 	// TabBar & TabContainer
+	Ref<StyleBoxFlat> style_tabbar_background = make_flat_stylebox(dark_color_1, 0, 0, 0, 0, corner_radius * EDSCALE);
+	style_tabbar_background->set_corner_radius(CORNER_BOTTOM_LEFT, 0);
+	style_tabbar_background->set_corner_radius(CORNER_BOTTOM_RIGHT, 0);
+	theme->set_stylebox("tabbar_background", "TabContainer", style_tabbar_background);
+
 	theme->set_stylebox("tab_selected", "TabContainer", style_tab_selected);
 	theme->set_stylebox("tab_unselected", "TabContainer", style_tab_unselected);
 	theme->set_stylebox("tab_disabled", "TabContainer", style_tab_disabled);
@@ -1160,8 +1241,6 @@ Ref<Theme> create_editor_theme(const Ref<Theme> p_theme) {
 	theme->set_stylebox("tab_disabled", "TabBar", style_tab_disabled);
 	theme->set_stylebox("button_pressed", "TabBar", style_menu);
 	theme->set_stylebox("button_highlight", "TabBar", style_menu);
-	theme->set_stylebox("SceneTabFG", "EditorStyles", style_tab_selected);
-	theme->set_stylebox("SceneTabBG", "EditorStyles", style_tab_unselected);
 	theme->set_color("font_selected_color", "TabContainer", font_color);
 	theme->set_color("font_unselected_color", "TabContainer", font_disabled_color);
 	theme->set_color("font_selected_color", "TabBar", font_color);
@@ -1181,21 +1260,24 @@ Ref<Theme> create_editor_theme(const Ref<Theme> p_theme) {
 	theme->set_icon("decrement_highlight", "TabContainer", theme->get_icon(SNAME("GuiScrollArrowLeftHl"), SNAME("EditorIcons")));
 	theme->set_icon("drop_mark", "TabContainer", theme->get_icon(SNAME("GuiTabDropMark"), SNAME("EditorIcons")));
 	theme->set_icon("drop_mark", "TabBar", theme->get_icon(SNAME("GuiTabDropMark"), SNAME("EditorIcons")));
+	theme->set_constant("side_margin", "TabContainer", 0);
 	theme->set_constant("h_separation", "TabBar", 4 * EDSCALE);
 
-	// Content of each tab
+	// Content of each tab.
 	Ref<StyleBoxFlat> style_content_panel = style_default->duplicate();
 	style_content_panel->set_border_color(dark_color_3);
 	style_content_panel->set_border_width_all(border_width);
-	// compensate the border
-	style_content_panel->set_default_margin(SIDE_TOP, (2 + margin_size_extra) * EDSCALE);
-	style_content_panel->set_default_margin(SIDE_RIGHT, margin_size_extra * EDSCALE);
-	style_content_panel->set_default_margin(SIDE_BOTTOM, margin_size_extra * EDSCALE);
-	style_content_panel->set_default_margin(SIDE_LEFT, margin_size_extra * EDSCALE);
-	// Display border to visually split the body of the container from its possible backgrounds.
-	style_content_panel->set_border_width(Side::SIDE_TOP, Math::round(2 * EDSCALE));
-	style_content_panel->set_border_color(dark_color_2);
+	style_content_panel->set_border_width(Side::SIDE_TOP, 0);
+	style_content_panel->set_corner_radius(CORNER_TOP_LEFT, 0);
+	style_content_panel->set_corner_radius(CORNER_TOP_RIGHT, 0);
+	// Compensate for the border.
+	style_content_panel->set_default_margin_individual(margin_size_extra * EDSCALE, (2 + margin_size_extra) * EDSCALE, margin_size_extra * EDSCALE, margin_size_extra * EDSCALE);
 	theme->set_stylebox("panel", "TabContainer", style_content_panel);
+
+	// Bottom panel.
+	Ref<StyleBoxFlat> style_bottom_panel = style_content_panel->duplicate();
+	style_bottom_panel->set_corner_radius_all(corner_radius * EDSCALE);
+	theme->set_stylebox("BottomPanel", "EditorStyles", style_bottom_panel);
 
 	// TabContainerOdd can be used on tabs against the base color background (e.g. nested tabs).
 	theme->set_type_variation("TabContainerOdd", "TabContainer");
@@ -1210,10 +1292,7 @@ Ref<Theme> create_editor_theme(const Ref<Theme> p_theme) {
 
 	// This stylebox is used in 3d and 2d viewports (no borders).
 	Ref<StyleBoxFlat> style_content_panel_vp = style_content_panel->duplicate();
-	style_content_panel_vp->set_default_margin(SIDE_LEFT, border_width * 2);
-	style_content_panel_vp->set_default_margin(SIDE_TOP, default_margin_size * EDSCALE);
-	style_content_panel_vp->set_default_margin(SIDE_RIGHT, border_width * 2);
-	style_content_panel_vp->set_default_margin(SIDE_BOTTOM, border_width * 2);
+	style_content_panel_vp->set_default_margin_individual(border_width * 2, default_margin_size * EDSCALE, border_width * 2, border_width * 2);
 	theme->set_stylebox("Content", "EditorStyles", style_content_panel_vp);
 
 	// This stylebox is used by preview tabs in the Theme Editor.
@@ -1275,7 +1354,6 @@ Ref<Theme> create_editor_theme(const Ref<Theme> p_theme) {
 	theme->set_stylebox("normal", "TextEdit", style_line_edit);
 	theme->set_stylebox("focus", "TextEdit", style_widget_focus);
 	theme->set_stylebox("read_only", "TextEdit", style_line_edit_disabled);
-	theme->set_constant("side_margin", "TabContainer", 0);
 	theme->set_icon("tab", "TextEdit", theme->get_icon(SNAME("GuiTab"), SNAME("EditorIcons")));
 	theme->set_icon("space", "TextEdit", theme->get_icon(SNAME("GuiSpace"), SNAME("EditorIcons")));
 	theme->set_color("font_color", "TextEdit", font_color);
@@ -1285,11 +1363,16 @@ Ref<Theme> create_editor_theme(const Ref<Theme> p_theme) {
 	theme->set_color("selection_color", "TextEdit", selection_color);
 	theme->set_constant("line_spacing", "TextEdit", 4 * EDSCALE);
 
+	theme->set_icon("h_grabber", "SplitContainer", theme->get_icon(SNAME("GuiHsplitter"), SNAME("EditorIcons")));
+	theme->set_icon("v_grabber", "SplitContainer", theme->get_icon(SNAME("GuiVsplitter"), SNAME("EditorIcons")));
 	theme->set_icon("grabber", "VSplitContainer", theme->get_icon(SNAME("GuiVsplitter"), SNAME("EditorIcons")));
 	theme->set_icon("grabber", "HSplitContainer", theme->get_icon(SNAME("GuiHsplitter"), SNAME("EditorIcons")));
 
 	theme->set_constant("separation", "HSplitContainer", default_margin_size * 2 * EDSCALE);
 	theme->set_constant("separation", "VSplitContainer", default_margin_size * 2 * EDSCALE);
+
+	theme->set_constant("minimum_grab_thickness", "HSplitContainer", 6 * EDSCALE);
+	theme->set_constant("minimum_grab_thickness", "VSplitContainer", 6 * EDSCALE);
 
 	// Containers
 	theme->set_constant("separation", "BoxContainer", default_margin_size * EDSCALE);
@@ -1350,6 +1433,7 @@ Ref<Theme> create_editor_theme(const Ref<Theme> p_theme) {
 
 	// AcceptDialog
 	theme->set_stylebox("panel", "AcceptDialog", style_window_title);
+	theme->set_constant("buttons_separation", "AcceptDialog", 8 * EDSCALE);
 
 	// HScrollBar
 	Ref<Texture2D> empty_icon = memnew(ImageTexture);
@@ -1438,6 +1522,7 @@ Ref<Theme> create_editor_theme(const Ref<Theme> p_theme) {
 	theme->set_stylebox("focus", "LinkButton", style_empty);
 	theme->set_color("font_color", "LinkButton", font_color);
 	theme->set_color("font_hover_color", "LinkButton", font_hover_color);
+	theme->set_color("font_hover_pressed_color", "LinkButton", font_hover_pressed_color);
 	theme->set_color("font_focus_color", "LinkButton", font_focus_color);
 	theme->set_color("font_pressed_color", "LinkButton", accent_color);
 	theme->set_color("font_disabled_color", "LinkButton", font_disabled_color);
@@ -1447,10 +1532,7 @@ Ref<Theme> create_editor_theme(const Ref<Theme> p_theme) {
 	// is only relevant for default tooltips.
 	Ref<StyleBoxFlat> style_tooltip = style_popup->duplicate();
 	style_tooltip->set_shadow_size(0);
-	style_tooltip->set_default_margin(SIDE_LEFT, default_margin_size * EDSCALE * 0.5);
-	style_tooltip->set_default_margin(SIDE_TOP, default_margin_size * EDSCALE * 0.5);
-	style_tooltip->set_default_margin(SIDE_RIGHT, default_margin_size * EDSCALE * 0.5);
-	style_tooltip->set_default_margin(SIDE_BOTTOM, default_margin_size * EDSCALE * 0.5);
+	style_tooltip->set_default_margin_all(default_margin_size * EDSCALE * 0.5);
 	style_tooltip->set_bg_color(dark_color_3 * Color(0.8, 0.8, 0.8, 0.9));
 	style_tooltip->set_border_width_all(0);
 	theme->set_color("font_color", "TooltipLabel", font_hover_color);
@@ -1460,13 +1542,24 @@ Ref<Theme> create_editor_theme(const Ref<Theme> p_theme) {
 	// PopupPanel
 	theme->set_stylebox("panel", "PopupPanel", style_popup);
 
+	Ref<StyleBoxFlat> control_editor_popup_style = style_popup->duplicate();
+	control_editor_popup_style->set_shadow_size(0);
+	control_editor_popup_style->set_default_margin(SIDE_LEFT, default_margin_size * EDSCALE);
+	control_editor_popup_style->set_default_margin(SIDE_TOP, default_margin_size * EDSCALE);
+	control_editor_popup_style->set_default_margin(SIDE_RIGHT, default_margin_size * EDSCALE);
+	control_editor_popup_style->set_default_margin(SIDE_BOTTOM, default_margin_size * EDSCALE);
+	control_editor_popup_style->set_border_width_all(0);
+
+	theme->set_stylebox("panel", "ControlEditorPopupPanel", control_editor_popup_style);
+	theme->set_type_variation("ControlEditorPopupPanel", "PopupPanel");
+
 	// SpinBox
 	theme->set_icon("updown", "SpinBox", theme->get_icon(SNAME("GuiSpinboxUpdown"), SNAME("EditorIcons")));
 	theme->set_icon("updown_disabled", "SpinBox", theme->get_icon(SNAME("GuiSpinboxUpdownDisabled"), SNAME("EditorIcons")));
 
 	// ProgressBar
-	theme->set_stylebox("bg", "ProgressBar", make_stylebox(theme->get_icon(SNAME("GuiProgressBar"), SNAME("EditorIcons")), 4, 4, 4, 4, 0, 0, 0, 0));
-	theme->set_stylebox("fg", "ProgressBar", make_stylebox(theme->get_icon(SNAME("GuiProgressFill"), SNAME("EditorIcons")), 6, 6, 6, 6, 2, 1, 2, 1));
+	theme->set_stylebox("background", "ProgressBar", make_stylebox(theme->get_icon(SNAME("GuiProgressBar"), SNAME("EditorIcons")), 4, 4, 4, 4, 0, 0, 0, 0));
+	theme->set_stylebox("fill", "ProgressBar", make_stylebox(theme->get_icon(SNAME("GuiProgressFill"), SNAME("EditorIcons")), 6, 6, 6, 6, 2, 1, 2, 1));
 	theme->set_color("font_color", "ProgressBar", font_color);
 
 	// GraphEdit
@@ -1509,14 +1602,13 @@ Ref<Theme> create_editor_theme(const Ref<Theme> p_theme) {
 	theme->set_stylebox("camera", "GraphEditMinimap", style_minimap_camera);
 	theme->set_stylebox("node", "GraphEditMinimap", style_minimap_node);
 
-	Ref<Texture2D> minimap_resizer_icon = theme->get_icon(SNAME("GuiResizer"), SNAME("EditorIcons"));
 	Color minimap_resizer_color;
 	if (dark_theme) {
 		minimap_resizer_color = Color(1, 1, 1, 0.65);
 	} else {
 		minimap_resizer_color = Color(0, 0, 0, 0.65);
 	}
-	theme->set_icon("resizer", "GraphEditMinimap", flip_icon(minimap_resizer_icon, true, true));
+	theme->set_icon("resizer", "GraphEditMinimap", theme->get_icon(SNAME("GuiResizerTopLeft"), SNAME("EditorIcons")));
 	theme->set_color("resizer_color", "GraphEditMinimap", minimap_resizer_color);
 
 	// GraphNode
@@ -1566,6 +1658,11 @@ Ref<Theme> create_editor_theme(const Ref<Theme> p_theme) {
 	graphsbcomment->set_border_width(SIDE_TOP, 24 * EDSCALE);
 	graphsbcommentselected->set_border_width(SIDE_TOP, 24 * EDSCALE);
 
+	graphsb->set_corner_detail(corner_radius * EDSCALE);
+	graphsbselected->set_corner_detail(corner_radius * EDSCALE);
+	graphsbcomment->set_corner_detail(corner_radius * EDSCALE);
+	graphsbcommentselected->set_corner_detail(corner_radius * EDSCALE);
+
 	theme->set_stylebox("frame", "GraphNode", graphsb);
 	theme->set_stylebox("selected_frame", "GraphNode", graphsbselected);
 	theme->set_stylebox("comment", "GraphNode", graphsbcomment);
@@ -1607,7 +1704,7 @@ Ref<Theme> create_editor_theme(const Ref<Theme> p_theme) {
 	theme->set_icon("toggle_hidden", "FileDialog", theme->get_icon(SNAME("GuiVisibilityVisible"), SNAME("EditorIcons")));
 	// Use a different color for folder icons to make them easier to distinguish from files.
 	// On a light theme, the icon will be dark, so we need to lighten it before blending it with the accent color.
-	theme->set_color("folder_icon_modulate", "FileDialog", (dark_theme ? Color(1, 1, 1) : Color(4.25, 4.25, 4.25)).lerp(accent_color, 0.7));
+	theme->set_color("folder_icon_color", "FileDialog", (dark_theme ? Color(1, 1, 1) : Color(4.25, 4.25, 4.25)).lerp(accent_color, 0.7));
 	theme->set_color("files_disabled", "FileDialog", font_disabled_color);
 
 	// ColorPicker
@@ -1816,14 +1913,14 @@ Ref<Theme> create_custom_theme(const Ref<Theme> p_theme) {
 	return theme;
 }
 
-Ref<ImageTexture> create_unscaled_default_project_icon() {
-#ifdef MODULE_SVG_ENABLED
+/**
+ * Returns the SVG code for the default project icon.
+ */
+String get_default_project_icon() {
 	for (int i = 0; i < editor_icons_count; i++) {
-		// ESCALE should never affect size of the icon
 		if (strcmp(editor_icons_names[i], "DefaultProjectIcon") == 0) {
-			return editor_generate_icon(i, false, 1.0);
+			return String(editor_icons_sources[i]);
 		}
 	}
-#endif
-	return Ref<ImageTexture>(memnew(ImageTexture));
+	return String();
 }

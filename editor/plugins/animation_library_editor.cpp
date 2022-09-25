@@ -32,6 +32,7 @@
 #include "editor/editor_file_dialog.h"
 #include "editor/editor_node.h"
 #include "editor/editor_scale.h"
+#include "editor/editor_undo_redo_manager.h"
 
 void AnimationLibraryEditor::set_animation_player(Object *p_player) {
 	player = p_player;
@@ -92,7 +93,7 @@ void AnimationLibraryEditor::_add_library_validate(const String &p_name) {
 void AnimationLibraryEditor::_add_library_confirm() {
 	if (adding_animation) {
 		String anim_name = add_library_name->get_text();
-		UndoRedo *undo_redo = EditorNode::get_singleton()->get_undo_redo();
+		Ref<EditorUndoRedoManager> undo_redo = EditorNode::get_singleton()->get_undo_redo();
 
 		Ref<AnimationLibrary> al = player->call("get_animation_library", adding_animation_to_library);
 		ERR_FAIL_COND(!al.is_valid());
@@ -109,7 +110,7 @@ void AnimationLibraryEditor::_add_library_confirm() {
 
 	} else {
 		String lib_name = add_library_name->get_text();
-		UndoRedo *undo_redo = EditorNode::get_singleton()->get_undo_redo();
+		Ref<EditorUndoRedoManager> undo_redo = EditorNode::get_singleton()->get_undo_redo();
 
 		Ref<AnimationLibrary> al;
 		al.instantiate();
@@ -197,13 +198,19 @@ void AnimationLibraryEditor::_file_popup_selected(int p_id) {
 		} break;
 		case FILE_MENU_MAKE_LIBRARY_UNIQUE: {
 			StringName lib_name = file_dialog_library;
+			List<StringName> animation_list;
 
-			Ref<AnimationLibrary> ald = al->duplicate();
+			Ref<AnimationLibrary> ald = memnew(AnimationLibrary);
+			al->get_animation_list(&animation_list);
+			for (const StringName &animation_name : animation_list) {
+				Ref<Animation> animation = al->get_animation(animation_name);
+				if (EditorNode::get_singleton()->is_resource_read_only(animation)) {
+					animation = animation->duplicate();
+				}
+				ald->add_animation(animation_name, animation);
+			}
 
-			// TODO: should probably make all foreign animations assigned to this library
-			// unique too.
-
-			UndoRedo *undo_redo = EditorNode::get_singleton()->get_undo_redo();
+			Ref<EditorUndoRedoManager> undo_redo = EditorNode::get_singleton()->get_undo_redo();
 			undo_redo->create_action(vformat(TTR("Make Animation Library Unique: %s"), lib_name));
 			undo_redo->add_do_method(player, "remove_animation_library", lib_name);
 			undo_redo->add_do_method(player, "add_animation_library", lib_name, ald);
@@ -272,7 +279,7 @@ void AnimationLibraryEditor::_file_popup_selected(int p_id) {
 
 			Ref<Animation> animd = anim->duplicate();
 
-			UndoRedo *undo_redo = EditorNode::get_singleton()->get_undo_redo();
+			Ref<EditorUndoRedoManager> undo_redo = EditorNode::get_singleton()->get_undo_redo();
 			undo_redo->create_action(vformat(TTR("Make Animation Unique: %s"), anim_name));
 			undo_redo->add_do_method(al.ptr(), "remove_animation", anim_name);
 			undo_redo->add_do_method(al.ptr(), "add_animation", anim_name, animd);
@@ -320,7 +327,7 @@ void AnimationLibraryEditor::_load_file(String p_path) {
 				name = p_path.get_file().get_basename() + " " + itos(attempt);
 			}
 
-			UndoRedo *undo_redo = EditorNode::get_singleton()->get_undo_redo();
+			Ref<EditorUndoRedoManager> undo_redo = EditorNode::get_singleton()->get_undo_redo();
 
 			undo_redo->create_action(vformat(TTR("Add Animation Library: %s"), name));
 			undo_redo->add_do_method(player, "add_animation_library", name, al);
@@ -358,7 +365,7 @@ void AnimationLibraryEditor::_load_file(String p_path) {
 				name = p_path.get_file().get_basename() + " " + itos(attempt);
 			}
 
-			UndoRedo *undo_redo = EditorNode::get_singleton()->get_undo_redo();
+			Ref<EditorUndoRedoManager> undo_redo = EditorNode::get_singleton()->get_undo_redo();
 
 			undo_redo->create_action(vformat(TTR("Load Animation into Library: %s"), name));
 			undo_redo->add_do_method(al.ptr(), "add_animation", name, anim);
@@ -374,7 +381,7 @@ void AnimationLibraryEditor::_load_file(String p_path) {
 			EditorNode::get_singleton()->save_resource_in_path(al, p_path);
 
 			if (al->get_path() != prev_path) { // Save successful.
-				UndoRedo *undo_redo = EditorNode::get_singleton()->get_undo_redo();
+				Ref<EditorUndoRedoManager> undo_redo = EditorNode::get_singleton()->get_undo_redo();
 
 				undo_redo->create_action(vformat(TTR("Save Animation library to File: %s"), file_dialog_library));
 				undo_redo->add_do_method(al.ptr(), "set_path", al->get_path());
@@ -395,7 +402,7 @@ void AnimationLibraryEditor::_load_file(String p_path) {
 			String prev_path = anim->get_path();
 			EditorNode::get_singleton()->save_resource_in_path(anim, p_path);
 			if (anim->get_path() != prev_path) { // Save successful.
-				UndoRedo *undo_redo = EditorNode::get_singleton()->get_undo_redo();
+				Ref<EditorUndoRedoManager> undo_redo = EditorNode::get_singleton()->get_undo_redo();
 
 				undo_redo->create_action(vformat(TTR("Save Animation to File: %s"), file_dialog_animation));
 				undo_redo->add_do_method(anim.ptr(), "set_path", anim->get_path());
@@ -413,7 +420,7 @@ void AnimationLibraryEditor::_item_renamed() {
 	String text = ti->get_text(0);
 	String old_text = ti->get_metadata(0);
 	bool restore_text = false;
-	UndoRedo *undo_redo = EditorNode::get_singleton()->get_undo_redo();
+	Ref<EditorUndoRedoManager> undo_redo = EditorNode::get_singleton()->get_undo_redo();
 
 	if (String(text).contains("/") || String(text).contains(":") || String(text).contains(",") || String(text).contains("[")) {
 		restore_text = true;
@@ -527,7 +534,7 @@ void AnimationLibraryEditor::_button_pressed(TreeItem *p_item, int p_column, int
 					name = base_name + " (" + itos(attempt) + ")";
 				}
 
-				UndoRedo *undo_redo = EditorNode::get_singleton()->get_undo_redo();
+				Ref<EditorUndoRedoManager> undo_redo = EditorNode::get_singleton()->get_undo_redo();
 
 				undo_redo->create_action(vformat(TTR("Add Animation to Library: %s"), name));
 				undo_redo->add_do_method(al.ptr(), "add_animation", name, anim);
@@ -553,7 +560,7 @@ void AnimationLibraryEditor::_button_pressed(TreeItem *p_item, int p_column, int
 				file_dialog_library = lib_name;
 			} break;
 			case LIB_BUTTON_DELETE: {
-				UndoRedo *undo_redo = EditorNode::get_singleton()->get_undo_redo();
+				Ref<EditorUndoRedoManager> undo_redo = EditorNode::get_singleton()->get_undo_redo();
 				undo_redo->create_action(vformat(TTR("Remove Animation Library: %s"), lib_name));
 				undo_redo->add_do_method(player, "remove_animation_library", lib_name);
 				undo_redo->add_undo_method(player, "add_animation_library", lib_name, al);
@@ -594,7 +601,7 @@ void AnimationLibraryEditor::_button_pressed(TreeItem *p_item, int p_column, int
 
 			} break;
 			case ANIM_BUTTON_DELETE: {
-				UndoRedo *undo_redo = EditorNode::get_singleton()->get_undo_redo();
+				Ref<EditorUndoRedoManager> undo_redo = EditorNode::get_singleton()->get_undo_redo();
 				undo_redo->create_action(vformat(TTR("Remove Animation from Library: %s"), anim_name));
 				undo_redo->add_do_method(al.ptr(), "remove_animation", anim_name);
 				undo_redo->add_undo_method(al.ptr(), "add_animation", anim_name, anim);
@@ -634,7 +641,7 @@ void AnimationLibraryEditor::update_tree() {
 		String al_path = al->get_path();
 		if (!al_path.is_resource_file()) {
 			libitem->set_text(1, TTR("[built-in]"));
-			libitem->set_tooltip(1, al_path);
+			libitem->set_tooltip_text(1, al_path);
 			int srpos = al_path.find("::");
 			if (srpos != -1) {
 				String base = al_path.substr(0, srpos);
@@ -686,7 +693,7 @@ void AnimationLibraryEditor::update_tree() {
 			String anim_path = anim->get_path();
 			if (!anim_path.is_resource_file()) {
 				anitem->set_text(1, TTR("[built-in]"));
-				anitem->set_tooltip(1, anim_path);
+				anitem->set_tooltip_text(1, anim_path);
 				int srpos = anim_path.find("::");
 				if (srpos != -1) {
 					String base = anim_path.substr(0, srpos);

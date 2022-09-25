@@ -162,6 +162,7 @@ void Variant::_register_variant_constructors() {
 	add_constructor<VariantConstructNoArgs<Projection>>(sarray());
 	add_constructor<VariantConstructor<Projection, Projection>>(sarray("from"));
 	add_constructor<VariantConstructor<Projection, Transform3D>>(sarray("from"));
+	add_constructor<VariantConstructor<Projection, Vector4, Vector4, Vector4, Vector4>>(sarray("x_axis", "y_axis", "z_axis", "w_axis"));
 
 	add_constructor<VariantConstructNoArgs<Color>>(sarray());
 	add_constructor<VariantConstructor<Color, Color>>(sarray("from"));
@@ -199,6 +200,7 @@ void Variant::_register_variant_constructors() {
 
 	add_constructor<VariantConstructNoArgs<Array>>(sarray());
 	add_constructor<VariantConstructor<Array, Array>>(sarray("from"));
+	add_constructor<VariantConstructorTypedArray>(sarray("base", "type", "class_name", "script"));
 	add_constructor<VariantConstructorToArray<PackedByteArray>>(sarray("from"));
 	add_constructor<VariantConstructorToArray<PackedInt32Array>>(sarray("from"));
 	add_constructor<VariantConstructorToArray<PackedInt64Array>>(sarray("from"));

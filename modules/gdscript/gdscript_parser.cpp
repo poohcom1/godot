@@ -127,7 +127,7 @@ GDScriptParser::GDScriptParser() {
 	register_annotation(MethodInfo("@export_global_file", PropertyInfo(Variant::STRING, "filter")), AnnotationInfo::VARIABLE, &GDScriptParser::export_annotations<PROPERTY_HINT_GLOBAL_FILE, Variant::STRING>, varray(""), true);
 	register_annotation(MethodInfo("@export_global_dir"), AnnotationInfo::VARIABLE, &GDScriptParser::export_annotations<PROPERTY_HINT_GLOBAL_DIR, Variant::STRING>);
 	register_annotation(MethodInfo("@export_multiline"), AnnotationInfo::VARIABLE, &GDScriptParser::export_annotations<PROPERTY_HINT_MULTILINE_TEXT, Variant::STRING>);
-	register_annotation(MethodInfo("@export_placeholder"), AnnotationInfo::VARIABLE, &GDScriptParser::export_annotations<PROPERTY_HINT_PLACEHOLDER_TEXT, Variant::STRING>);
+	register_annotation(MethodInfo("@export_placeholder", PropertyInfo(Variant::STRING, "placeholder")), AnnotationInfo::VARIABLE, &GDScriptParser::export_annotations<PROPERTY_HINT_PLACEHOLDER_TEXT, Variant::STRING>);
 	register_annotation(MethodInfo("@export_range", PropertyInfo(Variant::FLOAT, "min"), PropertyInfo(Variant::FLOAT, "max"), PropertyInfo(Variant::FLOAT, "step"), PropertyInfo(Variant::STRING, "extra_hints")), AnnotationInfo::VARIABLE, &GDScriptParser::export_annotations<PROPERTY_HINT_RANGE, Variant::FLOAT>, varray(1.0, ""), true);
 	register_annotation(MethodInfo("@export_exp_easing", PropertyInfo(Variant::STRING, "hints")), AnnotationInfo::VARIABLE, &GDScriptParser::export_annotations<PROPERTY_HINT_EXP_EASING, Variant::FLOAT>, varray(""), true);
 	register_annotation(MethodInfo("@export_color_no_alpha"), AnnotationInfo::VARIABLE, &GDScriptParser::export_annotations<PROPERTY_HINT_COLOR_NO_ALPHA, Variant::COLOR>);
@@ -684,17 +684,6 @@ GDScriptParser::ClassNode *GDScriptParser::parse_class() {
 void GDScriptParser::parse_class_name() {
 	if (consume(GDScriptTokenizer::Token::IDENTIFIER, R"(Expected identifier for the global class name after "class_name".)")) {
 		current_class->identifier = parse_identifier();
-	}
-
-	// TODO: Move this to annotation
-	if (match(GDScriptTokenizer::Token::COMMA)) {
-		// Icon path.
-		if (consume(GDScriptTokenizer::Token::LITERAL, R"(Expected class icon path string after ",".)")) {
-			if (previous.literal.get_type() != Variant::STRING) {
-				push_error(vformat(R"(Only strings can be used for the class icon path, found "%s" instead.)", Variant::get_type_name(previous.literal.get_type())));
-			}
-			current_class->icon_path = previous.literal;
-		}
 	}
 
 	if (match(GDScriptTokenizer::Token::EXTENDS)) {
@@ -3769,6 +3758,33 @@ bool GDScriptParser::export_annotations(const AnnotationNode *p_annotation, Node
 					return false;
 				}
 				break;
+			case GDScriptParser::DataType::CLASS:
+				// Can assume type is a global GDScript class.
+				if (!ClassDB::is_parent_class(export_type.native_type, SNAME("Resource"))) {
+					push_error(R"(Exported script type must extend Resource.)");
+					return false;
+				}
+				variable->export_info.type = Variant::OBJECT;
+				variable->export_info.hint = PROPERTY_HINT_RESOURCE_TYPE;
+				variable->export_info.hint_string = export_type.class_type->identifier->name;
+				break;
+			case GDScriptParser::DataType::SCRIPT: {
+				StringName class_name;
+				if (export_type.script_type != nullptr && export_type.script_type.is_valid()) {
+					class_name = export_type.script_type->get_language()->get_global_class_name(export_type.script_type->get_path());
+				}
+				if (class_name == StringName()) {
+					Ref<Script> script = ResourceLoader::load(export_type.script_path, SNAME("Script"));
+					if (script.is_valid()) {
+						class_name = script->get_language()->get_global_class_name(export_type.script_path);
+					}
+				}
+				if (class_name != StringName() && ClassDB::is_parent_class(ScriptServer::get_global_class_native_base(class_name), SNAME("Resource"))) {
+					variable->export_info.type = Variant::OBJECT;
+					variable->export_info.hint = PROPERTY_HINT_RESOURCE_TYPE;
+					variable->export_info.hint_string = class_name;
+				}
+			} break;
 			case GDScriptParser::DataType::ENUM: {
 				variable->export_info.type = Variant::INT;
 				variable->export_info.hint = PROPERTY_HINT_ENUM;
@@ -3985,7 +4001,7 @@ String GDScriptParser::DataType::to_string() const {
 			if (is_meta_type) {
 				return script_type->get_class_name().operator String();
 			}
-			String name = script_type->get_name();
+			String name = script_type != nullptr ? script_type->get_name() : "";
 			if (!name.is_empty()) {
 				return name;
 			}

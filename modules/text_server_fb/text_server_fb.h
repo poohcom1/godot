@@ -52,6 +52,7 @@
 #include <godot_cpp/variant/rect2.hpp>
 #include <godot_cpp/variant/rid.hpp>
 #include <godot_cpp/variant/string.hpp>
+#include <godot_cpp/variant/typed_array.hpp>
 #include <godot_cpp/variant/vector2.hpp>
 #include <godot_cpp/variant/vector2i.hpp>
 
@@ -179,7 +180,7 @@ class TextServerFallback : public TextServerExtension {
 	struct FontFallback {
 		Mutex mutex;
 
-		bool antialiased = true;
+		TextServer::FontAntialiasing antialiasing = TextServer::FONT_ANTIALIASING_GRAY;
 		bool mipmaps = false;
 		bool msdf = false;
 		int msdf_range = 14;
@@ -225,7 +226,7 @@ class TextServerFallback : public TextServerExtension {
 	_FORCE_INLINE_ FontGlyph rasterize_msdf(FontFallback *p_font_data, FontForSizeFallback *p_data, int p_pixel_range, int p_rect_margin, FT_Outline *outline, const Vector2 &advance) const;
 #endif
 #ifdef MODULE_FREETYPE_ENABLED
-	_FORCE_INLINE_ FontGlyph rasterize_bitmap(FontForSizeFallback *p_data, int p_rect_margin, FT_Bitmap bitmap, int yofs, int xofs, const Vector2 &advance) const;
+	_FORCE_INLINE_ FontGlyph rasterize_bitmap(FontForSizeFallback *p_data, int p_rect_margin, FT_Bitmap bitmap, int yofs, int xofs, const Vector2 &advance, bool p_bgra) const;
 #endif
 	_FORCE_INLINE_ bool _ensure_glyph(FontFallback *p_font_data, const Vector2i &p_size, int32_t p_glyph) const;
 	_FORCE_INLINE_ bool _ensure_cache_for_size(FontFallback *p_font_data, const Vector2i &p_size) const;
@@ -378,8 +379,8 @@ public:
 	virtual void font_set_name(const RID &p_font_rid, const String &p_name) override;
 	virtual String font_get_name(const RID &p_font_rid) const override;
 
-	virtual void font_set_antialiased(const RID &p_font_rid, bool p_antialiased) override;
-	virtual bool font_is_antialiased(const RID &p_font_rid) const override;
+	virtual void font_set_antialiasing(RID p_font_rid, TextServer::FontAntialiasing p_antialiasing) override;
+	virtual TextServer::FontAntialiasing font_get_antialiasing(RID p_font_rid) const override;
 
 	virtual void font_set_generate_mipmaps(const RID &p_font_rid, bool p_generate_mipmaps) override;
 	virtual bool font_get_generate_mipmaps(const RID &p_font_rid) const override;
@@ -417,7 +418,7 @@ public:
 	virtual void font_set_oversampling(const RID &p_font_rid, double p_oversampling) override;
 	virtual double font_get_oversampling(const RID &p_font_rid) const override;
 
-	virtual Array font_get_size_cache_list(const RID &p_font_rid) const override;
+	virtual TypedArray<Vector2i> font_get_size_cache_list(const RID &p_font_rid) const override;
 	virtual void font_clear_size_cache(const RID &p_font_rid) override;
 	virtual void font_remove_size_cache(const RID &p_font_rid, const Vector2i &p_size) override;
 
@@ -446,7 +447,7 @@ public:
 	virtual void font_set_texture_offsets(const RID &p_font_rid, const Vector2i &p_size, int64_t p_texture_index, const PackedInt32Array &p_offset) override;
 	virtual PackedInt32Array font_get_texture_offsets(const RID &p_font_rid, const Vector2i &p_size, int64_t p_texture_index) const override;
 
-	virtual Array font_get_glyph_list(const RID &p_font_rid, const Vector2i &p_size) const override;
+	virtual PackedInt32Array font_get_glyph_list(const RID &p_font_rid, const Vector2i &p_size) const override;
 	virtual void font_clear_glyphs(const RID &p_font_rid, const Vector2i &p_size) override;
 	virtual void font_remove_glyph(const RID &p_font_rid, const Vector2i &p_size, int64_t p_glyph) override;
 
@@ -469,7 +470,7 @@ public:
 
 	virtual Dictionary font_get_glyph_contours(const RID &p_font, int64_t p_size, int64_t p_index) const override;
 
-	virtual Array font_get_kerning_list(const RID &p_font_rid, int64_t p_size) const override;
+	virtual TypedArray<Vector2i> font_get_kerning_list(const RID &p_font_rid, int64_t p_size) const override;
 	virtual void font_clear_kerning_map(const RID &p_font_rid, int64_t p_size) override;
 	virtual void font_remove_kerning(const RID &p_font_rid, int64_t p_size, const Vector2i &p_glyph_pair) override;
 
@@ -535,13 +536,13 @@ public:
 	virtual void shaped_text_set_spacing(const RID &p_shaped, SpacingType p_spacing, int64_t p_value) override;
 	virtual int64_t shaped_text_get_spacing(const RID &p_shaped, SpacingType p_spacing) const override;
 
-	virtual bool shaped_text_add_string(const RID &p_shaped, const String &p_text, const Array &p_fonts, int64_t p_size, const Dictionary &p_opentype_features = Dictionary(), const String &p_language = "", const Variant &p_meta = Variant()) override;
+	virtual bool shaped_text_add_string(const RID &p_shaped, const String &p_text, const TypedArray<RID> &p_fonts, int64_t p_size, const Dictionary &p_opentype_features = Dictionary(), const String &p_language = "", const Variant &p_meta = Variant()) override;
 	virtual bool shaped_text_add_object(const RID &p_shaped, const Variant &p_key, const Size2 &p_size, InlineAlignment p_inline_align = INLINE_ALIGNMENT_CENTER, int64_t p_length = 1) override;
 	virtual bool shaped_text_resize_object(const RID &p_shaped, const Variant &p_key, const Size2 &p_size, InlineAlignment p_inline_align = INLINE_ALIGNMENT_CENTER) override;
 
 	virtual int64_t shaped_get_span_count(const RID &p_shaped) const override;
 	virtual Variant shaped_get_span_meta(const RID &p_shaped, int64_t p_index) const override;
-	virtual void shaped_set_span_update_font(const RID &p_shaped, int64_t p_index, const Array &p_fonts, int64_t p_size, const Dictionary &p_opentype_features = Dictionary()) override;
+	virtual void shaped_set_span_update_font(const RID &p_shaped, int64_t p_index, const TypedArray<RID> &p_fonts, int64_t p_size, const Dictionary &p_opentype_features = Dictionary()) override;
 
 	virtual RID shaped_text_substr(const RID &p_shaped, int64_t p_start, int64_t p_length) const override;
 	virtual RID shaped_text_get_parent(const RID &p_shaped) const override;

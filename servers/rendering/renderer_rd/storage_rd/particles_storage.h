@@ -336,10 +336,10 @@ private:
 
 		virtual void set_code(const String &p_Code);
 		virtual void set_path_hint(const String &p_hint);
-		virtual void set_default_texture_param(const StringName &p_name, RID p_texture, int p_index);
+		virtual void set_default_texture_parameter(const StringName &p_name, RID p_texture, int p_index);
 		virtual void get_shader_uniform_list(List<PropertyInfo> *p_param_list) const;
 		virtual void get_instance_param_list(List<RendererMaterialStorage::InstanceShaderParam> *p_param_list) const;
-		virtual bool is_param_texture(const StringName &p_param) const;
+		virtual bool is_parameter_texture(const StringName &p_param) const;
 		virtual bool is_animated() const;
 		virtual bool casts_shadows() const;
 		virtual Variant get_default_parameter(const StringName &p_parameter) const;
@@ -354,14 +354,14 @@ private:
 		return ParticlesStorage::get_singleton()->_create_particles_shader_func();
 	}
 
-	struct ParticlesMaterialData : public MaterialStorage::MaterialData {
+	struct ParticleProcessMaterialData : public MaterialStorage::MaterialData {
 		ParticlesShaderData *shader_data = nullptr;
 		RID uniform_set;
 
 		virtual void set_render_priority(int p_priority) {}
 		virtual void set_next_pass(RID p_pass) {}
 		virtual bool update_parameters(const HashMap<StringName, Variant> &p_parameters, bool p_uniform_dirty, bool p_textures_dirty);
-		virtual ~ParticlesMaterialData();
+		virtual ~ParticleProcessMaterialData();
 	};
 
 	MaterialStorage::MaterialData *_create_particles_material_func(ParticlesShaderData *p_shader);

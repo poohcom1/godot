@@ -94,7 +94,7 @@ void TextureRect::_notification(int p_what) {
 
 			Ref<AtlasTexture> p_atlas = texture;
 
-			if (p_atlas.is_valid() && region.has_no_area()) {
+			if (p_atlas.is_valid() && !region.has_area()) {
 				Size2 scale_size(size.width / texture->get_width(), size.height / texture->get_height());
 
 				offset.width += hflip ? p_atlas->get_margin().get_position().width * scale_size.width * 2 : 0;
@@ -104,10 +104,10 @@ void TextureRect::_notification(int p_what) {
 			size.width *= hflip ? -1.0f : 1.0f;
 			size.height *= vflip ? -1.0f : 1.0f;
 
-			if (region.has_no_area()) {
-				draw_texture_rect(texture, Rect2(offset, size), tile);
-			} else {
+			if (region.has_area()) {
 				draw_texture_rect_region(texture, Rect2(offset, size), region);
+			} else {
+				draw_texture_rect(texture, Rect2(offset, size), tile);
 			}
 		} break;
 	}
@@ -150,7 +150,7 @@ void TextureRect::_bind_methods() {
 
 void TextureRect::_texture_changed() {
 	if (texture.is_valid()) {
-		update();
+		queue_redraw();
 		update_minimum_size();
 	}
 }
@@ -170,7 +170,7 @@ void TextureRect::set_texture(const Ref<Texture2D> &p_tex) {
 		texture->connect(CoreStringNames::get_singleton()->changed, callable_mp(this, &TextureRect::_texture_changed));
 	}
 
-	update();
+	queue_redraw();
 	update_minimum_size();
 }
 
@@ -179,8 +179,12 @@ Ref<Texture2D> TextureRect::get_texture() const {
 }
 
 void TextureRect::set_ignore_texture_size(bool p_ignore) {
+	if (ignore_texture_size == p_ignore) {
+		return;
+	}
+
 	ignore_texture_size = p_ignore;
-	update();
+	queue_redraw();
 	update_minimum_size();
 }
 
@@ -189,8 +193,12 @@ bool TextureRect::get_ignore_texture_size() const {
 }
 
 void TextureRect::set_stretch_mode(StretchMode p_mode) {
+	if (stretch_mode == p_mode) {
+		return;
+	}
+
 	stretch_mode = p_mode;
-	update();
+	queue_redraw();
 }
 
 TextureRect::StretchMode TextureRect::get_stretch_mode() const {
@@ -198,8 +206,12 @@ TextureRect::StretchMode TextureRect::get_stretch_mode() const {
 }
 
 void TextureRect::set_flip_h(bool p_flip) {
+	if (hflip == p_flip) {
+		return;
+	}
+
 	hflip = p_flip;
-	update();
+	queue_redraw();
 }
 
 bool TextureRect::is_flipped_h() const {
@@ -207,8 +219,12 @@ bool TextureRect::is_flipped_h() const {
 }
 
 void TextureRect::set_flip_v(bool p_flip) {
+	if (vflip == p_flip) {
+		return;
+	}
+
 	vflip = p_flip;
-	update();
+	queue_redraw();
 }
 
 bool TextureRect::is_flipped_v() const {

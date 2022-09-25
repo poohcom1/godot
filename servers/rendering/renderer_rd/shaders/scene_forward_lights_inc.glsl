@@ -97,11 +97,12 @@ void light_compute(vec3 N, vec3 L, vec3 V, float A, vec3 light_color, float atte
 		float diffuse_brdf_NL; // BRDF times N.L for calculating diffuse radiance
 
 #if defined(DIFFUSE_LAMBERT_WRAP)
-		// energy conserving lambert wrap shader
-		diffuse_brdf_NL = max(0.0, (NdotL + roughness) / ((1.0 + roughness) * (1.0 + roughness)));
+		// Energy conserving lambert wrap shader.
+		// https://web.archive.org/web/20210228210901/http://blog.stevemcauley.com/2011/12/03/energy-conserving-wrapped-diffuse/
+		diffuse_brdf_NL = max(0.0, (NdotL + roughness) / ((1.0 + roughness) * (1.0 + roughness))) * (1.0 / M_PI);
 #elif defined(DIFFUSE_TOON)
 
-		diffuse_brdf_NL = smoothstep(-roughness, max(roughness, 0.01), NdotL);
+		diffuse_brdf_NL = smoothstep(-roughness, max(roughness, 0.01), NdotL) * (1.0 / M_PI);
 
 #elif defined(DIFFUSE_BURLEY)
 
@@ -909,7 +910,7 @@ void reflection_process(uint ref_index, vec3 vertex, vec3 ref_vec, vec3 normal, 
 		vec4 reflection;
 
 		reflection.rgb = textureLod(samplerCubeArray(reflection_atlas, material_samplers[SAMPLER_LINEAR_WITH_MIPMAPS_CLAMP]), vec4(local_ref_vec, reflections.data[ref_index].index), roughness * MAX_ROUGHNESS_LOD).rgb * sc_luminance_multiplier;
-
+		reflection.rgb *= reflections.data[ref_index].exposure_normalization;
 		if (reflections.data[ref_index].exterior) {
 			reflection.rgb = mix(specular_light, reflection.rgb, blend);
 		}
@@ -932,6 +933,7 @@ void reflection_process(uint ref_index, vec3 vertex, vec3 ref_vec, vec3 normal, 
 			vec4 ambient_out;
 
 			ambient_out.rgb = textureLod(samplerCubeArray(reflection_atlas, material_samplers[SAMPLER_LINEAR_WITH_MIPMAPS_CLAMP]), vec4(local_amb_vec, reflections.data[ref_index].index), MAX_ROUGHNESS_LOD).rgb;
+			ambient_out.rgb *= reflections.data[ref_index].exposure_normalization;
 			ambient_out.a = blend;
 			if (reflections.data[ref_index].exterior) {
 				ambient_out.rgb = mix(ambient_light, ambient_out.rgb, blend);

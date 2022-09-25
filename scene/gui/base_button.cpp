@@ -64,7 +64,10 @@ void BaseButton::gui_input(const Ref<InputEvent> &p_event) {
 
 	bool button_masked = mouse_button.is_valid() && (mouse_button_to_mask(mouse_button->get_button_index()) & button_mask) != MouseButton::NONE;
 	if (button_masked || ui_accept) {
+		was_mouse_pressed = button_masked;
 		on_action_event(p_event);
+		was_mouse_pressed = false;
+
 		return;
 	}
 
@@ -74,7 +77,7 @@ void BaseButton::gui_input(const Ref<InputEvent> &p_event) {
 			bool last_press_inside = status.pressing_inside;
 			status.pressing_inside = has_point(mouse_motion->get_position());
 			if (last_press_inside != status.pressing_inside) {
-				update();
+				queue_redraw();
 			}
 		}
 	}
@@ -84,32 +87,32 @@ void BaseButton::_notification(int p_what) {
 	switch (p_what) {
 		case NOTIFICATION_MOUSE_ENTER: {
 			status.hovering = true;
-			update();
+			queue_redraw();
 		} break;
 
 		case NOTIFICATION_MOUSE_EXIT: {
 			status.hovering = false;
-			update();
+			queue_redraw();
 		} break;
 
 		case NOTIFICATION_DRAG_BEGIN:
 		case NOTIFICATION_SCROLL_BEGIN: {
 			if (status.press_attempt) {
 				status.press_attempt = false;
-				update();
+				queue_redraw();
 			}
 		} break;
 
 		case NOTIFICATION_FOCUS_ENTER: {
-			update();
+			queue_redraw();
 		} break;
 
 		case NOTIFICATION_FOCUS_EXIT: {
 			if (status.press_attempt) {
 				status.press_attempt = false;
-				update();
+				queue_redraw();
 			} else if (status.hovering) {
-				update();
+				queue_redraw();
 			}
 		} break;
 
@@ -185,7 +188,7 @@ void BaseButton::on_action_event(Ref<InputEvent> p_event) {
 		emit_signal(SNAME("button_up"));
 	}
 
-	update();
+	queue_redraw();
 }
 
 void BaseButton::pressed() {
@@ -207,7 +210,7 @@ void BaseButton::set_disabled(bool p_disabled) {
 		status.press_attempt = false;
 		status.pressing_inside = false;
 	}
-	update();
+	queue_redraw();
 }
 
 bool BaseButton::is_disabled() const {
@@ -231,7 +234,7 @@ void BaseButton::set_pressed(bool p_pressed) {
 	}
 	_toggled(status.pressed);
 
-	update();
+	queue_redraw();
 }
 
 void BaseButton::set_pressed_no_signal(bool p_pressed) {
@@ -243,7 +246,7 @@ void BaseButton::set_pressed_no_signal(bool p_pressed) {
 	}
 	status.pressed = p_pressed;
 
-	update();
+	queue_redraw();
 }
 
 bool BaseButton::is_pressing() const {
@@ -382,7 +385,7 @@ void BaseButton::set_button_group(const Ref<ButtonGroup> &p_group) {
 		button_group->buttons.insert(this);
 	}
 
-	update(); //checkbox changes to radio if set a buttongroup
+	queue_redraw(); //checkbox changes to radio if set a buttongroup
 }
 
 Ref<ButtonGroup> BaseButton::get_button_group() const {
@@ -415,6 +418,10 @@ bool BaseButton::_is_focus_owner_in_shortcut_context() const {
 
 	// If the context is valid and the viewport focus is valid, check if the context is the focus or is a parent of it.
 	return ctx_node && vp_focus && (ctx_node == vp_focus || ctx_node->is_ancestor_of(vp_focus));
+}
+
+bool BaseButton::_was_pressed_by_mouse() const {
+	return was_mouse_pressed;
 }
 
 void BaseButton::_bind_methods() {
@@ -462,7 +469,7 @@ void BaseButton::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "keep_pressed_outside"), "set_keep_pressed_outside", "is_keep_pressed_outside");
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "shortcut", PROPERTY_HINT_RESOURCE_TYPE, "Shortcut"), "set_shortcut", "get_shortcut");
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "button_group", PROPERTY_HINT_RESOURCE_TYPE, "ButtonGroup"), "set_button_group", "get_button_group");
-	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "shortcut_context", PROPERTY_HINT_RESOURCE_TYPE, "Node"), "set_shortcut_context", "get_shortcut_context");
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "shortcut_context", PROPERTY_HINT_NODE_TYPE, "Node"), "set_shortcut_context", "get_shortcut_context");
 
 	BIND_ENUM_CONSTANT(DRAW_NORMAL);
 	BIND_ENUM_CONSTANT(DRAW_PRESSED);
@@ -490,8 +497,8 @@ void ButtonGroup::get_buttons(List<BaseButton *> *r_buttons) {
 	}
 }
 
-Array ButtonGroup::_get_buttons() {
-	Array btns;
+TypedArray<BaseButton> ButtonGroup::_get_buttons() {
+	TypedArray<BaseButton> btns;
 	for (const BaseButton *E : buttons) {
 		btns.push_back(E);
 	}

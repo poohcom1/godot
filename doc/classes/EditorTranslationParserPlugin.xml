@@ -11,7 +11,7 @@
 		Below shows an example of a custom parser that extracts strings from a CSV file to write into a POT.
 		[codeblocks]
 		[gdscript]
-		tool
+		@tool
 		extends EditorTranslationParserPlugin
 
 		func _parse_file(path, msgids, msgids_context_plural):
@@ -72,7 +72,7 @@
 		msgidsContextPlural.Add(new Godot.Collections.Array{"Only with context", "a friendly context", ""});
 		[/csharp]
 		[/codeblocks]
-		[b]Note:[/b] If you override parsing logic for standard script types (GDScript, C#, etc.), it would be better to load the [code]path[/code] argument using [method ResourceLoader.load]. This is because built-in scripts are loaded as [Resource] type, not [File] type.
+		[b]Note:[/b] If you override parsing logic for standard script types (GDScript, C#, etc.), it would be better to load the [code]path[/code] argument using [method ResourceLoader.load]. This is because built-in scripts are loaded as [Resource] type, not [FileAccess] type.
 		For example:
 		[codeblocks]
 		[gdscript]
@@ -112,8 +112,8 @@
 		<method name="_parse_file" qualifiers="virtual">
 			<return type="void" />
 			<param index="0" name="path" type="String" />
-			<param index="1" name="msgids" type="Array" />
-			<param index="2" name="msgids_context_plural" type="Array" />
+			<param index="1" name="msgids" type="String[]" />
+			<param index="2" name="msgids_context_plural" type="Array[]" />
 			<description>
 				Override this method to define a custom parsing logic to extract the translatable strings.
 			</description>

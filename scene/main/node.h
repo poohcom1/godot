@@ -181,7 +181,7 @@ private:
 	Node *_duplicate(int p_flags, HashMap<const Node *, Node *> *r_duplimap = nullptr) const;
 
 	TypedArray<Node> _get_children(bool p_include_internal = true) const;
-	Array _get_groups() const;
+	TypedArray<StringName> _get_groups() const;
 
 	Error _rpc_bind(const Variant **p_args, int p_argcount, Callable::CallError &r_error);
 	Error _rpc_id_bind(const Variant **p_args, int p_argcount, Callable::CallError &r_error);
@@ -259,7 +259,7 @@ public:
 		NOTIFICATION_PROCESS = 17,
 		NOTIFICATION_PARENTED = 18,
 		NOTIFICATION_UNPARENTED = 19,
-		NOTIFICATION_INSTANCED = 20,
+		NOTIFICATION_SCENE_INSTANTIATED = 20,
 		NOTIFICATION_DRAG_BEGIN = 21,
 		NOTIFICATION_DRAG_END = 22,
 		NOTIFICATION_PATH_RENAMED = 23,
@@ -303,8 +303,8 @@ public:
 	StringName get_name() const;
 	void set_name(const String &p_name);
 
-	void add_child(Node *p_child, bool p_legible_unique_name = false, InternalMode p_internal = INTERNAL_MODE_DISABLED);
-	void add_sibling(Node *p_sibling, bool p_legible_unique_name = false);
+	void add_child(Node *p_child, bool p_force_readable_name = false, InternalMode p_internal = INTERNAL_MODE_DISABLED);
+	void add_sibling(Node *p_sibling, bool p_force_readable_name = false);
 	void remove_child(Node *p_child);
 
 	int get_child_count(bool p_include_internal = true) const;
@@ -348,7 +348,6 @@ public:
 
 	void move_child(Node *p_child, int p_pos);
 	void _move_child(Node *p_child, int p_pos, bool p_ignore_end = false);
-	void raise();
 
 	void set_owner(Node *p_owner);
 	Node *get_owner() const;
@@ -357,7 +356,6 @@ public:
 	void set_unique_name_in_owner(bool p_enabled);
 	bool is_unique_name_in_owner() const;
 
-	void remove_and_skip();
 	int get_index(bool p_include_internal = true) const;
 
 	Ref<Tween> create_tween();
@@ -459,6 +457,7 @@ public:
 #ifdef TOOLS_ENABLED
 	String validate_child_name(Node *p_child);
 #endif
+	static String adjust_name_casing(const String &p_name);
 
 	void queue_delete();
 
@@ -478,7 +477,7 @@ public:
 
 	_FORCE_INLINE_ Viewport *get_viewport() const { return data.viewport; }
 
-	virtual TypedArray<String> get_configuration_warnings() const;
+	virtual PackedStringArray get_configuration_warnings() const;
 	String get_configuration_warnings_as_string() const;
 
 	void update_configuration_warnings();
@@ -529,5 +528,9 @@ Error Node::rpc_id(int p_peer_id, const StringName &p_method, VarArgs... p_args)
 	}
 	return rpcp(p_peer_id, p_method, sizeof...(p_args) == 0 ? nullptr : (const Variant **)argptrs, sizeof...(p_args));
 }
+
+// Add these macro to your class's 'get_configuration_warnings' function to have warnings show up in the scene tree inspector.
+#define DEPRECATED_NODE_WARNING warnings.push_back(RTR("This node is marked as deprecated and will be removed in future versions.\nPlease check the Godot documentation for information about migration."));
+#define EXPERIMENTAL_NODE_WARNING warnings.push_back(RTR("This node is marked as experimental and may be subject to removal or major changes in future versions."));
 
 #endif // NODE_H

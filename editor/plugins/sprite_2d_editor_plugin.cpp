@@ -34,6 +34,7 @@
 #include "core/math/geometry_2d.h"
 #include "editor/editor_node.h"
 #include "editor/editor_scale.h"
+#include "editor/editor_undo_redo_manager.h"
 #include "editor/scene_tree_dock.h"
 #include "scene/2d/collision_polygon_2d.h"
 #include "scene/2d/light_occluder_2d.h"
@@ -127,7 +128,7 @@ void Sprite2DEditor::_menu_option(int p_option) {
 
 			_update_mesh_data();
 			debug_uv_dialog->popup_centered();
-			debug_uv->update();
+			debug_uv->queue_redraw();
 
 		} break;
 		case MENU_OPTION_CONVERT_TO_POLYGON_2D: {
@@ -136,7 +137,7 @@ void Sprite2DEditor::_menu_option(int p_option) {
 
 			_update_mesh_data();
 			debug_uv_dialog->popup_centered();
-			debug_uv->update();
+			debug_uv->queue_redraw();
 		} break;
 		case MENU_OPTION_CREATE_COLLISION_POLY_2D: {
 			debug_uv_dialog->set_ok_button_text(TTR("Create CollisionPolygon2D"));
@@ -144,7 +145,7 @@ void Sprite2DEditor::_menu_option(int p_option) {
 
 			_update_mesh_data();
 			debug_uv_dialog->popup_centered();
-			debug_uv->update();
+			debug_uv->queue_redraw();
 
 		} break;
 		case MENU_OPTION_CREATE_LIGHT_OCCLUDER_2D: {
@@ -153,7 +154,7 @@ void Sprite2DEditor::_menu_option(int p_option) {
 
 			_update_mesh_data();
 			debug_uv_dialog->popup_centered();
-			debug_uv->update();
+			debug_uv->queue_redraw();
 
 		} break;
 	}
@@ -301,7 +302,7 @@ void Sprite2DEditor::_update_mesh_data() {
 		}
 	}
 
-	debug_uv->update();
+	debug_uv->queue_redraw();
 }
 
 void Sprite2DEditor::_create_node() {
@@ -342,7 +343,7 @@ void Sprite2DEditor::_convert_to_mesh_2d_node() {
 	MeshInstance2D *mesh_instance = memnew(MeshInstance2D);
 	mesh_instance->set_mesh(mesh);
 
-	UndoRedo *ur = EditorNode::get_singleton()->get_undo_redo();
+	Ref<EditorUndoRedoManager> &ur = EditorNode::get_undo_redo();
 	ur->create_action(TTR("Convert to MeshInstance2D"));
 	ur->add_do_method(SceneTreeDock::get_singleton(), "replace_node", node, mesh_instance, true, false);
 	ur->add_do_reference(mesh_instance);
@@ -400,7 +401,7 @@ void Sprite2DEditor::_convert_to_polygon_2d_node() {
 	polygon_2d_instance->set_polygon(polygon);
 	polygon_2d_instance->set_polygons(polys);
 
-	UndoRedo *ur = EditorNode::get_singleton()->get_undo_redo();
+	Ref<EditorUndoRedoManager> &ur = EditorNode::get_undo_redo();
 	ur->create_action(TTR("Convert to Polygon2D"));
 	ur->add_do_method(SceneTreeDock::get_singleton(), "replace_node", node, polygon_2d_instance, true, false);
 	ur->add_do_reference(polygon_2d_instance);
@@ -422,7 +423,7 @@ void Sprite2DEditor::_create_collision_polygon_2d_node() {
 		CollisionPolygon2D *collision_polygon_2d_instance = memnew(CollisionPolygon2D);
 		collision_polygon_2d_instance->set_polygon(outline);
 
-		UndoRedo *ur = EditorNode::get_singleton()->get_undo_redo();
+		Ref<EditorUndoRedoManager> &ur = EditorNode::get_undo_redo();
 		ur->create_action(TTR("Create CollisionPolygon2D Sibling"));
 		ur->add_do_method(this, "_add_as_sibling_or_child", node, collision_polygon_2d_instance);
 		ur->add_do_reference(collision_polygon_2d_instance);
@@ -455,7 +456,7 @@ void Sprite2DEditor::_create_light_occluder_2d_node() {
 		LightOccluder2D *light_occluder_2d_instance = memnew(LightOccluder2D);
 		light_occluder_2d_instance->set_occluder_polygon(polygon);
 
-		UndoRedo *ur = EditorNode::get_singleton()->get_undo_redo();
+		Ref<EditorUndoRedoManager> &ur = EditorNode::get_undo_redo();
 		ur->create_action(TTR("Create LightOccluder2D Sibling"));
 		ur->add_do_method(this, "_add_as_sibling_or_child", node, light_occluder_2d_instance);
 		ur->add_do_reference(light_occluder_2d_instance);
@@ -603,7 +604,7 @@ void Sprite2DEditorPlugin::make_visible(bool p_visible) {
 
 Sprite2DEditorPlugin::Sprite2DEditorPlugin() {
 	sprite_editor = memnew(Sprite2DEditor);
-	EditorNode::get_singleton()->get_main_control()->add_child(sprite_editor);
+	EditorNode::get_singleton()->get_main_screen_control()->add_child(sprite_editor);
 	make_visible(false);
 
 	//sprite_editor->options->hide();

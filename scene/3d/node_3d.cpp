@@ -561,8 +561,8 @@ void Node3D::clear_gizmos() {
 #endif
 }
 
-Array Node3D::get_gizmos_bind() const {
-	Array ret;
+TypedArray<Node3DGizmo> Node3D::get_gizmos_bind() const {
+	TypedArray<Node3DGizmo> ret;
 
 #ifdef TOOLS_ENABLED
 	for (int i = 0; i < data.gizmos.size(); i++) {
@@ -792,8 +792,8 @@ void Node3D::look_at(const Vector3 &p_target, const Vector3 &p_up) {
 
 void Node3D::look_at_from_position(const Vector3 &p_pos, const Vector3 &p_target, const Vector3 &p_up) {
 	ERR_FAIL_COND_MSG(p_pos.is_equal_approx(p_target), "Node origin and target are in the same position, look_at() failed.");
-	ERR_FAIL_COND_MSG(p_up.is_equal_approx(Vector3()), "The up vector can't be zero, look_at() failed.");
-	ERR_FAIL_COND_MSG(p_up.cross(p_target - p_pos).is_equal_approx(Vector3()), "Up vector and direction between node origin and target are aligned, look_at() failed.");
+	ERR_FAIL_COND_MSG(p_up.is_zero_approx(), "The up vector can't be zero, look_at() failed.");
+	ERR_FAIL_COND_MSG(p_up.cross(p_target - p_pos).is_zero_approx(), "Up vector and direction between node origin and target are aligned, look_at() failed.");
 
 	Transform3D lookat = Transform3D(Basis::looking_at(p_target - p_pos, p_up), p_pos);
 	Vector3 original_scale = get_scale();
@@ -879,25 +879,25 @@ NodePath Node3D::get_visibility_parent() const {
 	return visibility_parent_path;
 }
 
-void Node3D::_validate_property(PropertyInfo &property) const {
-	if (data.rotation_edit_mode != ROTATION_EDIT_MODE_BASIS && property.name == "basis") {
-		property.usage = 0;
+void Node3D::_validate_property(PropertyInfo &p_property) const {
+	if (data.rotation_edit_mode != ROTATION_EDIT_MODE_BASIS && p_property.name == "basis") {
+		p_property.usage = 0;
 	}
-	if (data.rotation_edit_mode == ROTATION_EDIT_MODE_BASIS && property.name == "scale") {
-		property.usage = 0;
+	if (data.rotation_edit_mode == ROTATION_EDIT_MODE_BASIS && p_property.name == "scale") {
+		p_property.usage = 0;
 	}
-	if (data.rotation_edit_mode != ROTATION_EDIT_MODE_QUATERNION && property.name == "quaternion") {
-		property.usage = 0;
+	if (data.rotation_edit_mode != ROTATION_EDIT_MODE_QUATERNION && p_property.name == "quaternion") {
+		p_property.usage = 0;
 	}
-	if (data.rotation_edit_mode != ROTATION_EDIT_MODE_EULER && property.name == "rotation") {
-		property.usage = 0;
+	if (data.rotation_edit_mode != ROTATION_EDIT_MODE_EULER && p_property.name == "rotation") {
+		p_property.usage = 0;
 	}
-	if (data.rotation_edit_mode != ROTATION_EDIT_MODE_EULER && property.name == "rotation_order") {
-		property.usage = 0;
+	if (data.rotation_edit_mode != ROTATION_EDIT_MODE_EULER && p_property.name == "rotation_order") {
+		p_property.usage = 0;
 	}
 }
 
-bool Node3D::property_can_revert(const String &p_name) {
+bool Node3D::_property_can_revert(const StringName &p_name) const {
 	if (p_name == "basis") {
 		return true;
 	} else if (p_name == "scale") {
@@ -912,47 +912,48 @@ bool Node3D::property_can_revert(const String &p_name) {
 	return false;
 }
 
-Variant Node3D::property_get_revert(const String &p_name) {
-	Variant r_ret;
+bool Node3D::_property_get_revert(const StringName &p_name, Variant &r_property) const {
 	bool valid = false;
 
 	if (p_name == "basis") {
 		Variant variant = PropertyUtils::get_property_default_value(this, "transform", &valid);
 		if (valid && variant.get_type() == Variant::Type::TRANSFORM3D) {
-			r_ret = Transform3D(variant).get_basis();
+			r_property = Transform3D(variant).get_basis();
 		} else {
-			r_ret = Basis();
+			r_property = Basis();
 		}
 	} else if (p_name == "scale") {
 		Variant variant = PropertyUtils::get_property_default_value(this, "transform", &valid);
 		if (valid && variant.get_type() == Variant::Type::TRANSFORM3D) {
-			r_ret = Transform3D(variant).get_basis().get_scale();
+			r_property = Transform3D(variant).get_basis().get_scale();
 		} else {
-			return Vector3(1.0, 1.0, 1.0);
+			r_property = Vector3(1.0, 1.0, 1.0);
 		}
 	} else if (p_name == "quaternion") {
 		Variant variant = PropertyUtils::get_property_default_value(this, "transform", &valid);
 		if (valid && variant.get_type() == Variant::Type::TRANSFORM3D) {
-			r_ret = Quaternion(Transform3D(variant).get_basis().get_rotation_quaternion());
+			r_property = Quaternion(Transform3D(variant).get_basis().get_rotation_quaternion());
 		} else {
-			return Quaternion();
+			r_property = Quaternion();
 		}
 	} else if (p_name == "rotation") {
 		Variant variant = PropertyUtils::get_property_default_value(this, "transform", &valid);
 		if (valid && variant.get_type() == Variant::Type::TRANSFORM3D) {
-			r_ret = Transform3D(variant).get_basis().get_euler_normalized(data.euler_rotation_order);
+			r_property = Transform3D(variant).get_basis().get_euler_normalized(data.euler_rotation_order);
 		} else {
-			return Vector3();
+			r_property = Vector3();
 		}
 	} else if (p_name == "position") {
 		Variant variant = PropertyUtils::get_property_default_value(this, "transform", &valid);
 		if (valid) {
-			r_ret = Transform3D(variant).get_origin();
+			r_property = Transform3D(variant).get_origin();
 		} else {
-			return Vector3();
+			r_property = Vector3();
 		}
+	} else {
+		return false;
 	}
-	return r_ret;
+	return true;
 }
 
 void Node3D::_bind_methods() {
@@ -1032,13 +1033,11 @@ void Node3D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("to_local", "global_point"), &Node3D::to_local);
 	ClassDB::bind_method(D_METHOD("to_global", "local_point"), &Node3D::to_global);
 
-	ClassDB::bind_method(D_METHOD("property_can_revert", "name"), &Node3D::property_can_revert);
-	ClassDB::bind_method(D_METHOD("property_get_revert", "name"), &Node3D::property_get_revert);
-
 	BIND_CONSTANT(NOTIFICATION_TRANSFORM_CHANGED);
 	BIND_CONSTANT(NOTIFICATION_ENTER_WORLD);
 	BIND_CONSTANT(NOTIFICATION_EXIT_WORLD);
 	BIND_CONSTANT(NOTIFICATION_VISIBILITY_CHANGED);
+	BIND_CONSTANT(NOTIFICATION_LOCAL_TRANSFORM_CHANGED);
 
 	BIND_ENUM_CONSTANT(ROTATION_EDIT_MODE_EULER);
 	BIND_ENUM_CONSTANT(ROTATION_EDIT_MODE_QUATERNION);
@@ -1054,9 +1053,9 @@ void Node3D::_bind_methods() {
 	ADD_GROUP("Transform", "");
 	ADD_PROPERTY(PropertyInfo(Variant::TRANSFORM3D, "transform", PROPERTY_HINT_NONE, "suffix:m", PROPERTY_USAGE_NO_EDITOR), "set_transform", "get_transform");
 	ADD_PROPERTY(PropertyInfo(Variant::TRANSFORM3D, "global_transform", PROPERTY_HINT_NONE, "suffix:m", PROPERTY_USAGE_NONE), "set_global_transform", "get_global_transform");
-	ADD_PROPERTY(PropertyInfo(Variant::VECTOR3, "position", PROPERTY_HINT_RANGE, "-99999,99999,0.001,or_greater,or_lesser,no_slider,suffix:m", PROPERTY_USAGE_EDITOR), "set_position", "get_position");
-	ADD_PROPERTY(PropertyInfo(Variant::VECTOR3, "rotation", PROPERTY_HINT_RANGE, "-360,360,0.1,or_lesser,or_greater,radians", PROPERTY_USAGE_EDITOR), "set_rotation", "get_rotation");
-	ADD_PROPERTY(PropertyInfo(Variant::QUATERNION, "quaternion", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_EDITOR), "set_quaternion", "get_quaternion");
+	ADD_PROPERTY(PropertyInfo(Variant::VECTOR3, "position", PROPERTY_HINT_RANGE, "-99999,99999,0.001,or_greater,or_less,no_slider,suffix:m", PROPERTY_USAGE_EDITOR), "set_position", "get_position");
+	ADD_PROPERTY(PropertyInfo(Variant::VECTOR3, "rotation", PROPERTY_HINT_RANGE, "-360,360,0.1,or_less,or_greater,radians", PROPERTY_USAGE_EDITOR), "set_rotation", "get_rotation");
+	ADD_PROPERTY(PropertyInfo(Variant::QUATERNION, "quaternion", PROPERTY_HINT_HIDE_QUATERNION_EDIT, "", PROPERTY_USAGE_EDITOR), "set_quaternion", "get_quaternion");
 	ADD_PROPERTY(PropertyInfo(Variant::BASIS, "basis", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_EDITOR), "set_basis", "get_basis");
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR3, "scale", PROPERTY_HINT_LINK, "", PROPERTY_USAGE_EDITOR), "set_scale", "get_scale");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "rotation_edit_mode", PROPERTY_HINT_ENUM, "Euler,Quaternion,Basis"), "set_rotation_edit_mode", "get_rotation_edit_mode");

@@ -6,7 +6,7 @@
 	<description>
 		Most basic 3D game object, with a 3D [Transform3D] and visibility settings. All other 3D game objects inherit from Node3D. Use [Node3D] as a parent node to move, scale, rotate and show/hide children in a 3D project.
 		Affine operations (rotate, scale, translate) happen in parent's local coordinate system, unless the [Node3D] object is set as top-level. Affine operations in this coordinate system correspond to direct affine operations on the [Node3D]'s transform. The word local below refers to this coordinate system. The coordinate system that is attached to the [Node3D] object itself is referred to as object-local coordinate system.
-		[b]Note:[/b] Unless otherwise specified, all methods that have angle parameters must have angles specified as [i]radians[/i]. To convert degrees to radians, use [method @GlobalScope.deg2rad].
+		[b]Note:[/b] Unless otherwise specified, all methods that have angle parameters must have angles specified as [i]radians[/i]. To convert degrees to radians, use [method @GlobalScope.deg_to_rad].
 	</description>
 	<tutorials>
 		<link title="Introduction to 3D">$DOCS_URL/tutorials/3d/introduction_to_3d.html</link>
@@ -39,7 +39,7 @@
 			</description>
 		</method>
 		<method name="get_gizmos" qualifiers="const">
-			<return type="Array" />
+			<return type="Node3DGizmo[]" />
 			<description>
 				Returns all the gizmos attached to this [code]Node3D[/code].
 			</description>
@@ -132,20 +132,6 @@
 			<return type="void" />
 			<description>
 				Resets this node's transformations (like scale, skew and taper) preserving its rotation and translation by performing Gram-Schmidt orthonormalization on this node's [Transform3D].
-			</description>
-		</method>
-		<method name="property_can_revert">
-			<return type="bool" />
-			<param index="0" name="name" type="String" />
-			<description>
-				Returns [code]true[/code] if the property identified by [param name] can be reverted to a default value.
-			</description>
-		</method>
-		<method name="property_get_revert">
-			<return type="Variant" />
-			<param index="0" name="name" type="String" />
-			<description>
-				Returns the default value of the Node3D property with given [param name].
 			</description>
 		</method>
 		<method name="rotate">
@@ -344,6 +330,10 @@
 		</constant>
 		<constant name="NOTIFICATION_VISIBILITY_CHANGED" value="43">
 			Node3D nodes receives this notification when their visibility changes.
+		</constant>
+		<constant name="NOTIFICATION_LOCAL_TRANSFORM_CHANGED" value="44">
+			Node3D nodes receives this notification when their local transform changes. This is not received when the transform of a parent node is changed.
+			In order for [constant NOTIFICATION_LOCAL_TRANSFORM_CHANGED] to work, users first need to ask for it, with [method set_notify_local_transform].
 		</constant>
 		<constant name="ROTATION_EDIT_MODE_EULER" value="0" enum="RotationEditMode">
 		</constant>

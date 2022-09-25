@@ -1,17 +1,16 @@
 using Godot;
 using System;
-using Godot.Collections;
+using System.Diagnostics.CodeAnalysis;
 using GodotTools.Internals;
-using JetBrains.Annotations;
 using File = GodotTools.Utils.File;
 using Path = System.IO.Path;
 
 namespace GodotTools.Build
 {
-    public class BuildOutputView : VBoxContainer, ISerializationListener
+    public partial class BuildOutputView : VBoxContainer, ISerializationListener
     {
         [Serializable]
-        private class BuildIssue : RefCounted // TODO Remove RefCounted once we have proper serialization
+        private partial class BuildIssue : RefCounted // TODO Remove RefCounted once we have proper serialization
         {
             public bool Warning { get; set; }
             public string File { get; set; }
@@ -22,7 +21,8 @@ namespace GodotTools.Build
             public string ProjectFile { get; set; }
         }
 
-        [Signal] public event Action BuildStateChanged;
+        [Signal]
+        public delegate void BuildStateChangedEventHandler();
 
         public bool HasBuildExited { get; private set; } = false;
 
@@ -58,7 +58,7 @@ namespace GodotTools.Build
         }
 
         // TODO Use List once we have proper serialization.
-        private readonly Array<BuildIssue> _issues = new Array<BuildIssue>();
+        private Godot.Collections.Array<BuildIssue> _issues = new();
         private ItemList _issuesList;
         private PopupMenu _issuesListContextMenu;
         private TextEdit _buildLog;
@@ -69,71 +69,63 @@ namespace GodotTools.Build
 
         private void LoadIssuesFromFile(string csvFile)
         {
-            using (var file = new Godot.File())
+            using var file = FileAccess.Open(csvFile, FileAccess.ModeFlags.Read);
+
+            if (file == null)
+                return;
+
+            while (!file.EofReached())
             {
-                try
+                string[] csvColumns = file.GetCsvLine();
+
+                if (csvColumns.Length == 1 && string.IsNullOrEmpty(csvColumns[0]))
+                    return;
+
+                if (csvColumns.Length != 7)
                 {
-                    Error openError = file.Open(csvFile, Godot.File.ModeFlags.Read);
-
-                    if (openError != Error.Ok)
-                        return;
-
-                    while (!file.EofReached())
-                    {
-                        string[] csvColumns = file.GetCsvLine();
-
-                        if (csvColumns.Length == 1 && string.IsNullOrEmpty(csvColumns[0]))
-                            return;
-
-                        if (csvColumns.Length != 7)
-                        {
-                            GD.PushError($"Expected 7 columns, got {csvColumns.Length}");
-                            continue;
-                        }
-
-                        var issue = new BuildIssue
-                        {
-                            Warning = csvColumns[0] == "warning",
-                            File = csvColumns[1],
-                            Line = int.Parse(csvColumns[2]),
-                            Column = int.Parse(csvColumns[3]),
-                            Code = csvColumns[4],
-                            Message = csvColumns[5],
-                            ProjectFile = csvColumns[6]
-                        };
-
-                        if (issue.Warning)
-                            WarningCount += 1;
-                        else
-                            ErrorCount += 1;
-
-                        _issues.Add(issue);
-                    }
+                    GD.PushError($"Expected 7 columns, got {csvColumns.Length}");
+                    continue;
                 }
-                finally
+
+                var issue = new BuildIssue
                 {
-                    file.Close(); // Disposing it is not enough. We need to call Close()
-                }
+                    Warning = csvColumns[0] == "warning",
+                    File = csvColumns[1],
+                    Line = int.Parse(csvColumns[2]),
+                    Column = int.Parse(csvColumns[3]),
+                    Code = csvColumns[4],
+                    Message = csvColumns[5],
+                    ProjectFile = csvColumns[6]
+                };
+
+                if (issue.Warning)
+                    WarningCount += 1;
+                else
+                    ErrorCount += 1;
+
+                _issues.Add(issue);
             }
         }
 
-        private void IssueActivated(int idx)
+        private void IssueActivated(long idx)
         {
             if (idx < 0 || idx >= _issuesList.ItemCount)
-                throw new IndexOutOfRangeException("Item list index out of range");
+                throw new ArgumentOutOfRangeException(nameof(idx), "Item list index out of range.");
 
             // Get correct issue idx from issue list
-            int issueIndex = (int)(long)_issuesList.GetItemMetadata(idx);
+            int issueIndex = (int)_issuesList.GetItemMetadata((int)idx);
 
             if (issueIndex < 0 || issueIndex >= _issues.Count)
-                throw new IndexOutOfRangeException("Issue index out of range");
+                throw new InvalidOperationException("Issue index out of range.");
 
             BuildIssue issue = _issues[issueIndex];
 
             if (string.IsNullOrEmpty(issue.ProjectFile) && string.IsNullOrEmpty(issue.File))
                 return;
 
-            string projectDir = issue.ProjectFile.Length > 0 ? issue.ProjectFile.GetBaseDir() : _buildInfo.Solution.GetBaseDir();
+            string projectDir = !string.IsNullOrEmpty(issue.ProjectFile) ?
+                issue.ProjectFile.GetBaseDir() :
+                _buildInfo.Solution.GetBaseDir();
 
             string file = Path.Combine(projectDir.SimplifyGodotPath(), issue.File.SimplifyGodotPath());
 
@@ -291,7 +283,7 @@ namespace GodotTools.Build
         public void RestartBuild()
         {
             if (!HasBuildExited)
-                throw new InvalidOperationException("Build already started");
+                throw new InvalidOperationException("Build already started.");
 
             BuildManager.RestartBuild(this);
         }
@@ -299,7 +291,7 @@ namespace GodotTools.Build
         public void StopBuild()
         {
             if (!HasBuildExited)
-                throw new InvalidOperationException("Build is not in progress");
+                throw new InvalidOperationException("Build is not in progress.");
 
             BuildManager.StopBuild(this);
         }
@@ -309,7 +301,7 @@ namespace GodotTools.Build
             Copy
         }
 
-        private void IssuesListContextOptionPressed(int id)
+        private void IssuesListContextOptionPressed(long id)
         {
             switch ((IssuesContextMenuOption)id)
             {
@@ -334,9 +326,9 @@ namespace GodotTools.Build
             }
         }
 
-        private void IssuesListClicked(int index, Vector2 atPosition, int mouseButtonIndex)
+        private void IssuesListClicked(long index, Vector2 atPosition, long mouseButtonIndex)
         {
-            if (mouseButtonIndex != (int)MouseButton.Right)
+            if (mouseButtonIndex != (long)MouseButton.Right)
             {
                 return;
             }
@@ -412,6 +404,16 @@ namespace GodotTools.Build
         {
             // In case it didn't update yet. We don't want to have to serialize any pending output.
             UpdateBuildLogText();
+
+            // NOTE:
+            // Currently, GodotTools is loaded in its own load context. This load context is not reloaded, but the script still are.
+            // Until that changes, we need workarounds like this one because events keep strong references to disposed objects.
+            BuildManager.BuildLaunchFailed -= BuildLaunchFailed;
+            BuildManager.BuildStarted -= BuildStarted;
+            BuildManager.BuildFinished -= BuildFinished;
+            // StdOutput/Error can be received from different threads, so we need to use CallDeferred
+            BuildManager.StdOutputReceived -= StdOutputReceived;
+            BuildManager.StdErrorReceived -= StdErrorReceived;
         }
 
         public void OnAfterDeserialize()

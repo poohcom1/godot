@@ -34,6 +34,7 @@
 #include "core/templates/local_vector.h"
 #include "core/templates/rid_owner.h"
 #include "core/templates/self_list.h"
+#include "servers/rendering/renderer_rd/storage_rd/texture_storage.h"
 #include "servers/rendering/storage/light_storage.h"
 #include "servers/rendering/storage/utilities.h"
 
@@ -87,6 +88,7 @@ private:
 		bool enable_shadows = false;
 		uint32_t cull_mask = (1 << 20) - 1;
 		float mesh_lod_threshold = 0.01;
+		float baked_exposure = 1.0;
 
 		Dependency dependency;
 	};
@@ -99,6 +101,7 @@ private:
 		bool uses_spherical_harmonics = false;
 		bool interior = false;
 		AABB bounds = AABB(Vector3(), Vector3(1, 1, 1));
+		float baked_exposure = 1.0;
 		int32_t array_index = -1; //unassigned
 		PackedVector3Array points;
 		PackedColorArray point_sh;
@@ -233,7 +236,7 @@ public:
 		const Light *light = light_owner.get_or_null(p_light);
 		ERR_FAIL_COND_V(!light, RS::LIGHT_DIRECTIONAL);
 
-		return light_owner.owns(light->projector);
+		return TextureStorage::get_singleton()->owns_texture(light->projector);
 	}
 
 	_FORCE_INLINE_ bool light_is_negative(RID p_light) const {
@@ -248,13 +251,6 @@ public:
 		ERR_FAIL_COND_V(!light, 0.0);
 
 		return light->param[RS::LIGHT_PARAM_TRANSMITTANCE_BIAS];
-	}
-
-	_FORCE_INLINE_ float light_get_shadow_volumetric_fog_fade(RID p_light) const {
-		const Light *light = light_owner.get_or_null(p_light);
-		ERR_FAIL_COND_V(!light, 0.0);
-
-		return light->param[RS::LIGHT_PARAM_SHADOW_VOLUMETRIC_FOG_FADE];
 	}
 
 	virtual RS::LightBakeMode light_get_bake_mode(RID p_light) override;
@@ -286,6 +282,8 @@ public:
 	virtual void reflection_probe_set_resolution(RID p_probe, int p_resolution) override;
 	virtual void reflection_probe_set_mesh_lod_threshold(RID p_probe, float p_ratio) override;
 
+	void reflection_probe_set_baked_exposure(RID p_probe, float p_exposure);
+
 	virtual AABB reflection_probe_get_aabb(RID p_probe) const override;
 	virtual RS::ReflectionProbeUpdateMode reflection_probe_get_update_mode(RID p_probe) const override;
 	virtual uint32_t reflection_probe_get_cull_mask(RID p_probe) const override;
@@ -295,6 +293,7 @@ public:
 	virtual float reflection_probe_get_mesh_lod_threshold(RID p_probe) const override;
 
 	int reflection_probe_get_resolution(RID p_probe) const;
+	float reflection_probe_get_baked_exposure(RID p_probe) const;
 	virtual bool reflection_probe_renders_shadows(RID p_probe) const override;
 
 	float reflection_probe_get_intensity(RID p_probe) const;
@@ -318,6 +317,7 @@ public:
 	virtual void lightmap_set_probe_bounds(RID p_lightmap, const AABB &p_bounds) override;
 	virtual void lightmap_set_probe_interior(RID p_lightmap, bool p_interior) override;
 	virtual void lightmap_set_probe_capture_data(RID p_lightmap, const PackedVector3Array &p_points, const PackedColorArray &p_point_sh, const PackedInt32Array &p_tetrahedra, const PackedInt32Array &p_bsp_tree) override;
+	virtual void lightmap_set_baked_exposure_normalization(RID p_lightmap, float p_exposure) override;
 	virtual PackedVector3Array lightmap_get_probe_capture_points(RID p_lightmap) const override;
 	virtual PackedColorArray lightmap_get_probe_capture_sh(RID p_lightmap) const override;
 	virtual PackedInt32Array lightmap_get_probe_capture_tetrahedra(RID p_lightmap) const override;
@@ -336,6 +336,11 @@ public:
 		const Lightmap *lm = lightmap_owner.get_or_null(p_lightmap);
 		ERR_FAIL_COND_V(!lm, RID());
 		return lm->light_texture;
+	}
+	_FORCE_INLINE_ float lightmap_get_baked_exposure_normalization(RID p_lightmap) const {
+		const Lightmap *lm = lightmap_owner.get_or_null(p_lightmap);
+		ERR_FAIL_COND_V(!lm, 1.0);
+		return lm->baked_exposure;
 	}
 	_FORCE_INLINE_ int32_t lightmap_get_array_index(RID p_lightmap) const {
 		ERR_FAIL_COND_V(!using_lightmap_array, -1); //only for arrays

@@ -34,10 +34,11 @@
 #include "core/templates/local_vector.h"
 #include "core/templates/rid_owner.h"
 #include "core/templates/self_list.h"
-#include "servers/rendering/renderer_scene.h"
 #include "servers/rendering/renderer_scene_render.h"
+#include "servers/rendering/rendering_method.h"
 #include "servers/rendering_server.h"
 #include "servers/xr/xr_interface.h"
+#include "storage/render_scene_buffers.h"
 
 class RendererViewport {
 public:
@@ -53,6 +54,7 @@ public:
 
 		Size2i internal_size;
 		Size2i size;
+		uint32_t view_count;
 		RID camera;
 		RID scenario;
 
@@ -64,9 +66,10 @@ public:
 		RS::ViewportUpdateMode update_mode = RenderingServer::VIEWPORT_UPDATE_WHEN_VISIBLE;
 		RID render_target;
 		RID render_target_texture;
-		RID render_buffers;
+		Ref<RenderSceneBuffers> render_buffers;
 
-		RS::ViewportMSAA msaa = RenderingServer::VIEWPORT_MSAA_DISABLED;
+		RS::ViewportMSAA msaa_2d = RenderingServer::VIEWPORT_MSAA_DISABLED;
+		RS::ViewportMSAA msaa_3d = RenderingServer::VIEWPORT_MSAA_DISABLED;
 		RS::ViewportScreenSpaceAA screen_space_aa = RenderingServer::VIEWPORT_SCREEN_SPACE_AA_DISABLED;
 		bool use_taa = false;
 		bool use_debanding = false;
@@ -145,9 +148,10 @@ public:
 
 		HashMap<RID, CanvasData> canvas_map;
 
-		RendererScene::RenderInfo render_info;
+		RenderingMethod::RenderInfo render_info;
 
 		Viewport() {
+			view_count = 1;
 			update_mode = RS::VIEWPORT_UPDATE_WHEN_VISIBLE;
 			clear_mode = RS::VIEWPORT_CLEAR_ALWAYS;
 			transparent_bg = false;
@@ -157,7 +161,6 @@ public:
 			measure_render_time = false;
 
 			debug_draw = RS::VIEWPORT_DEBUG_DRAW_DISABLED;
-			msaa = RS::VIEWPORT_MSAA_DISABLED;
 			screen_space_aa = RS::VIEWPORT_SCREEN_SPACE_AA_DISABLED;
 			use_debanding = false;
 			use_occlusion_culling = false;
@@ -175,8 +178,6 @@ public:
 			time_gpu_begin = 0;
 			time_gpu_end = 0;
 		}
-
-		uint32_t get_view_count();
 	};
 
 	HashMap<String, RID> timestamp_vp_map;
@@ -185,25 +186,17 @@ public:
 
 	mutable RID_Owner<Viewport, true> viewport_owner;
 
-	struct ViewportSort {
-		_FORCE_INLINE_ bool operator()(const Viewport *p_left, const Viewport *p_right) const {
-			bool left_to_screen = p_left->viewport_to_screen_rect.size != Size2();
-			bool right_to_screen = p_right->viewport_to_screen_rect.size != Size2();
-
-			if (left_to_screen == right_to_screen) {
-				return p_right->parent == p_left->self;
-			}
-			return (right_to_screen ? 0 : 1) < (left_to_screen ? 0 : 1);
-		}
-	};
-
 	Vector<Viewport *> active_viewports;
+	Vector<Viewport *> sorted_active_viewports;
+	bool sorted_active_viewports_dirty = false;
 
 	int total_objects_drawn = 0;
 	int total_vertices_drawn = 0;
 	int total_draw_calls_used = 0;
 
 private:
+	Vector<Viewport *> _sort_active_viewports();
+	void _viewport_set_size(Viewport *p_viewport, int p_width, int p_height, uint32_t p_view_count);
 	void _configure_3d_render_buffers(Viewport *p_viewport);
 	void _draw_3d(Viewport *p_viewport);
 	void _draw_viewport(Viewport *p_viewport);
@@ -259,7 +252,8 @@ public:
 	void viewport_set_positional_shadow_atlas_size(RID p_viewport, int p_size, bool p_16_bits = true);
 	void viewport_set_positional_shadow_atlas_quadrant_subdivision(RID p_viewport, int p_quadrant, int p_subdiv);
 
-	void viewport_set_msaa(RID p_viewport, RS::ViewportMSAA p_msaa);
+	void viewport_set_msaa_2d(RID p_viewport, RS::ViewportMSAA p_msaa);
+	void viewport_set_msaa_3d(RID p_viewport, RS::ViewportMSAA p_msaa);
 	void viewport_set_screen_space_aa(RID p_viewport, RS::ViewportScreenSpaceAA p_mode);
 	void viewport_set_use_taa(RID p_viewport, bool p_use_taa);
 	void viewport_set_use_debanding(RID p_viewport, bool p_use_debanding);

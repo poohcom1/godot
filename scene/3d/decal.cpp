@@ -152,15 +152,14 @@ AABB Decal::get_aabb() const {
 	return aabb;
 }
 
-void Decal::_validate_property(PropertyInfo &property) const {
-	if (!distance_fade_enabled && (property.name == "distance_fade_begin" || property.name == "distance_fade_length")) {
-		property.usage = PROPERTY_USAGE_NO_EDITOR;
+void Decal::_validate_property(PropertyInfo &p_property) const {
+	if (!distance_fade_enabled && (p_property.name == "distance_fade_begin" || p_property.name == "distance_fade_length")) {
+		p_property.usage = PROPERTY_USAGE_NO_EDITOR;
 	}
-	VisualInstance3D::_validate_property(property);
 }
 
-TypedArray<String> Decal::get_configuration_warnings() const {
-	TypedArray<String> warnings = Node::get_configuration_warnings();
+PackedStringArray Decal::get_configuration_warnings() const {
+	PackedStringArray warnings = Node::get_configuration_warnings();
 
 	if (textures[TEXTURE_ALBEDO].is_null() && textures[TEXTURE_NORMAL].is_null() && textures[TEXTURE_ORM].is_null() && textures[TEXTURE_EMISSION].is_null()) {
 		warnings.push_back(RTR("The decal has no textures loaded into any of its texture properties, and will therefore not be visible."));

@@ -1,8 +1,3 @@
-#if REAL_T_IS_DOUBLE
-using real_t = System.Double;
-#else
-using real_t = System.Single;
-#endif
 using System;
 using System.Runtime.InteropServices;
 
@@ -53,8 +48,8 @@ namespace Godot
         /// <summary>
         /// Access vector components using their index.
         /// </summary>
-        /// <exception cref="IndexOutOfRangeException">
-        /// Thrown when the given the <paramref name="index"/> is not 0, 1 or 2.
+        /// <exception cref="ArgumentOutOfRangeException">
+        /// <paramref name="index"/> is not 0, 1 or 2.
         /// </exception>
         /// <value>
         /// <c>[0]</c> is equivalent to <see cref="x"/>,
@@ -74,7 +69,7 @@ namespace Godot
                     case 2:
                         return z;
                     default:
-                        throw new IndexOutOfRangeException();
+                        throw new ArgumentOutOfRangeException(nameof(index));
                 }
             }
             set
@@ -91,7 +86,7 @@ namespace Godot
                         z = value;
                         return;
                     default:
-                        throw new IndexOutOfRangeException();
+                        throw new ArgumentOutOfRangeException(nameof(index));
                 }
             }
         }
@@ -210,6 +205,30 @@ namespace Godot
                 Mathf.CubicInterpolate(x, b.x, preA.x, postB.x, weight),
                 Mathf.CubicInterpolate(y, b.y, preA.y, postB.y, weight),
                 Mathf.CubicInterpolate(z, b.z, preA.z, postB.z, weight)
+            );
+        }
+
+        /// <summary>
+        /// Performs a cubic interpolation between vectors <paramref name="preA"/>, this vector,
+        /// <paramref name="b"/>, and <paramref name="postB"/>, by the given amount <paramref name="weight"/>.
+        /// It can perform smoother interpolation than <see cref="CubicInterpolate"/>
+        /// by the time values.
+        /// </summary>
+        /// <param name="b">The destination vector.</param>
+        /// <param name="preA">A vector before this vector.</param>
+        /// <param name="postB">A vector after <paramref name="b"/>.</param>
+        /// <param name="weight">A value on the range of 0.0 to 1.0, representing the amount of interpolation.</param>
+        /// <param name="t"></param>
+        /// <param name="preAT"></param>
+        /// <param name="postBT"></param>
+        /// <returns>The interpolated vector.</returns>
+        public Vector3 CubicInterpolateInTime(Vector3 b, Vector3 preA, Vector3 postB, real_t weight, real_t t, real_t preAT, real_t postBT)
+        {
+            return new Vector3
+            (
+                Mathf.CubicInterpolateInTime(x, b.x, preA.x, postB.x, weight, t, preAT, postBT),
+                Mathf.CubicInterpolateInTime(y, b.y, preA.y, postB.y, weight, t, preAT, postBT),
+                Mathf.CubicInterpolateInTime(z, b.z, preA.z, postB.z, weight, t, preAT, postBT)
             );
         }
 
@@ -502,7 +521,7 @@ namespace Godot
 #if DEBUG
             if (!normal.IsNormalized())
             {
-                throw new ArgumentException("Argument is not normalized", nameof(normal));
+                throw new ArgumentException("Argument is not normalized.", nameof(normal));
             }
 #endif
             return (2.0f * Dot(normal) * normal) - this;
@@ -520,10 +539,10 @@ namespace Godot
 #if DEBUG
             if (!axis.IsNormalized())
             {
-                throw new ArgumentException("Argument is not normalized", nameof(axis));
+                throw new ArgumentException("Argument is not normalized.", nameof(axis));
             }
 #endif
-            return new Basis(axis, angle).Xform(this);
+            return new Basis(axis, angle) * this;
         }
 
         /// <summary>
@@ -694,17 +713,6 @@ namespace Godot
             this.x = x;
             this.y = y;
             this.z = z;
-        }
-
-        /// <summary>
-        /// Constructs a new <see cref="Vector3"/> from an existing <see cref="Vector3"/>.
-        /// </summary>
-        /// <param name="v">The existing <see cref="Vector3"/>.</param>
-        public Vector3(Vector3 v)
-        {
-            x = v.x;
-            y = v.y;
-            z = v.z;
         }
 
         /// <summary>
@@ -1009,12 +1017,7 @@ namespace Godot
         /// <returns>Whether or not the vector and the object are equal.</returns>
         public override bool Equals(object obj)
         {
-            if (obj is Vector3)
-            {
-                return Equals((Vector3)obj);
-            }
-
-            return false;
+            return obj is Vector3 other && Equals(other);
         }
 
         /// <summary>

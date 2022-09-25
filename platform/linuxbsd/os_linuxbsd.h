@@ -43,8 +43,6 @@
 class OS_LinuxBSD : public OS_Unix {
 	virtual void delete_main_loop() override;
 
-	bool force_quit;
-
 #ifdef FONTCONFIG_ENABLED
 	bool font_config_initialized = false;
 #endif
@@ -69,6 +67,8 @@ class OS_LinuxBSD : public OS_Unix {
 
 	MainLoop *main_loop = nullptr;
 
+	String get_systemd_os_release_info_value(const String &key) const;
+
 protected:
 	virtual void initialize() override;
 	virtual void finalize() override;
@@ -79,6 +79,8 @@ protected:
 
 public:
 	virtual String get_name() const override;
+	virtual String get_distribution_name() const override;
+	virtual String get_version() const override;
 
 	virtual MainLoop *get_main_loop() const override;
 
