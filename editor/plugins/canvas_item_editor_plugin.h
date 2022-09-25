@@ -33,6 +33,7 @@
 
 #include "editor/editor_plugin.h"
 #include "editor/editor_zoom_widget.h"
+#include "scene/2d/node_2d.h"
 #include "scene/gui/box_container.h"
 #include "scene/gui/check_box.h"
 #include "scene/gui/label.h"
@@ -41,7 +42,6 @@
 #include "scene/gui/split_container.h"
 #include "scene/gui/texture_rect.h"
 #include "scene/main/canvas_item.h"
-#include "scene/2d/node_2d.h"
 
 class EditorData;
 class CanvasItemEditorViewport;
@@ -137,12 +137,12 @@ private:
 		ANIM_COPY_POSE,
 		ANIM_PASTE_POSE,
 		ANIM_CLEAR_POSE,
-        ANIM_SKELETON_MAKE_BONES,
-        ANIM_SKELETON_CLEAR_BONES,
-        ANIM_SKELETON_SHOW_BONES,
-        ANIM_SKELETON_ALWAYS_APPLY,
-        ANIM_SKELETON_SET_IK_CHAIN,
-        ANIM_SKELETON_CLEAR_IK_CHAIN,
+		ANIM_SKELETON_MAKE_BONES,
+		ANIM_SKELETON_CLEAR_BONES,
+		ANIM_SKELETON_SHOW_BONES,
+		ANIM_SKELETON_ALWAYS_APPLY,
+		ANIM_SKELETON_SET_IK_CHAIN,
+		ANIM_SKELETON_CLEAR_IK_CHAIN,
 		CLEAR_GUIDES,
 		VIEW_CENTER_TO_SELECTION,
 		VIEW_FRAME_TO_SELECTION,
@@ -243,8 +243,8 @@ private:
 	bool key_pos = true;
 	bool key_rot = true;
 	bool key_scale = false;
-    bool show_anim_bones = true;
-    bool anim_bones_always_apply = false;
+	bool show_anim_bones = true;
+	bool anim_bones_always_apply = false;
 
 	bool pan_pressed = false;
 
@@ -330,7 +330,7 @@ private:
 	PopupMenu *grid_menu = nullptr;
 	HBoxContainer *animation_hb = nullptr;
 	MenuButton *animation_menu = nullptr;
-    MenuButton *animation_skeleton_menu = nullptr;
+	MenuButton *animation_skeleton_menu = nullptr;
 
 	Button *key_loc_button = nullptr;
 	Button *key_rot_button = nullptr;
@@ -391,7 +391,7 @@ private:
 
 	void _save_canvas_item_ik_chain(const CanvasItem *p_canvas_item, List<float> *p_bones_length, List<Dictionary> *p_bones_state);
 	void _save_canvas_item_state(List<CanvasItem *> p_canvas_items, bool save_bones = false);
-	void _restore_canvas_item_ik_chain(CanvasItem* p_canvas_item, const List<Dictionary>* p_bones_state);
+	void _restore_canvas_item_ik_chain(CanvasItem *p_canvas_item, const List<Dictionary> *p_bones_state);
 	void _restore_canvas_item_state(List<CanvasItem *> p_canvas_items, bool restore_bones = false);
 	void _commit_canvas_item_state(List<CanvasItem *> p_canvas_items, String action_name, bool commit_bones = false);
 
@@ -416,7 +416,7 @@ private:
 	Ref<EditorUndoRedoManager> undo_redo;
 
 	bool _build_bones_list(Node *p_node);
-	bool _get_bone_shape(Vector<Vector2> *shape, Vector<Vector2> *outline_shape, const KeyValue<BoneKey,BoneList> &bone);
+	bool _get_bone_shape(Vector<Vector2> *shape, Vector<Vector2> *outline_shape, const KeyValue<BoneKey, BoneList> &bone);
 
 	List<CanvasItem *> _get_edited_canvas_items(bool retrieve_locked = false, bool remove_canvas_item_if_parent_in_selection = true);
 	Rect2 _get_encompassing_rect_from_list(List<CanvasItem *> p_list);
@@ -474,7 +474,7 @@ private:
 	void _focus_selection(int p_op);
 	void _reset_drag();
 
-	void _solve_IK(Node2D* leaf_node, Point2 target_position);
+	void _solve_IK(Node2D *leaf_node, Point2 target_position);
 
 	SnapTarget snap_target[2];
 	Transform2D snap_transform;
