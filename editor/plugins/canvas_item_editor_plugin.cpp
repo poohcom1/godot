@@ -4449,7 +4449,7 @@ void CanvasItemEditor::_update_bone_list() {
 	}
     anim_bone_list_dirty = false;
 
-    viewport->update();
+    viewport->queue_redraw();
 }
 
 void CanvasItemEditor::_tree_changed(Node *) {
@@ -5097,14 +5097,14 @@ void CanvasItemEditor::_popup_callback(int p_op) {
 
             show_anim_bones = !animation_skeleton_menu->get_popup()->is_item_checked(idx);
             animation_skeleton_menu->get_popup()->set_item_checked(idx, show_anim_bones);
-			viewport->update();
+			viewport->queue_redraw();
 		} break;
         case ANIM_SKELETON_ALWAYS_APPLY: {
             int idx = animation_skeleton_menu->get_popup()->get_item_index(ANIM_SKELETON_ALWAYS_APPLY);
 
             anim_bones_always_apply = !animation_skeleton_menu->get_popup()->is_item_checked(idx);
             animation_skeleton_menu->get_popup()->set_item_checked(idx, anim_bones_always_apply);
-            viewport->update();
+            viewport->queue_redraw();
         } break;
 		case ANIM_SKELETON_MAKE_BONES: {
 			HashMap<Node*, Object*> &selection = editor_selection->get_selection();
@@ -5978,7 +5978,7 @@ CanvasItemEditor::CanvasItemEditor() {
     animation_skeleton_menu = memnew(MenuButton);
     animation_skeleton_menu->set_shortcut_context(this);
     animation_hb->add_child(animation_skeleton_menu);
-    animation_skeleton_menu->set_tooltip(TTR("Guide Bones"));
+    animation_skeleton_menu->set_tooltip_text(TTR("Guide Bones"));
     animation_skeleton_menu->set_switch_on_hover(true);
     animation_skeleton_menu->get_popup()->connect("id_pressed", callable_mp(this, &CanvasItemEditor::_popup_callback));
 
