@@ -5108,7 +5108,7 @@ void CanvasItemEditor::_popup_callback(int p_op) {
 			HashMap<Node *, Object *> &selection = editor_selection->get_selection();
 
 			undo_redo->create_action(TTR("Create Animation Bone(s) from Node(s)"));
-			for (const KeyValue<Node *, Object *> E : selection) {
+			for (const KeyValue<Node *, Object *> &E : selection) {
 				Node2D *n2d = Object::cast_to<Node2D>(E.key);
 				if (!n2d) {
 					continue;
@@ -5136,7 +5136,7 @@ void CanvasItemEditor::_popup_callback(int p_op) {
 			HashMap<Node *, Object *> &selection = editor_selection->get_selection();
 
 			undo_redo->create_action(TTR("Clear Bones"));
-			for (const KeyValue<Node *, Object *> E : selection) {
+			for (const KeyValue<Node *, Object *> &E : selection) {
 				Node2D *n2d = Object::cast_to<Node2D>(E.key);
 				if (!n2d) {
 					continue;
@@ -5184,7 +5184,7 @@ void CanvasItemEditor::_popup_callback(int p_op) {
 			HashMap<Node *, Object *> &selection = editor_selection->get_selection();
 
 			undo_redo->create_action(TTR("Clear IK Chain"));
-			for (const KeyValue<Node *, Object *> E : selection) {
+			for (const KeyValue<Node *, Object *> &E : selection) {
 				CanvasItem *n2d = Object::cast_to<CanvasItem>(E.key);
 				if (!n2d) {
 					continue;
