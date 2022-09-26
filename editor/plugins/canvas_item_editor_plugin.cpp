@@ -902,9 +902,9 @@ Vector2 CanvasItemEditor::_position_to_anchor(const Control *p_control, Vector2 
 	return output;
 }
 
-void CanvasItemEditor::_save_canvas_item_ik_chain(const CanvasItem *p_canvas_item, List<float> *p_bones_length, List<Dictionary> *p_bones_state) {
+void CanvasItemEditor::_save_canvas_item_ik_chain(const CanvasItem *p_canvas_item, List<real_t> *p_bones_length, List<Dictionary> *p_bones_state) {
 	if (p_bones_length) {
-		*p_bones_length = List<float>();
+		*p_bones_length = List<real_t>();
 	}
 	if (p_bones_state) {
 		*p_bones_state = List<Dictionary>();
@@ -1556,9 +1556,9 @@ void CanvasItemEditor::_solve_IK(Node2D *leaf_node, Point2 target_position) {
 			Point2 root_pos = joints_list.back()->get()->get_global_transform_with_canvas().get_origin();
 
 			// Restraints the node to a maximum distance is necessary
-			float total_len = 0;
-			for (List<float>::Element *E = se->pre_drag_bones_length.front(); E; E = E->next()) {
-				total_len += E->get();
+			real_t total_len = 0;
+			for (real_t &E : se->pre_drag_bones_length) {
+				total_len += E;
 			}
 			if ((root_pos.distance_to(leaf_pos)) > total_len) {
 				Vector2 rel = leaf_pos - root_pos;
@@ -1569,18 +1569,18 @@ void CanvasItemEditor::_solve_IK(Node2D *leaf_node, Point2 target_position) {
 
 			// Run the solver
 			int solver_iterations = 64;
-			float solver_k = 0.3;
+			real_t solver_k = 0.3;
 
 			// Build the position list
 			for (int i = 0; i < solver_iterations; i++) {
 				// Handle the leaf joint
 				int node_id = 0;
-				for (List<float>::Element *E = se->pre_drag_bones_length.front(); E; E = E->next()) {
+				for (real_t &E : se->pre_drag_bones_length) {
 					Vector2 direction = (joints_pos[node_id + 1] - joints_pos[node_id]).normalized();
-					int len = E->get();
-					if (E == se->pre_drag_bones_length.front()) {
+					int len = E;
+					if (E == se->pre_drag_bones_length.front()->get()) {
 						joints_pos[1] = joints_pos[1].lerp(joints_pos[0] + len * direction, solver_k);
-					} else if (E == se->pre_drag_bones_length.back()) {
+					} else if (E == se->pre_drag_bones_length.back()->get()) {
 						joints_pos[node_id] = joints_pos[node_id].lerp(joints_pos[node_id + 1] - len * direction, solver_k);
 					} else {
 						Vector2 center = (joints_pos[node_id + 1] + joints_pos[node_id]) / 2.0;
