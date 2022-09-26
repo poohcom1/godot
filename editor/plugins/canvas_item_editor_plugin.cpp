@@ -2290,8 +2290,6 @@ bool CanvasItemEditor::_gui_input_move(const Ref<InputEvent> &p_event) {
 
 				CanvasItemEditorSelectedItem *se = editor_selection->get_node_editor_data<CanvasItemEditorSelectedItem>(canvas_item);
 				if (se) {
-					Transform2D xform = canvas_item->get_global_transform_with_canvas().affine_inverse() * canvas_item->get_transform();
-
 					Node2D *node2d = Object::cast_to<Node2D>(canvas_item);
 					if (node2d && se->pre_drag_bones_undo_state.size() > 0 && apply_anim_IK) {
 						real_t initial_leaf_node_rotation = node2d->get_global_transform_with_canvas().get_rotation();
