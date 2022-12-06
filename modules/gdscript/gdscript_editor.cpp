@@ -2888,32 +2888,86 @@ static void _find_call_arguments(GDScriptParser::CompletionContext &p_context, c
 			_find_call_arguments(completion_context, completion_context.node, completion_context.current_argument, options, r_forced, r_call_hint);
 		} break;
 		case GDScriptParser::COMPLETION_OVERRIDE_METHOD: {
-			GDScriptParser::DataType native_type = completion_context.current_class->base_type;
-			while (native_type.is_set() && native_type.kind != GDScriptParser::DataType::NATIVE) {
-				switch (native_type.kind) {
+			const bool use_type_hint = EditorSettings::get_singleton()->get_setting("text_editor/completion/add_type_hints");
+
+			GDScriptParser::DataType base_type = completion_context.current_class->base_type;
+
+			while (base_type.is_set() && base_type.kind != GDScriptParser::DataType::NATIVE) {
+				switch (base_type.kind) {
 					case GDScriptParser::DataType::CLASS: {
-						native_type = native_type.class_type->base_type;
+						for (int j = 0; j < base_type.class_type->members.size(); j++) {
+							const GDScriptParser::ClassNode::Member member = base_type.class_type->members[j];
+
+							if (member.type != GDScriptParser::ClassNode::Member::FUNCTION) {
+								continue;
+							}
+
+							if (options.has(member.function->identifier->name) || completion_context.current_class->has_member(member.function->identifier->name)) {
+								continue;
+							}
+
+							String method_hint = member.function->identifier->name;
+							method_hint += "(";
+
+							for (int i = 0; i < member.function->parameters.size(); i++) {
+								if (i > 0) {
+									method_hint += ", ";
+								}
+
+								const GDScriptParser::ParameterNode *param = member.function->parameters[i];
+
+								method_hint += param->identifier->name;
+
+								if (use_type_hint) {
+									if (param->get_datatype().is_hard_type()) {
+										method_hint += ": " + param->datatype.to_string();
+									}
+								}
+
+								if (param->default_value) {
+									// todo
+								}
+							}
+							method_hint += ")";
+
+							if (use_type_hint) {
+								method_hint += " -> ";
+								if (member.function->get_datatype().builtin_type == Variant::NIL) {
+									method_hint += "void";
+								} else {
+									method_hint += member.function->get_datatype().to_string();
+								}
+							}
+
+							method_hint += ":";
+
+							ScriptLanguage::CodeCompletionOption option(method_hint, ScriptLanguage::CODE_COMPLETION_KIND_FUNCTION);
+							options.insert(member.function->identifier->name, option); // Insert name instead of display to track duplicates
+						}
+
+						base_type = base_type.class_type->base_type;
 					} break;
 					default: {
-						native_type.kind = GDScriptParser::DataType::UNRESOLVED;
+						base_type.kind = GDScriptParser::DataType::UNRESOLVED;
 					} break;
 				}
 			}
 
-			if (!native_type.is_set()) {
+			if (!base_type.is_set()) {
 				break;
 			}
 
-			StringName class_name = native_type.native_type;
-			if (!ClassDB::class_exists(class_name)) {
+			const StringName native_class_name = base_type.native_type;
+			if (!ClassDB::class_exists(native_class_name)) {
 				break;
 			}
-
-			bool use_type_hint = EditorSettings::get_singleton()->get_setting("text_editor/completion/add_type_hints").operator bool();
 
 			List<MethodInfo> virtual_methods;
-			ClassDB::get_virtual_methods(class_name, &virtual_methods);
+			ClassDB::get_virtual_methods(native_class_name, &virtual_methods);
 			for (const MethodInfo &mi : virtual_methods) {
+				if (options.has(mi.name) || completion_context.current_class->has_member(mi.name)) {
+					continue;
+				}
 				String method_hint = mi.name;
 				if (method_hint.contains(":")) {
 					method_hint = method_hint.get_slice(":", 0);
@@ -2954,7 +3008,7 @@ static void _find_call_arguments(GDScriptParser::CompletionContext &p_context, c
 				method_hint += ":";
 
 				ScriptLanguage::CodeCompletionOption option(method_hint, ScriptLanguage::CODE_COMPLETION_KIND_FUNCTION);
-				options.insert(option.display, option);
+				options.insert(mi.name, option);
 			}
 		} break;
 		case GDScriptParser::COMPLETION_GET_NODE: {
