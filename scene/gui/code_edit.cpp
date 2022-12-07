@@ -2071,7 +2071,7 @@ void CodeEdit::confirm_code_completion(bool p_replace) {
 
 		//* Handle merging of symbols eg strings, brackets.
 		const String line = get_line(caret_line);
-		char32_t next_char = line[get_caret_column(i)];
+		char32_t next_char = get_caret_column(i) < line.size() ? line[get_caret_column(i)] : line[line.size() - 1];
 		char32_t last_completion_char = insert_text[insert_text.length() - 1];
 		if (i == 0) {
 			caret_last_completion_char = last_completion_char;

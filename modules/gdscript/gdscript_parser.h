@@ -868,6 +868,10 @@ public:
 		bool infer_datatype = false;
 		int usages = 0;
 
+#ifdef TOOLS_ENABLED
+		String default_value_source = "";
+#endif
+
 		ParameterNode() {
 			type = PARAMETER;
 		}

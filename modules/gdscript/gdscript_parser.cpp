@@ -1170,9 +1170,20 @@ GDScriptParser::ParameterNode *GDScriptParser::parse_parameter() {
 		}
 	}
 
+	// Get collect start and end position to capture default value string for auto-complete
+#ifdef TOOLS_ENABLED
+	int default_param_start = tokenizer.get_position() + 1;
+#endif
+
 	if (match(GDScriptTokenizer::Token::EQUAL)) {
 		// Default value.
 		parameter->default_value = parse_expression(false);
+
+#ifdef TOOLS_ENABLED
+		int default_param_end = tokenizer.get_position();
+
+		parameter->default_value_source = String(tokenizer.get_source_code()).substr(default_param_start, default_param_end - default_param_start - 1);
+#endif
 	}
 
 	complete_extents(parameter);

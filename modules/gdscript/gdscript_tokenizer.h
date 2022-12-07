@@ -196,6 +196,8 @@ public:
 	const HashMap<int, CommentData> &get_comments() const {
 		return comments;
 	}
+	const char32_t *get_source_code() { return _source; };
+	int get_position() { return position; };
 #endif // TOOLS_ENABLED
 
 private:
