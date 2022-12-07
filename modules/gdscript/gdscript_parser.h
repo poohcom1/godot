@@ -1453,6 +1453,7 @@ public:
 
 #ifdef DEBUG_ENABLED
 	class TreePrinter {
+		const bool pretty_print;
 		int indent_level = 0;
 		String indent;
 		StringBuilder printed;
@@ -1462,6 +1463,11 @@ public:
 		void decrease_indent();
 		void push_line(const String &p_line = String());
 		void push_text(const String &p_text);
+
+		void push_operator(const String &p_text);
+		void push_keyword(const String &p_text);
+		void push_comma();
+		void push_space(); // for pretty print
 
 		void print_annotation(const AnnotationNode *p_annotation);
 		void print_array(ArrayNode *p_array);
@@ -1474,7 +1480,6 @@ public:
 		void print_class(ClassNode *p_class);
 		void print_constant(ConstantNode *p_constant);
 		void print_dictionary(DictionaryNode *p_dictionary);
-		void print_expression(ExpressionNode *p_expression);
 		void print_enum(EnumNode *p_enum);
 		void print_for(ForNode *p_for);
 		void print_function(FunctionNode *p_function, const String &p_context = "Function");
@@ -1502,6 +1507,12 @@ public:
 
 	public:
 		void print_tree(const GDScriptParser &p_parser);
+		void print_expression(ExpressionNode *p_expression);
+
+		String get_printed() { return printed; };
+
+		TreePrinter(bool pretty_print = true) :
+				pretty_print(pretty_print) {}
 	};
 #endif // DEBUG_ENABLED
 	static void cleanup();

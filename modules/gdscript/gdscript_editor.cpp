@@ -2925,7 +2925,10 @@ static void _find_call_arguments(GDScriptParser::CompletionContext &p_context, c
 								}
 
 								if (param->default_value) {
-									// todo
+									GDScriptParser::TreePrinter tree(false);
+									tree.print_expression(param->default_value);
+
+									method_hint += " = " + tree.get_printed();
 								}
 							}
 							method_hint += ")";

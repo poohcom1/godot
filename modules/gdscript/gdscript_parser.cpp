@@ -4122,18 +4122,32 @@ void GDScriptParser::reset_extents(Node *p_node, Node *p_from) {
 	p_node->rightmost_column = p_from->rightmost_column;
 }
 
-/*---------- PRETTY PRINT FOR DEBUG ----------*/
+/*---------- FOR SOURCE-CODE RECONSTRUCTION AND PRETTY PRINT FOR DEBUG ----------*/
 
-#ifdef DEBUG_ENABLED
+#ifdef TOOLS_ENABLED
 
 void GDScriptParser::TreePrinter::increase_indent() {
 	indent_level++;
 	indent = "";
-	for (int i = 0; i < indent_level * 4; i++) {
-		if (i % 4 == 0) {
-			indent += "|";
+	if (pretty_print) {
+		for (int i = 0; i < indent_level * 4; i++) {
+			if (i % 4 == 0) {
+				indent += "|";
+			} else {
+				indent += " ";
+			}
+		}
+	} else {
+		int tab_size = EDITOR_GET("text_editor/behavior/indent/size");
+		bool use_space_indentation = EDITOR_GET("text_editor/behavior/indent/type");
+		if (use_space_indentation) {
+			for (int i = 0; i < indent_level * tab_size; i++) {
+				indent += " ";
+			}
 		} else {
-			indent += " ";
+			for (int i = 0; i < indent_level; i++) {
+				indent += "\t";
+			}
 		}
 	}
 }
@@ -4141,11 +4155,25 @@ void GDScriptParser::TreePrinter::increase_indent() {
 void GDScriptParser::TreePrinter::decrease_indent() {
 	indent_level--;
 	indent = "";
-	for (int i = 0; i < indent_level * 4; i++) {
-		if (i % 4 == 0) {
-			indent += "|";
+	if (pretty_print) {
+		for (int i = 0; i < indent_level * 4; i++) {
+			if (i % 4 == 0) {
+				indent += "|";
+			} else {
+				indent += " ";
+			}
+		}
+	} else {
+		int tab_size = EDITOR_GET("text_editor/behavior/indent/size");
+		bool use_space_indentation = EDITOR_GET("text_editor/behavior/indent/type");
+		if (use_space_indentation) {
+			for (int i = 0; i < indent_level * tab_size; i++) {
+				indent += " ";
+			}
 		} else {
-			indent += " ";
+			for (int i = 0; i < indent_level; i++) {
+				indent += "\t";
+			}
 		}
 	}
 }
@@ -4166,12 +4194,44 @@ void GDScriptParser::TreePrinter::push_text(const String &p_text) {
 	printed += p_text;
 }
 
+void GDScriptParser::TreePrinter::push_operator(const String &p_text) {
+	if (pretty_print) {
+		push_text(p_text.to_upper());
+	} else {
+		push_text(p_text);
+	}
+}
+
+void GDScriptParser::TreePrinter::push_keyword(const String &p_text) {
+	if (pretty_print) {
+		push_text(p_text.substr(0, 1).to_upper() + p_text.substr(1));
+	} else {
+		push_text(p_text);
+	}
+}
+
+void GDScriptParser::TreePrinter::push_comma() {
+	if (pretty_print) {
+		push_text(" , ");
+	} else {
+		push_text(", ");
+	}
+}
+
+// Add space only for pretty-print
+void GDScriptParser::TreePrinter::push_space() {
+	if (pretty_print) {
+		push_text(" ");
+	}
+}
+
 void GDScriptParser::TreePrinter::print_annotation(const AnnotationNode *p_annotation) {
 	push_text(p_annotation->name);
-	push_text(" (");
+	push_space();
+	push_text("(");
 	for (int i = 0; i < p_annotation->arguments.size(); i++) {
 		if (i > 0) {
-			push_text(" , ");
+			push_comma();
 		}
 		print_expression(p_annotation->arguments[i]);
 	}
@@ -4179,20 +4239,33 @@ void GDScriptParser::TreePrinter::print_annotation(const AnnotationNode *p_annot
 }
 
 void GDScriptParser::TreePrinter::print_array(ArrayNode *p_array) {
-	push_text("[ ");
+	push_text("[");
+	push_space();
 	for (int i = 0; i < p_array->elements.size(); i++) {
 		if (i > 0) {
-			push_text(" , ");
+			push_comma();
 		}
 		print_expression(p_array->elements[i]);
 	}
-	push_text(" ]");
+	push_space();
+	push_text("]");
 }
 
 void GDScriptParser::TreePrinter::print_assert(AssertNode *p_assert) {
-	push_text("Assert ( ");
+	push_keyword("assert");
+	push_space();
+
+	push_text("(");
+	push_space();
+
 	print_expression(p_assert->condition);
-	push_line(" )");
+
+	push_space();
+	if (pretty_print) {
+		push_line(")");
+	} else {
+		push_text(")");
+	}
 }
 
 void GDScriptParser::TreePrinter::print_assignment(AssignmentNode *p_assignment) {
@@ -4251,13 +4324,15 @@ void GDScriptParser::TreePrinter::print_assignment(AssignmentNode *p_assignment)
 }
 
 void GDScriptParser::TreePrinter::print_await(AwaitNode *p_await) {
-	push_text("Await ");
+	push_keyword("await ");
 	print_expression(p_await->to_await);
 }
 
 void GDScriptParser::TreePrinter::print_binary_op(BinaryOpNode *p_binary_op) {
 	// Surround in parenthesis for disambiguation.
-	push_text("(");
+	if (pretty_print) {
+		push_text("(");
+	}
 	print_expression(p_binary_op->left_operand);
 	switch (p_binary_op->operation) {
 		case BinaryOpNode::OP_ADDITION:
@@ -4294,16 +4369,16 @@ void GDScriptParser::TreePrinter::print_binary_op(BinaryOpNode *p_binary_op) {
 			push_text(" ^ ");
 			break;
 		case BinaryOpNode::OP_LOGIC_AND:
-			push_text(" AND ");
+			push_operator(" AND ");
 			break;
 		case BinaryOpNode::OP_LOGIC_OR:
-			push_text(" OR ");
+			push_operator(" OR ");
 			break;
 		case BinaryOpNode::OP_TYPE_TEST:
-			push_text(" IS ");
+			push_operator(" IS ");
 			break;
 		case BinaryOpNode::OP_CONTENT_TEST:
-			push_text(" IN ");
+			push_operator(" IN ");
 			break;
 		case BinaryOpNode::OP_COMP_EQUAL:
 			push_text(" == ");
@@ -4326,7 +4401,9 @@ void GDScriptParser::TreePrinter::print_binary_op(BinaryOpNode *p_binary_op) {
 	}
 	print_expression(p_binary_op->right_operand);
 	// Surround in parenthesis for disambiguation.
-	push_text(")");
+	if (pretty_print) {
+		push_text(")");
+	}
 }
 
 void GDScriptParser::TreePrinter::print_call(CallNode *p_call) {
@@ -4339,24 +4416,26 @@ void GDScriptParser::TreePrinter::print_call(CallNode *p_call) {
 	} else {
 		print_expression(p_call->callee);
 	}
-	push_text("( ");
+	push_text("(");
+	push_space();
 	for (int i = 0; i < p_call->arguments.size(); i++) {
 		if (i > 0) {
-			push_text(" , ");
+			push_comma();
 		}
 		print_expression(p_call->arguments[i]);
 	}
-	push_text(" )");
+	push_space();
+	push_text(")");
 }
 
 void GDScriptParser::TreePrinter::print_cast(CastNode *p_cast) {
 	print_expression(p_cast->operand);
-	push_text(" AS ");
+	push_operator(" as ");
 	print_type(p_cast->cast_type);
 }
 
 void GDScriptParser::TreePrinter::print_class(ClassNode *p_class) {
-	push_text("Class ");
+	push_keyword("class ");
 	if (p_class->identifier == nullptr) {
 		push_text("<unnamed>");
 	} else {
@@ -4365,7 +4444,7 @@ void GDScriptParser::TreePrinter::print_class(ClassNode *p_class) {
 
 	if (p_class->extends_used) {
 		bool first = true;
-		push_text(" Extends ");
+		push_keyword(" extends ");
 		if (!p_class->extends_path.is_empty()) {
 			push_text(vformat(R"("%s")", p_class->extends_path));
 			first = false;
@@ -4380,7 +4459,8 @@ void GDScriptParser::TreePrinter::print_class(ClassNode *p_class) {
 		}
 	}
 
-	push_line(" :");
+	push_space();
+	push_line(":");
 
 	increase_indent();
 
@@ -4420,7 +4500,11 @@ void GDScriptParser::TreePrinter::print_class(ClassNode *p_class) {
 }
 
 void GDScriptParser::TreePrinter::print_constant(ConstantNode *p_constant) {
-	push_text("Constant ");
+	if (pretty_print) {
+		push_text("Constant ");
+	} else {
+		push_keyword("const ");
+	}
 	print_identifier(p_constant->identifier);
 
 	increase_indent();
@@ -4438,18 +4522,27 @@ void GDScriptParser::TreePrinter::print_constant(ConstantNode *p_constant) {
 
 void GDScriptParser::TreePrinter::print_dictionary(DictionaryNode *p_dictionary) {
 	push_line("{");
-	increase_indent();
+	if (pretty_print) {
+		increase_indent();
+	}
 	for (int i = 0; i < p_dictionary->elements.size(); i++) {
 		print_expression(p_dictionary->elements[i].key);
+		push_space();
 		if (p_dictionary->style == DictionaryNode::PYTHON_DICT) {
-			push_text(" : ");
+			push_text(": ");
 		} else {
-			push_text(" = ");
+			push_text("= ");
 		}
 		print_expression(p_dictionary->elements[i].value);
-		push_line(" ,");
+		if (pretty_print) {
+			push_line(" ,");
+		} else {
+			push_comma();
+		}
 	}
-	decrease_indent();
+	if (pretty_print) {
+		decrease_indent();
+	}
 	push_text("}");
 }
 
@@ -4535,11 +4628,12 @@ void GDScriptParser::TreePrinter::print_enum(EnumNode *p_enum) {
 }
 
 void GDScriptParser::TreePrinter::print_for(ForNode *p_for) {
-	push_text("For ");
+	push_keyword("for ");
 	print_identifier(p_for->variable);
-	push_text(" IN ");
+	push_keyword(" in ");
 	print_expression(p_for->list);
-	push_line(" :");
+	push_space();
+	push_line(":");
 
 	increase_indent();
 
@@ -4553,20 +4647,25 @@ void GDScriptParser::TreePrinter::print_function(FunctionNode *p_function, const
 		print_annotation(E);
 	}
 	push_text(p_context);
-	push_text(" ");
+	push_space();
 	if (p_function->identifier) {
 		print_identifier(p_function->identifier);
 	} else {
 		push_text("<anonymous>");
 	}
-	push_text("( ");
+	push_text("(");
+	push_space();
 	for (int i = 0; i < p_function->parameters.size(); i++) {
 		if (i > 0) {
-			push_text(" , ");
+			push_comma();
 		}
 		print_parameter(p_function->parameters[i]);
 	}
-	push_line(" ) :");
+	push_space();
+	push_line(")");
+	push_space();
+	push_line(":");
+
 	increase_indent();
 	print_suite(p_function->body);
 	decrease_indent();
@@ -4589,9 +4688,9 @@ void GDScriptParser::TreePrinter::print_identifier(IdentifierNode *p_identifier)
 
 void GDScriptParser::TreePrinter::print_if(IfNode *p_if, bool p_is_elif) {
 	if (p_is_elif) {
-		push_text("Elif ");
+		push_keyword("elif ");
 	} else {
-		push_text("If ");
+		push_keyword("if ");
 	}
 	print_expression(p_if->condition);
 	push_line(" :");
@@ -4602,7 +4701,7 @@ void GDScriptParser::TreePrinter::print_if(IfNode *p_if, bool p_is_elif) {
 
 	// FIXME: Properly detect "elif" blocks.
 	if (p_if->false_block != nullptr) {
-		push_line("Else :");
+		push_keyword("else :");
 		increase_indent();
 		print_suite(p_if->false_block);
 		decrease_indent();
@@ -4610,15 +4709,45 @@ void GDScriptParser::TreePrinter::print_if(IfNode *p_if, bool p_is_elif) {
 }
 
 void GDScriptParser::TreePrinter::print_lambda(LambdaNode *p_lambda) {
-	print_function(p_lambda->function, "Lambda");
-	push_text("| captures [ ");
-	for (int i = 0; i < p_lambda->captures.size(); i++) {
-		if (i > 0) {
-			push_text(" , ");
+	if (pretty_print) {
+		print_function(p_lambda->function, "Lambda");
+		push_text("| captures [ ");
+		for (int i = 0; i < p_lambda->captures.size(); i++) {
+			if (i > 0) {
+				push_comma();
+			}
+			push_text(p_lambda->captures[i]->name.operator String());
 		}
-		push_text(p_lambda->captures[i]->name.operator String());
+		push_line(" ]");
+	} else {
+		push_text("func");
+
+		if (p_lambda->has_name()) {
+			push_text(" " + p_lambda->function->identifier->name);
+		}
+
+		push_text("(");
+		for (int i = 0; i < p_lambda->function->parameters.size(); i++) {
+			if (i > 0) {
+				push_comma();
+			}
+			print_parameter(p_lambda->function->parameters[i]);
+		}
+
+		push_text("):");
+
+		if (p_lambda->function->body != nullptr) {
+			if (p_lambda->function->body->statements.size() == 1 && p_lambda->function->body->statements[0]->is_expression()) {
+				push_text(" ");
+				print_statement(p_lambda->function->body->statements[0]);
+			} else {
+				push_line();
+				increase_indent();
+				print_suite(p_lambda->function->body);
+				decrease_indent();
+			}
+		}
 	}
-	push_line(" ]");
 }
 
 void GDScriptParser::TreePrinter::print_literal(LiteralNode *p_literal) {
@@ -4650,7 +4779,7 @@ void GDScriptParser::TreePrinter::print_literal(LiteralNode *p_literal) {
 }
 
 void GDScriptParser::TreePrinter::print_match(MatchNode *p_match) {
-	push_text("Match ");
+	push_keyword("match ");
 	print_expression(p_match->test);
 	push_line(" :");
 
@@ -4664,7 +4793,7 @@ void GDScriptParser::TreePrinter::print_match(MatchNode *p_match) {
 void GDScriptParser::TreePrinter::print_match_branch(MatchBranchNode *p_match_branch) {
 	for (int i = 0; i < p_match_branch->patterns.size(); i++) {
 		if (i > 0) {
-			push_text(" , ");
+			push_comma();
 		}
 		print_match_pattern(p_match_branch->patterns[i]);
 	}
@@ -4688,7 +4817,7 @@ void GDScriptParser::TreePrinter::print_match_pattern(PatternNode *p_match_patte
 			push_text("..");
 			break;
 		case PatternNode::PT_BIND:
-			push_text("Var ");
+			push_keyword("var ");
 			print_identifier(p_match_pattern->bind);
 			break;
 		case PatternNode::PT_EXPRESSION:
@@ -4698,7 +4827,7 @@ void GDScriptParser::TreePrinter::print_match_pattern(PatternNode *p_match_patte
 			push_text("[ ");
 			for (int i = 0; i < p_match_pattern->array.size(); i++) {
 				if (i > 0) {
-					push_text(" , ");
+					push_comma();
 				}
 				print_match_pattern(p_match_pattern->array[i]);
 			}
@@ -4708,7 +4837,7 @@ void GDScriptParser::TreePrinter::print_match_pattern(PatternNode *p_match_patte
 			push_text("{ ");
 			for (int i = 0; i < p_match_pattern->dictionary.size(); i++) {
 				if (i > 0) {
-					push_text(" , ");
+					push_comma();
 				}
 				if (p_match_pattern->dictionary[i].key != nullptr) {
 					// Key can be null for rest pattern.
@@ -4725,7 +4854,8 @@ void GDScriptParser::TreePrinter::print_match_pattern(PatternNode *p_match_patte
 void GDScriptParser::TreePrinter::print_parameter(ParameterNode *p_parameter) {
 	print_identifier(p_parameter->identifier);
 	if (p_parameter->datatype_specifier != nullptr) {
-		push_text(" : ");
+		push_space();
+		push_text(": ");
 		print_type(p_parameter->datatype_specifier);
 	}
 	if (p_parameter->default_value != nullptr) {
@@ -4735,13 +4865,20 @@ void GDScriptParser::TreePrinter::print_parameter(ParameterNode *p_parameter) {
 }
 
 void GDScriptParser::TreePrinter::print_preload(PreloadNode *p_preload) {
-	push_text(R"(Preload ( ")");
-	push_text(p_preload->resolved_path);
-	push_text(R"(" )");
+	if (pretty_print) {
+		push_text(R"(Preload ( ")");
+		push_text(p_preload->resolved_path);
+		push_text(R"(" )");
+	} else {
+		push_keyword("preload");
+		push_text("(");
+		push_text(p_preload->resolved_path);
+		push_text(")");
+	}
 }
 
 void GDScriptParser::TreePrinter::print_return(ReturnNode *p_return) {
-	push_text("Return");
+	push_keyword("return");
 	if (p_return->return_value != nullptr) {
 		push_text(" ");
 		print_expression(p_return->return_value);
@@ -4750,23 +4887,29 @@ void GDScriptParser::TreePrinter::print_return(ReturnNode *p_return) {
 }
 
 void GDScriptParser::TreePrinter::print_self(SelfNode *p_self) {
-	push_text("Self(");
-	if (p_self->current_class->identifier != nullptr) {
-		print_identifier(p_self->current_class->identifier);
+	if (pretty_print) {
+		push_text("Self(");
+		if (p_self->current_class->identifier != nullptr) {
+			print_identifier(p_self->current_class->identifier);
+		} else {
+			push_text("<main class>");
+		}
+		push_text(")");
 	} else {
-		push_text("<main class>");
+		push_keyword("self");
 	}
-	push_text(")");
 }
 
 void GDScriptParser::TreePrinter::print_signal(SignalNode *p_signal) {
-	push_text("Signal ");
+	push_keyword("signal ");
 	print_identifier(p_signal->identifier);
-	push_text("( ");
+	push_text("(");
+	push_space();
 	for (int i = 0; i < p_signal->parameters.size(); i++) {
 		print_parameter(p_signal->parameters[i]);
 	}
-	push_line(" )");
+	push_space();
+	push_line(")");
 }
 
 void GDScriptParser::TreePrinter::print_subscript(SubscriptNode *p_subscript) {
@@ -4775,9 +4918,11 @@ void GDScriptParser::TreePrinter::print_subscript(SubscriptNode *p_subscript) {
 		push_text(".");
 		print_identifier(p_subscript->attribute);
 	} else {
-		push_text("[ ");
+		push_text("[");
+		push_space();
 		print_expression(p_subscript->index);
-		push_text(" ]");
+		push_space();
+		push_text("]");
 	}
 }
 
@@ -4808,16 +4953,21 @@ void GDScriptParser::TreePrinter::print_statement(Node *p_statement) {
 			print_return(static_cast<ReturnNode *>(p_statement));
 			break;
 		case Node::BREAK:
-			push_line("Break");
+			push_line();
+			push_keyword("break");
 			break;
 		case Node::CONTINUE:
-			push_line("Continue");
+			push_line();
+			push_keyword("continue");
 			break;
 		case Node::PASS:
-			push_line("Pass");
+			push_line();
+			push_keyword("pass");
 			break;
 		case Node::BREAKPOINT:
-			push_line("Breakpoint");
+			if (pretty_print) {
+				push_line("Breakpoint");
+			}
 			break;
 		case Node::ASSIGNMENT:
 			print_assignment(static_cast<AssignmentNode *>(p_statement));
@@ -4835,24 +4985,35 @@ void GDScriptParser::TreePrinter::print_statement(Node *p_statement) {
 
 void GDScriptParser::TreePrinter::print_suite(SuiteNode *p_suite) {
 	for (int i = 0; i < p_suite->statements.size(); i++) {
+		if (!pretty_print) {
+			push_line();
+		}
 		print_statement(p_suite->statements[i]);
 	}
 }
 
 void GDScriptParser::TreePrinter::print_ternary_op(TernaryOpNode *p_ternary_op) {
-	// Surround in parenthesis for disambiguation.
-	push_text("(");
-	print_expression(p_ternary_op->true_expr);
-	push_text(") IF (");
-	print_expression(p_ternary_op->condition);
-	push_text(") ELSE (");
-	print_expression(p_ternary_op->false_expr);
-	push_text(")");
+	if (pretty_print) {
+		// Surround in parenthesis for disambiguation.
+		push_text("(");
+		print_expression(p_ternary_op->true_expr);
+		push_text(") IF (");
+		print_expression(p_ternary_op->condition);
+		push_text(") ELSE (");
+		print_expression(p_ternary_op->false_expr);
+		push_text(")");
+	} else {
+		print_expression(p_ternary_op->true_expr);
+		push_text(" if ");
+		print_expression(p_ternary_op->condition);
+		push_text(" else ");
+		print_expression(p_ternary_op->false_expr);
+	}
 }
 
 void GDScriptParser::TreePrinter::print_type(TypeNode *p_type) {
 	if (p_type->type_chain.is_empty()) {
-		push_text("Void");
+		push_keyword("void");
 	} else {
 		for (int i = 0; i < p_type->type_chain.size(); i++) {
 			if (i > 0) {
@@ -4865,7 +5026,9 @@ void GDScriptParser::TreePrinter::print_type(TypeNode *p_type) {
 
 void GDScriptParser::TreePrinter::print_unary_op(UnaryOpNode *p_unary_op) {
 	// Surround in parenthesis for disambiguation.
-	push_text("(");
+	if (pretty_print) {
+		push_text("(");
+	}
 	switch (p_unary_op->operation) {
 		case UnaryOpNode::OP_POSITIVE:
 			push_text("+");
@@ -4874,7 +5037,7 @@ void GDScriptParser::TreePrinter::print_unary_op(UnaryOpNode *p_unary_op) {
 			push_text("-");
 			break;
 		case UnaryOpNode::OP_LOGIC_NOT:
-			push_text("NOT");
+			push_operator("not");
 			break;
 		case UnaryOpNode::OP_COMPLEMENT:
 			push_text("~");
@@ -4882,7 +5045,9 @@ void GDScriptParser::TreePrinter::print_unary_op(UnaryOpNode *p_unary_op) {
 	}
 	print_expression(p_unary_op->operand);
 	// Surround in parenthesis for disambiguation.
-	push_text(")");
+	if (pretty_print) {
+		push_text(")");
+	}
 }
 
 void GDScriptParser::TreePrinter::print_variable(VariableNode *p_variable) {
@@ -4890,32 +5055,53 @@ void GDScriptParser::TreePrinter::print_variable(VariableNode *p_variable) {
 		print_annotation(E);
 	}
 
-	push_text("Variable ");
+	if (pretty_print) {
+		push_text("Variable ");
+	} else {
+		push_keyword("var ");
+	}
 	print_identifier(p_variable->identifier);
 
-	push_text(" : ");
-	if (p_variable->datatype_specifier != nullptr) {
-		print_type(p_variable->datatype_specifier);
-	} else if (p_variable->infer_datatype) {
-		push_text("<inferred type>");
+	if (pretty_print) {
+		push_text(" : ");
+		if (p_variable->datatype_specifier != nullptr) {
+			print_type(p_variable->datatype_specifier);
+		} else if (p_variable->infer_datatype) {
+			push_text("<inferred type>");
+		} else {
+			push_text("Variant");
+		}
 	} else {
-		push_text("Variant");
+		if (p_variable->datatype_specifier != nullptr) {
+			push_text(": ");
+			print_type(p_variable->datatype_specifier);
+		} else if (p_variable->infer_datatype) {
+			push_text(" :");
+		}
 	}
 
-	increase_indent();
+	if (pretty_print) {
+		increase_indent();
+		push_line();
+	}
 
-	push_line();
-	push_text("= ");
 	if (p_variable->initializer == nullptr) {
-		push_text("<default value>");
+		if (pretty_print) {
+			push_text("= ");
+			push_text("<default value>");
+		}
 	} else {
+		push_text(" = ");
 		print_expression(p_variable->initializer);
 	}
-	push_line();
+
+	if (pretty_print) {
+		push_line();
+	}
 
 	if (p_variable->property != VariableNode::PROP_NONE) {
 		if (p_variable->getter != nullptr) {
-			push_text("Get");
+			push_keyword("get");
 			if (p_variable->property == VariableNode::PROP_INLINE) {
 				push_line(":");
 				increase_indent();
@@ -4930,7 +5116,7 @@ void GDScriptParser::TreePrinter::print_variable(VariableNode *p_variable) {
 			}
 		}
 		if (p_variable->setter != nullptr) {
-			push_text("Set (");
+			push_keyword("Set (");
 			if (p_variable->property == VariableNode::PROP_INLINE) {
 				if (p_variable->setter_parameter != nullptr) {
 					print_identifier(p_variable->setter_parameter);
@@ -4950,15 +5136,17 @@ void GDScriptParser::TreePrinter::print_variable(VariableNode *p_variable) {
 			}
 		}
 	}
-
-	decrease_indent();
-	push_line();
+	if (pretty_print) {
+		decrease_indent();
+		push_line();
+	}
 }
 
 void GDScriptParser::TreePrinter::print_while(WhileNode *p_while) {
-	push_text("While ");
+	push_keyword("while ");
 	print_expression(p_while->condition);
-	push_line(" :");
+	push_space();
+	push_line(":");
 
 	increase_indent();
 	print_suite(p_while->loop);
@@ -4981,4 +5169,4 @@ void GDScriptParser::TreePrinter::print_tree(const GDScriptParser &p_parser) {
 	print_line(String(printed));
 }
 
-#endif // DEBUG_ENABLED
+#endif // TOOLS_ENABLED
