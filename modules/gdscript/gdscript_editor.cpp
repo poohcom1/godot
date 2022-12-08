@@ -2677,6 +2677,68 @@ static void _find_call_arguments(GDScriptParser::CompletionContext &p_context, c
 	r_forced = r_result.size() > 0;
 }
 
+static String _get_datatype_code_string(GDScriptParser::DataType p_data_type, GDScriptParser::ClassNode *p_class_context) {
+	switch (p_data_type.kind) {
+		case GDScriptParser::DataType::BUILTIN:
+		case GDScriptParser::DataType::NATIVE:
+		case GDScriptParser::DataType::SCRIPT:
+			return p_data_type.to_string();
+		case GDScriptParser::DataType::ENUM:
+			return p_data_type.enum_type.operator String();
+		case GDScriptParser::DataType::CLASS:
+			if (p_data_type.is_meta_type) {
+				return GDScript::get_class_static();
+			}
+
+			if (p_data_type.class_type->identifier != nullptr) {
+				String class_name = p_data_type.class_type->identifier->name;
+
+				GDScriptParser::ClassNode *outer_class = p_data_type.class_type->outer;
+
+				while (outer_class != nullptr && outer_class->identifier != nullptr) {
+					class_name = outer_class->identifier->name.operator String() + "." + class_name;
+
+					outer_class = outer_class->outer;
+				}
+
+				return class_name;
+			}
+
+			if (!p_data_type.class_type->fqcn.is_empty()) {
+				GDScriptParser::DataType base_type = p_class_context->base_type;
+
+				while (base_type.is_set() && base_type.kind == GDScriptParser::DataType::CLASS) {
+					for (const GDScriptParser::ClassNode::Member &m : base_type.class_type->members) {
+						if (m.type != GDScriptParser::ClassNode::Member::Type::CONSTANT) {
+							continue;
+						}
+
+						if (m.constant->initializer->type != GDScriptParser::Node::Type::PRELOAD) {
+							continue;
+						};
+
+						GDScriptParser::PreloadNode *preload_node = static_cast<GDScriptParser::PreloadNode *>(m.constant->initializer);
+
+						if (preload_node->resolved_path == p_data_type.class_type->fqcn) {
+							if (m.constant->identifier != nullptr) {
+								return m.constant->identifier->name;
+
+							} else {
+								return "Variant";
+							}
+						}
+					}
+
+					base_type = base_type.class_type->base_type;
+				};
+			};
+
+			return "Variant";
+		default:
+			return "Variant";
+	}
+}
+
 ::Error GDScriptLanguage::complete_code(const String &p_code, const String &p_path, Object *p_owner, List<ScriptLanguage::CodeCompletionOption> *r_options, bool &r_forced, String &r_call_hint) {
 	const String quote_style = EDITOR_GET("text_editor/completion/use_single_quotes") ? "'" : "\"";
 
@@ -2925,31 +2987,7 @@ static void _find_call_arguments(GDScriptParser::CompletionContext &p_context, c
 								display_text += param->identifier->name;
 
 								if (use_type_hint) {
-									if (param->get_datatype().is_hard_type()) {
-										switch (param->get_datatype().kind) {
-											case GDScriptParser::DataType::Kind::ENUM:
-												display_text += ": " + param->datatype.enum_type;
-												break;
-											case GDScriptParser::DataType::Kind::CLASS: {
-												String class_type = param->get_datatype().to_string();
-
-												if (class_type == param->get_datatype().class_type->fqcn) {
-													for (const GDScriptParser::ClassNode::Member &m : base_type.class_type->members) {
-														if (m.type == GDScriptParser::ClassNode::Member::CONSTANT) {
-															class_type = m.constant->identifier->name;
-														}
-													}
-												}
-
-												if (!class_type.is_empty()) {
-													display_text += ": " + class_type;
-												}
-
-											} break;
-											default:
-												display_text += ": " + param->get_datatype().to_string();
-										}
-									}
+									display_text += ": " + _get_datatype_code_string(param->get_datatype(), completion_context.current_class);
 								}
 
 								if (param->default_value) {
@@ -2963,7 +3001,7 @@ static void _find_call_arguments(GDScriptParser::CompletionContext &p_context, c
 								if (member.function->get_datatype().builtin_type == Variant::NIL) {
 									display_text += "void";
 								} else {
-									display_text += member.function->get_datatype().to_string();
+									display_text += _get_datatype_code_string(member.function->get_datatype(), completion_context.current_class);
 								}
 							}
 
