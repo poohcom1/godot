@@ -3203,11 +3203,34 @@ void GDScriptAnalyzer::reduce_lambda(GDScriptParser::LambdaNode *p_lambda) {
 	lambda_type.type_source = GDScriptParser::DataType::ANNOTATED_INFERRED;
 	lambda_type.kind = GDScriptParser::DataType::BUILTIN;
 	lambda_type.builtin_type = Variant::CALLABLE;
-	p_lambda->set_datatype(lambda_type);
 
-	if (p_lambda->function == nullptr) {
-		return;
+	if (p_lambda->function != nullptr) {
+		MethodInfo method_info;
+
+		for (GDScriptParser::ParameterNode *param : p_lambda->function->parameters) {
+			resolve_parameter(param);
+
+			PropertyInfo info;
+			info.name = param->identifier->name;
+			if (param->get_datatype().is_set()) {
+				info.type = param->get_datatype().builtin_type;
+			}
+
+			if (param->get_datatype().kind == GDScriptParser::DataType::CLASS) {
+				info.class_name = param->get_datatype().class_type->identifier->name;
+			}
+
+			method_info.arguments.push_back(info);
+		}
+
+		p_lambda->function->set_datatype(resolve_datatype(p_lambda->function->return_type));
+
+		method_info.return_val = PropertyInfo(p_lambda->function->get_datatype().builtin_type, "");
+
+		lambda_type.method_info = method_info;
 	}
+
+	p_lambda->set_datatype(lambda_type);
 
 	GDScriptParser::FunctionNode *previous_function = parser->current_function;
 	parser->current_function = p_lambda->function;

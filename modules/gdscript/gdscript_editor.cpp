@@ -1155,8 +1155,12 @@ static void _find_identifiers_in_base(const GDScriptCompletionIdentifier &p_base
 
 				List<MethodInfo> methods;
 				tmp.get_method_list(&methods);
-				for (const MethodInfo &E : methods) {
+				for (MethodInfo &E : methods) {
 					ScriptLanguage::CodeCompletionOption option(E.name, ScriptLanguage::CODE_COMPLETION_KIND_FUNCTION);
+					if (tmp.get_type() == Variant::CALLABLE) {
+						E = base_type.method_info;
+					}
+
 					if (E.arguments.size()) {
 						option.insert_text += "(";
 					} else {
@@ -2335,6 +2339,11 @@ static bool _guess_method_return_type_from_base(GDScriptParser::CompletionContex
 					return false;
 				}
 
+				if (base_type.builtin_type == Variant::CALLABLE && p_method == "call") {
+					r_type = _type_from_property(base_type.method_info.return_val);
+					return true;
+				}
+
 				List<MethodInfo> methods;
 				tmp.get_method_list(&methods);
 
@@ -2491,6 +2500,12 @@ static void _find_call_arguments(GDScriptParser::CompletionContext &p_context, c
 					if (err.error != Callable::CallError::CALL_OK) {
 						return;
 					}
+				}
+
+				// Callable check
+				if (base.get_type() == Variant::CALLABLE && p_method == "call") {
+					r_arghint = _make_arguments_hint(p_base.type.method_info, p_argidx);
+					return;
 				}
 
 				List<MethodInfo> methods;
