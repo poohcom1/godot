@@ -2430,17 +2430,20 @@ Error GDScriptCompiler::_populate_class_members(GDScript *p_script, const GDScri
 
 			case GDScriptParser::ClassNode::Member::SIGNAL: {
 				const GDScriptParser::SignalNode *signal = member.signal;
-				StringName name = signal->identifier->name;
+				MethodInfo info;
 
-				Vector<StringName> parameters_names;
-				parameters_names.resize(signal->parameters.size());
-				for (int j = 0; j < signal->parameters.size(); j++) {
-					parameters_names.write[j] = signal->parameters[j]->identifier->name;
+				info.name = signal->identifier->name;
+				for (const GDScriptParser::ParameterNode *param : signal->parameters) {
+					PropertyInfo prop = PropertyInfo(_gdtype_from_datatype(param->get_datatype(), p_script));
+					prop.name = param->identifier->name;
+
+					info._push_params(prop);
 				}
-				p_script->_signals[name] = parameters_names;
+
+				p_script->_signals[info.name] = info;
 #ifdef TOOLS_ENABLED
 				if (!signal->doc_description.is_empty()) {
-					p_script->doc_signals[name] = signal->doc_description;
+					p_script->doc_signals[info.name] = signal->doc_description;
 				}
 #endif
 			} break;

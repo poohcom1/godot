@@ -95,6 +95,25 @@ static GDScriptParser::DataType make_signal_type(const MethodInfo &p_info) {
 	return type;
 }
 
+static MethodInfo make_signal_method_info(const GDScriptParser::SignalNode *p_signal) {
+	MethodInfo info;
+	info.name = p_signal->identifier->name;
+
+	for (const GDScriptParser::ParameterNode *param : p_signal->parameters) {
+		PropertyInfo prop;
+		prop.name = param->identifier->name;
+		prop.type = param->get_datatype().builtin_type;
+
+		if (param->get_datatype().kind == GDScriptParser::DataType::CLASS) {
+			prop.class_name = param->get_datatype().native_type;
+		}
+
+		info._push_params(prop);
+	}
+
+	return info;
+}
+
 static GDScriptParser::DataType make_native_meta_type(const StringName &p_class_name) {
 	GDScriptParser::DataType type;
 	type.type_source = GDScriptParser::DataType::ANNOTATED_EXPLICIT;
@@ -792,6 +811,7 @@ void GDScriptAnalyzer::resolve_class_interface(GDScriptParser::ClassNode *p_clas
 				signal_type.type_source = GDScriptParser::DataType::ANNOTATED_EXPLICIT;
 				signal_type.kind = GDScriptParser::DataType::BUILTIN;
 				signal_type.builtin_type = Variant::SIGNAL;
+				signal_type.method_info = make_signal_method_info(member.signal);
 
 				member.signal->set_datatype(signal_type);
 
@@ -2885,6 +2905,8 @@ void GDScriptAnalyzer::reduce_identifier_from_base(GDScriptParser::IdentifierNod
 					break;
 				case GDScriptParser::ClassNode::Member::SIGNAL:
 					p_identifier->source = GDScriptParser::IdentifierNode::MEMBER_SIGNAL;
+					p_identifier->set_datatype(make_signal_type(make_signal_method_info(member.signal)));
+
 					break;
 				case GDScriptParser::ClassNode::Member::FUNCTION:
 					resolve_function_signature(member.function);
@@ -3882,12 +3904,23 @@ bool GDScriptAnalyzer::get_function_signature(GDScriptParser::Node *p_source, bo
 		List<MethodInfo> methods;
 		dummy.get_method_list(&methods);
 
-		for (const MethodInfo &E : methods) {
-			if (E.name == p_function) {
-				function_signature_from_info(E, r_return_type, r_par_types, r_default_arg_count, r_static, r_vararg);
-				r_static = Variant::is_builtin_method_static(p_base_type.builtin_type, function_name);
-				return true;
-			}
+		switch (p_base_type.builtin_type) {
+			case Variant::SIGNAL:
+				if (p_function == "emit") {
+					function_signature_from_info(p_base_type.method_info, r_return_type, r_par_types, r_default_arg_count, r_static, r_vararg);
+					r_static = Variant::is_builtin_method_static(p_base_type.builtin_type, function_name);
+					return true;
+				}
+			case Variant::CALLABLE:
+
+			default:
+				for (const MethodInfo &E : methods) {
+					if (E.name == p_function) {
+						function_signature_from_info(E, r_return_type, r_par_types, r_default_arg_count, r_static, r_vararg);
+						r_static = Variant::is_builtin_method_static(p_base_type.builtin_type, function_name);
+						return true;
+					}
+				}
 		}
 
 		return false;
