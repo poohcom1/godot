@@ -3201,16 +3201,28 @@ GDScriptParser::TypeNode *GDScriptParser::parse_type(bool p_allow_void) {
 
 	type->type_chain.push_back(type_element);
 
+	// Typed collection (like Array[int]).
 	if (match(GDScriptTokenizer::Token::BRACKET_OPEN)) {
-		// Typed collection (like Array[int]).
-		type->container_type = parse_type(false); // Don't allow void for array element type.
-		if (type->container_type == nullptr) {
-			push_error(R"(Expected type for collection after "[".)");
-			complete_extents(type);
-			type = nullptr;
-		} else if (type->container_type->container_type != nullptr) {
-			push_error("Nested typed collections are not supported.");
-		}
+		do {
+			if (check(GDScriptTokenizer::Token::PARENTHESIS_CLOSE)) {
+				// Allow for trailing comma.
+				break;
+			}
+
+			TypeNode *container_type = parse_type(true);
+
+			if (container_type == nullptr) {
+				push_error(R"(Expected type for collection after "[".)");
+				complete_extents(type);
+				type = nullptr;
+			} else if (container_type->container_types.size() > 0) {
+				push_error("Nested typed collections are not supported.");
+			} else {
+				type->container_types.push_back(container_type);
+			}
+
+		} while (match(GDScriptTokenizer::Token::COMMA) && !is_at_end());
+
 		consume(GDScriptTokenizer::Token::BRACKET_CLOSE, R"(Expected closing "]" after collection type.)");
 		if (type != nullptr) {
 			complete_extents(type);
@@ -4010,7 +4022,31 @@ String GDScriptParser::DataType::to_string() const {
 				return "null";
 			}
 			if (builtin_type == Variant::ARRAY && has_container_element_type()) {
-				return vformat("Array[%s]", container_element_type->to_string());
+				return vformat("Array[%s]", container_element_types[0]->to_string());
+			}
+			if (builtin_type == Variant::CALLABLE && !method_info.name.is_empty()) {
+				String callable_type = "Callable(";
+
+				for (int i = 0; i < method_info.arguments.size(); i++) {
+					if (i > 0) {
+						callable_type += ",";
+					}
+					if (method_info.arguments[i].type == Variant::NIL) {
+						callable_type += "Variant";
+					} else {
+						callable_type += Variant::get_type_name(method_info.arguments[i].type);
+					}
+				}
+
+				callable_type += "): ";
+
+				if (method_info.return_val.type == Variant::NIL) {
+					callable_type += "void";
+				} else {
+					callable_type += Variant::get_type_name(method_info.return_val.type);
+				}
+
+				return callable_type;
 			}
 			return Variant::get_type_name(builtin_type);
 		case NATIVE:

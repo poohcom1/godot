@@ -628,7 +628,11 @@ static String _make_arguments_hint(const MethodInfo &p_info, int p_arg_idx, bool
 		if (i == p_arg_idx) {
 			arghint += String::chr(0xFFFF);
 		}
-		arghint += E.name + ": " + _get_visual_datatype(E, true);
+
+		if (!E.name.is_empty()) {
+			arghint += E.name + ": ";
+		}
+		arghint += _get_visual_datatype(E, true);
 
 		if (i - def_args >= 0) {
 			arghint += String(" = ") + p_info.default_arguments[i - def_args].get_construct_string();
@@ -1163,6 +1167,30 @@ static void _find_identifiers_in_base(const GDScriptCompletionIdentifier &p_base
 						option.insert_text += "()";
 					}
 					r_result.insert(option.display, option);
+				}
+
+				// Exceptions
+				switch (base_type.builtin_type) {
+					case Variant::CALLABLE: {
+						ScriptLanguage::CodeCompletionOption option("call", ScriptLanguage::CODE_COMPLETION_KIND_FUNCTION);
+						if (base_type.method_info.arguments.size() > 0) {
+							option.insert_text += "(";
+						} else {
+							option.insert_text += "()";
+						}
+						r_result.insert(option.display, option);
+					} break;
+					case Variant::SIGNAL: {
+						ScriptLanguage::CodeCompletionOption option("emit", ScriptLanguage::CODE_COMPLETION_KIND_FUNCTION);
+						if (base_type.method_info.arguments.size() > 0) {
+							option.insert_text += "(";
+						} else {
+							option.insert_text += "()";
+						}
+						r_result.insert(option.display, option);
+					} break;
+					default:
+						break;
 				}
 
 				return;
@@ -2100,6 +2128,7 @@ static bool _guess_identifier_type_from_base(GDScriptParser::CompletionContext &
 							r_type.type.type_source = GDScriptParser::DataType::ANNOTATED_EXPLICIT;
 							r_type.type.kind = GDScriptParser::DataType::BUILTIN;
 							r_type.type.builtin_type = Variant::SIGNAL;
+							r_type.type.method_info = member.signal->get_datatype().method_info;
 							return true;
 						case GDScriptParser::ClassNode::Member::FUNCTION:
 							if (is_static && !member.function->is_static) {
@@ -2108,6 +2137,7 @@ static bool _guess_identifier_type_from_base(GDScriptParser::CompletionContext &
 							r_type.type.type_source = GDScriptParser::DataType::ANNOTATED_EXPLICIT;
 							r_type.type.kind = GDScriptParser::DataType::BUILTIN;
 							r_type.type.builtin_type = Variant::CALLABLE;
+							r_type.type.method_info = member.function->info;
 							return true;
 						case GDScriptParser::ClassNode::Member::CLASS:
 							r_type.type.type_source = GDScriptParser::DataType::ANNOTATED_EXPLICIT;
@@ -2491,6 +2521,23 @@ static void _find_call_arguments(GDScriptParser::CompletionContext &p_context, c
 					if (err.error != Callable::CallError::CALL_OK) {
 						return;
 					}
+				}
+
+				// Exceptions
+				switch (base_type.builtin_type) {
+					case Variant::CALLABLE:
+						if (p_method == "call" && !base_type.method_info.name.is_empty()) {
+							r_arghint = _make_arguments_hint(base_type.method_info, p_argidx);
+							return;
+						}
+					case Variant::SIGNAL:
+						if (p_method == "emit" && !base_type.method_info.name.is_empty()) {
+							r_arghint = _make_arguments_hint(base_type.method_info, p_argidx);
+							return;
+						}
+						break;
+					default:
+						break;
 				}
 
 				List<MethodInfo> methods;

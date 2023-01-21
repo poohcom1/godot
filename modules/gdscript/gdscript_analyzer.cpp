@@ -95,20 +95,30 @@ static GDScriptParser::DataType make_signal_type(const MethodInfo &p_info) {
 	return type;
 }
 
+static PropertyInfo property_info_from_datatype(String p_name, const GDScriptParser::DataType p_data_type) {
+	if (p_data_type.kind == GDScriptParser::DataType::CLASS) {
+		return PropertyInfo(Variant::OBJECT, p_name, PROPERTY_HINT_RESOURCE_TYPE, p_data_type.native_type);
+
+	} else {
+		return PropertyInfo(p_data_type.builtin_type, p_name);
+	}
+}
+
 static MethodInfo make_signal_method_info(const GDScriptParser::SignalNode *p_signal) {
 	MethodInfo info;
 	info.name = p_signal->identifier->name;
 
 	for (const GDScriptParser::ParameterNode *param : p_signal->parameters) {
-		PropertyInfo prop;
-		prop.name = param->identifier->name;
-		prop.type = param->get_datatype().builtin_type;
+		info._push_params(property_info_from_datatype(param->identifier->name, param->get_datatype()));
 
-		if (param->get_datatype().kind == GDScriptParser::DataType::CLASS) {
-			prop.class_name = param->get_datatype().native_type;
-		}
-
-		info._push_params(prop);
+		// Signals don't support default parameters at the moment
+		// if (param->default_value != nullptr) {
+		// 	if (param->default_value->is_constant) {
+		// 		info.default_arguments.push_back(param->default_value->reduced_value);
+		// 	} else {
+		// 		info.default_arguments.push_back(Variant());
+		// 	}
+		// }
 	}
 
 	return info;
@@ -505,13 +515,44 @@ GDScriptParser::DataType GDScriptAnalyzer::resolve_datatype(GDScriptParser::Type
 		result.builtin_type = GDScriptParser::get_builtin_type(first);
 
 		if (result.builtin_type == Variant::ARRAY) {
-			GDScriptParser::DataType container_type = resolve_datatype(p_type->container_type);
+			GDScriptParser::DataType container_type;
+			container_type.kind = GDScriptParser::DataType::VARIANT;
+
+			if (p_type->container_types.size() > 0) {
+				container_type = resolve_datatype(p_type->container_types[0]);
+			}
+
+			if (container_type.has_container_element_type() > 0 && container_type.builtin_type == Variant::NIL) {
+				push_error(R"("void" is not allowed as an Array type.)", p_type->container_types[0]);
+			}
 
 			if (container_type.kind != GDScriptParser::DataType::VARIANT) {
 				container_type.is_meta_type = false;
 				container_type.is_constant = false;
 				result.set_container_element_type(container_type);
 			}
+		} else if (result.builtin_type == Variant::CALLABLE && p_type->container_types.size() > 0) {
+			for (int i = 0; i < p_type->container_types.size() - 1; i++) {
+				GDScriptParser::DataType container_type = resolve_datatype(p_type->container_types[i]);
+
+				if (container_type.builtin_type == Variant::NIL) {
+					push_error(R"("void" is only allowed as the last type in a Callable.)", p_type->container_types[i]);
+				}
+
+				if (container_type.kind != GDScriptParser::DataType::VARIANT) {
+					container_type.is_meta_type = false;
+					container_type.is_constant = false;
+				}
+
+				result.method_info._push_params(property_info_from_datatype(String(), container_type));
+			}
+
+			if (p_type->container_types.size() > 1) {
+				GDScriptParser::DataType return_type = resolve_datatype(p_type->container_types[p_type->container_types.size() - 1]);
+				result.method_info.return_val = property_info_from_datatype("retval", return_type);
+			}
+
+			result.method_info.name = "<anonymous>";
 		}
 	} else if (class_exists(first)) {
 		// Native engine classes.
@@ -640,8 +681,18 @@ GDScriptParser::DataType GDScriptAnalyzer::resolve_datatype(GDScriptParser::Type
 		}
 	}
 
-	if (result.builtin_type != Variant::ARRAY && p_type->container_type != nullptr) {
-		push_error("Only arrays can specify the collection element type.", p_type);
+	switch (result.builtin_type) {
+		case Variant::CALLABLE:
+			break;
+		case Variant::ARRAY:
+			if (p_type->container_types.size() > 1) {
+				push_error("Arrays can specify only one collection element type.", p_type);
+			}
+			break;
+		default:
+			if (p_type->container_types.size() > 0) {
+				push_error("Only arrays and callables can specify the collection element type.", p_type);
+			}
 	}
 
 	p_type->set_datatype(result);
@@ -806,7 +857,6 @@ void GDScriptAnalyzer::resolve_class_interface(GDScriptParser::ClassNode *p_clas
 					signal_type.is_meta_type = false;
 					member.signal->parameters[j]->set_datatype(signal_type);
 				}
-				// TODO: Make MethodInfo from signal.
 				GDScriptParser::DataType signal_type;
 				signal_type.type_source = GDScriptParser::DataType::ANNOTATED_EXPLICIT;
 				signal_type.kind = GDScriptParser::DataType::BUILTIN;
@@ -859,11 +909,8 @@ void GDScriptAnalyzer::resolve_class_interface(GDScriptParser::ClassNode *p_clas
 
 					enum_type.enum_values[element.identifier->name] = element.value;
 				}
-
 				current_enum = nullptr;
-
 				member.m_enum->set_datatype(enum_type);
-
 				// Apply annotations.
 				for (GDScriptParser::AnnotationNode *&E : member.m_enum->annotations) {
 					E->apply(parser, member.m_enum);
@@ -1182,8 +1229,11 @@ void GDScriptAnalyzer::resolve_function_signature(GDScriptParser::FunctionNode *
 	int default_value_count = 0;
 #endif // TOOLS_ENABLED
 
+	p_function->info.name = p_function->identifier->name;
+
 	for (int i = 0; i < p_function->parameters.size(); i++) {
 		resolve_parameter(p_function->parameters[i]);
+		p_function->info._push_params(property_info_from_datatype(p_function->parameters[i]->identifier->name, p_function->parameters[i]->get_datatype()));
 #ifdef DEBUG_ENABLED
 		if (p_function->parameters[i]->usages == 0 && !String(p_function->parameters[i]->identifier->name).begins_with("_")) {
 			parser->push_warning(p_function->parameters[i]->identifier, GDScriptWarning::UNUSED_PARAMETER, p_function->identifier->name, p_function->parameters[i]->identifier->name);
@@ -1194,11 +1244,13 @@ void GDScriptAnalyzer::resolve_function_signature(GDScriptParser::FunctionNode *
 		if (p_function->parameters[i]->default_value) {
 			default_value_count++;
 
+			Variant default_value = Variant();
+
 			if (p_function->parameters[i]->default_value->is_constant) {
-				p_function->default_arg_values.push_back(p_function->parameters[i]->default_value->reduced_value);
-			} else {
-				p_function->default_arg_values.push_back(Variant()); // Prevent shift.
+				default_value = p_function->parameters[i]->default_value->reduced_value;
 			}
+
+			p_function->info.default_arguments.push_back(default_value);
 		}
 #endif // TOOLS_ENABLED
 	}
@@ -1770,6 +1822,10 @@ void GDScriptAnalyzer::resolve_parameter(GDScriptParser::ParameterNode *p_parame
 	if (p_parameter->datatype_specifier != nullptr) {
 		result = resolve_datatype(p_parameter->datatype_specifier);
 		result.is_meta_type = false;
+
+		if (result.builtin_type == Variant::CALLABLE) {
+			result.method_info.name = p_parameter->identifier->name;
+		}
 
 		if (p_parameter->default_value != nullptr) {
 			if (!is_type_compatible(result, p_parameter->default_value->get_datatype())) {
@@ -2577,6 +2633,10 @@ void GDScriptAnalyzer::reduce_call(GDScriptParser::CallNode *p_call, bool p_is_a
 				update_array_literal_element_type(par_types[index], E.value);
 			}
 		}
+		// For any callables to type from signal
+		if (base_type.is_set() && base_type.builtin_type == Variant::SIGNAL && p_call->function_name == "connect") {
+			par_types[0].method_info = base_type.method_info;
+		}
 		validate_call_arg(par_types, default_arg_count, is_vararg, p_call);
 
 		if (base_type.kind == GDScriptParser::DataType::ENUM && base_type.is_meta_type) {
@@ -2988,6 +3048,7 @@ void GDScriptAnalyzer::reduce_identifier_from_base(GDScriptParser::IdentifierNod
 		}
 		if (ClassDB::get_signal(native, name, &method_info)) {
 			// Signal is a type too.
+			method_info.name = name;
 			p_identifier->set_datatype(make_signal_type(method_info));
 			p_identifier->source = GDScriptParser::IdentifierNode::INHERITED_VARIABLE;
 			return;
@@ -3225,7 +3286,6 @@ void GDScriptAnalyzer::reduce_lambda(GDScriptParser::LambdaNode *p_lambda) {
 	lambda_type.type_source = GDScriptParser::DataType::ANNOTATED_INFERRED;
 	lambda_type.kind = GDScriptParser::DataType::BUILTIN;
 	lambda_type.builtin_type = Variant::CALLABLE;
-	p_lambda->set_datatype(lambda_type);
 
 	if (p_lambda->function == nullptr) {
 		return;
@@ -3236,9 +3296,32 @@ void GDScriptAnalyzer::reduce_lambda(GDScriptParser::LambdaNode *p_lambda) {
 
 	lambda_stack.push_back(p_lambda);
 
-	for (int i = 0; i < p_lambda->function->parameters.size(); i++) {
-		resolve_parameter(p_lambda->function->parameters[i]);
+	for (GDScriptParser::ParameterNode *param : p_lambda->function->parameters) {
+		resolve_parameter(param);
+		lambda_type.method_info._push_params(property_info_from_datatype(param->identifier->name, param->get_datatype()));
+		if (param->default_value != nullptr) {
+			if (param->default_value->is_constant) {
+				lambda_type.method_info.default_arguments.push_back(param->default_value->reduced_value);
+			} else {
+				lambda_type.method_info.default_arguments.push_back(Variant());
+			}
+		}
 	}
+
+	if (p_lambda->function->return_type != nullptr) {
+		resolve_datatype(p_lambda->function->return_type);
+		lambda_type.method_info.return_val = property_info_from_datatype("", p_lambda->function->return_type->get_datatype());
+	} else {
+		lambda_type.method_info.return_val = PropertyInfo(Variant::NIL, "retval");
+	}
+
+	if (p_lambda->has_name()) {
+		lambda_type.method_info.name = p_lambda->function->identifier->name;
+	} else {
+		lambda_type.method_info.name = "<anonymous>";
+	}
+
+	p_lambda->set_datatype(lambda_type);
 
 	resolve_suite(p_lambda->function->body);
 
@@ -3906,12 +3989,15 @@ bool GDScriptAnalyzer::get_function_signature(GDScriptParser::Node *p_source, bo
 
 		switch (p_base_type.builtin_type) {
 			case Variant::SIGNAL:
-				if (p_function == "emit") {
+				if (p_function == "emit" && !p_base_type.method_info.name.is_empty()) {
 					function_signature_from_info(p_base_type.method_info, r_return_type, r_par_types, r_default_arg_count, r_static, r_vararg);
-					r_static = Variant::is_builtin_method_static(p_base_type.builtin_type, function_name);
 					return true;
 				}
 			case Variant::CALLABLE:
+				if (p_function == "call" && !p_base_type.method_info.name.is_empty()) {
+					function_signature_from_info(p_base_type.method_info, r_return_type, r_par_types, r_default_arg_count, r_static, r_vararg);
+					return true;
+				}
 
 			default:
 				for (const MethodInfo &E : methods) {
@@ -4234,6 +4320,36 @@ bool GDScriptAnalyzer::is_type_compatible(const GDScriptParser::DataType &p_targ
 					valid = false;
 				} else {
 					valid = is_type_compatible(p_target.get_container_element_type(), p_source.get_container_element_type(), false);
+				}
+			}
+		}
+		if (valid && p_source.builtin_type == Variant::CALLABLE && p_target.builtin_type == Variant::CALLABLE) {
+			// Only check if both callables are typed
+			if (!p_target.method_info.name.is_empty() && !p_source.method_info.name.is_empty()) {
+				int source_args_count = p_source.method_info.arguments.size() - p_source.method_info.default_arguments.size();
+
+				if (source_args_count != p_target.method_info.arguments.size() - p_target.method_info.default_arguments.size()) {
+					valid = false;
+				} else {
+					for (int i = 0; i < source_args_count; i++) {
+						if (p_source.method_info.arguments[i].type == Variant::NIL || p_target.method_info.arguments[i].type == Variant::NIL) {
+							continue;
+						}
+
+						valid = p_source.method_info.arguments[i].type == p_target.method_info.arguments[i].type;
+
+						valid = valid && p_source.method_info.arguments[i].class_name == p_target.method_info.arguments[i].class_name;
+
+						if (!valid) {
+							break;
+						}
+					}
+				}
+
+				if (valid && (p_source.method_info.return_val.type != Variant::NIL || p_allow_implicit_conversion)) {
+					valid = p_source.method_info.return_val.type == p_target.method_info.return_val.type;
+
+					valid = valid && p_source.method_info.return_val.class_name == p_target.method_info.return_val.class_name;
 				}
 			}
 		}

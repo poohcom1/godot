@@ -97,7 +97,7 @@ public:
 	class DataType {
 	private:
 		// Private access so we can control memory management.
-		DataType *container_element_type = nullptr;
+		Vector<DataType *> container_element_types;
 
 	public:
 		enum Kind {
@@ -140,23 +140,23 @@ public:
 		String to_string() const;
 
 		_FORCE_INLINE_ void set_container_element_type(const DataType &p_type) {
-			container_element_type = memnew(DataType(p_type));
+			container_element_types.append(memnew(DataType(p_type)));
 		}
 
 		_FORCE_INLINE_ DataType get_container_element_type() const {
-			ERR_FAIL_COND_V(container_element_type == nullptr, DataType());
-			return *container_element_type;
+			ERR_FAIL_COND_V(container_element_types.size() == 0, DataType());
+			return *container_element_types[0];
 		}
 
 		_FORCE_INLINE_ bool has_container_element_type() const {
-			return container_element_type != nullptr;
+			return container_element_types.size() > 0;
 		}
 
 		_FORCE_INLINE_ void unset_container_element_type() {
-			if (container_element_type) {
-				memdelete(container_element_type);
-			};
-			container_element_type = nullptr;
+			for (DataType *type : container_element_types) {
+				memdelete(type);
+			}
+			container_element_types.clear();
 		}
 
 		bool is_typed_container_type() const;
@@ -1092,7 +1092,7 @@ public:
 
 	struct TypeNode : public Node {
 		Vector<IdentifierNode *> type_chain;
-		TypeNode *container_type = nullptr;
+		Vector<TypeNode *> container_types;
 
 		TypeNode() {
 			type = TYPE;
