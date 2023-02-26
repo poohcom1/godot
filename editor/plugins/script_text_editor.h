@@ -150,6 +150,8 @@ class ScriptTextEditor : public ScriptEditorBase {
 		DEBUG_GOTO_PREV_BREAKPOINT,
 		HELP_CONTEXTUAL,
 		LOOKUP_SYMBOL,
+		RENAME_SYMBOL,
+		FIND_SYMBOL_REFERENCES,
 	};
 
 	void _enable_code_editor();
@@ -190,6 +192,8 @@ protected:
 	void _goto_line(int p_line) { goto_line(p_line); }
 	void _lookup_symbol(const String &p_symbol, int p_row, int p_column);
 	void _validate_symbol(const String &p_symbol);
+	void _find_symbol_references(const String &p_symbol, int p_row, int p_column);
+	void _rename_symbol(const String &p_symbol, const String &p_new_name, int p_row, int p_column);
 
 	void _convert_case(CodeTextEditor::CaseStyle p_case);
 

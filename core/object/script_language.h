@@ -371,9 +371,11 @@ public:
 		String class_member;
 		String class_path;
 		int location;
+		int column;
 	};
 
 	virtual Error lookup_code(const String &p_code, const String &p_symbol, const String &p_path, Object *p_owner, LookupResult &r_result) { return ERR_UNAVAILABLE; }
+	virtual Error find_references(const String &p_code, const String &p_symbol, const String &p_path, Object *p_owner, List<LookupResult> &r_results) { return ERR_UNAVAILABLE; }
 
 	virtual void auto_indent_code(String &p_code, int p_from_line, int p_to_line) const = 0;
 	virtual void add_global_constant(const StringName &p_variable, const Variant &p_value) = 0;

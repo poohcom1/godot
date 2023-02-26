@@ -3534,4 +3534,159 @@ static Error _lookup_symbol_from_base(const GDScriptParser::DataType &p_base, co
 	return ERR_CANT_RESOLVE;
 }
 
+// Finding references
+void _find_local_references_in_expression(const String &p_name, const GDScriptParser::ExpressionNode *p_node, List<GDScriptLanguage::LookupResult> &r_results);
+
+void _find_local_references_in_suite(const String &p_name, const GDScriptParser::SuiteNode *p_suite, bool p_base_suite, List<GDScriptLanguage::LookupResult> &r_results) {
+	if (!p_base_suite) {
+		for (auto local : p_suite->locals) {
+			if (local.name == p_name) {
+				return;
+			}
+		}
+	}
+	for (GDScriptParser::Node *statement : p_suite->statements) {
+		switch (statement->type) {
+			case GDScriptParser::Node::SUITE: {
+				GDScriptParser::SuiteNode *suite_node = static_cast<GDScriptParser::SuiteNode *>(statement);
+				_find_local_references_in_suite(p_name, suite_node, false, r_results);
+			} break;
+			case GDScriptParser::Node::VARIABLE: {
+				GDScriptParser::VariableNode *variable_node = static_cast<GDScriptParser::VariableNode *>(statement);
+				if (variable_node->identifier->name == p_name) {
+					if (p_base_suite) {
+						GDScriptLanguage::LookupResult result;
+						result.location = variable_node->identifier->start_line;
+						result.column = variable_node->identifier->start_column;
+						r_results.push_back(result);
+					}
+				} else if (variable_node->initializer != nullptr) {
+					_find_local_references_in_expression(p_name, variable_node->initializer, r_results);
+				}
+			} break;
+			case GDScriptParser::Node::IF: {
+				GDScriptParser::IfNode *if_node = static_cast<GDScriptParser::IfNode *>(statement);
+				_find_local_references_in_expression(p_name, if_node->condition, r_results);
+				_find_local_references_in_suite(p_name, if_node->true_block, false, r_results);
+				if (if_node->false_block != nullptr) {
+					_find_local_references_in_suite(p_name, if_node->false_block, false, r_results);
+				}
+			} break;
+			case GDScriptParser::Node::WHILE: {
+				GDScriptParser::WhileNode *while_node = static_cast<GDScriptParser::WhileNode *>(statement);
+				_find_local_references_in_expression(p_name, while_node->condition, r_results);
+				_find_local_references_in_suite(p_name, while_node->loop, false, r_results);
+
+			} break;
+			case GDScriptParser::Node::ASSERT:
+			case GDScriptParser::Node::FOR:
+			case GDScriptParser::Node::MATCH:
+			case GDScriptParser::Node::MATCH_BRANCH:
+				break;
+			case GDScriptParser::Node::IDENTIFIER:
+			case GDScriptParser::Node::ASSIGNMENT:
+			case GDScriptParser::Node::ARRAY:
+			case GDScriptParser::Node::DICTIONARY:
+			case GDScriptParser::Node::AWAIT:
+			case GDScriptParser::Node::BINARY_OPERATOR:
+			case GDScriptParser::Node::TERNARY_OPERATOR:
+			case GDScriptParser::Node::UNARY_OPERATOR:
+			case GDScriptParser::Node::CAST:
+			case GDScriptParser::Node::CONSTANT:
+			case GDScriptParser::Node::GET_NODE:
+			case GDScriptParser::Node::LAMBDA:
+			case GDScriptParser::Node::PRELOAD:
+			case GDScriptParser::Node::RETURN:
+			case GDScriptParser::Node::SUBSCRIPT:
+			case GDScriptParser::Node::CALL: {
+				GDScriptParser::ExpressionNode *expression_node = static_cast<GDScriptParser::ExpressionNode *>(statement);
+				_find_local_references_in_expression(p_name, expression_node, r_results);
+			} break;
+			case GDScriptParser::Node::PATTERN:
+			case GDScriptParser::Node::PARAMETER:
+				break;
+			default:
+				break;
+		}
+	}
+}
+
+void _find_local_references_in_expression(const String &p_name, const GDScriptParser::ExpressionNode *p_node, List<GDScriptLanguage::LookupResult> &r_results) {
+	if (p_node == nullptr) {
+		return;
+	}
+
+	switch (p_node->type) {
+		case GDScriptParser::Node::IDENTIFIER: {
+			const GDScriptParser::IdentifierNode *identifier_node = static_cast<const GDScriptParser::IdentifierNode *>(p_node);
+			if (identifier_node->name == p_name) {
+				GDScriptLanguage::LookupResult result;
+				result.location = identifier_node->start_line;
+				result.column = identifier_node->start_column;
+				r_results.push_back(result);
+			}
+		} break;
+		case GDScriptParser::Node::CALL: {
+			const GDScriptParser::CallNode *call_node = static_cast<const GDScriptParser::CallNode *>(p_node);
+			_find_local_references_in_expression(p_name, call_node->callee, r_results);
+			for (auto argument : call_node->arguments) {
+				_find_local_references_in_expression(p_name, argument, r_results);
+			}
+		} break;
+		case GDScriptParser::Node::ASSIGNMENT: {
+			const GDScriptParser::AssignmentNode *assignment_node = static_cast<const GDScriptParser::AssignmentNode *>(p_node);
+			_find_local_references_in_expression(p_name, assignment_node->assignee, r_results);
+			_find_local_references_in_expression(p_name, assignment_node->assigned_value, r_results);
+
+		} break;
+		default:
+			break;
+	}
+};
+
+::Error GDScriptLanguage::find_references(const String &p_code, const String &p_symbol, const String &p_path, Object *p_owner, List<LookupResult> &r_results) {
+	LookupResult declaration_result;
+	if (lookup_code(p_code, p_symbol, p_path, p_owner, declaration_result) == OK) {
+		GDScriptParser parser;
+		parser.parse(p_code, p_path, true);
+
+		GDScriptParser::CompletionContext context = parser.get_completion_context();
+		context.base = p_owner;
+
+		GDScriptAnalyzer analyzer(&parser);
+		analyzer.analyze();
+
+		switch (context.type) {
+			case GDScriptParser::COMPLETION_IDENTIFIER: {
+				GDScriptParser::DataType base_type;
+				if (context.current_class) {
+					if (context.type != GDScriptParser::COMPLETION_SUPER_METHOD) {
+						base_type = context.current_class->get_datatype();
+					} else {
+						base_type = context.current_class->base_type;
+					}
+				} else {
+					break;
+				}
+
+				if (context.current_suite) {
+					// Lookup local variables.
+					const GDScriptParser::SuiteNode *suite = context.current_suite;
+					while (suite) {
+						if (suite->has_local(p_symbol)) {
+							_find_local_references_in_suite(p_symbol, suite, true, r_results);
+							return OK;
+							break;
+						}
+						suite = suite->parent_block;
+					}
+				}
+			}
+			default:
+				break;
+		}
+	}
+
+	return ERR_CANT_RESOLVE;
+}
 #endif

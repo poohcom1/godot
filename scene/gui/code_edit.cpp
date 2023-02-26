@@ -2369,6 +2369,9 @@ void CodeEdit::_bind_methods() {
 	/* Symbol lookup */
 	ADD_SIGNAL(MethodInfo("symbol_lookup", PropertyInfo(Variant::STRING, "symbol"), PropertyInfo(Variant::INT, "line"), PropertyInfo(Variant::INT, "column")));
 	ADD_SIGNAL(MethodInfo("symbol_validate", PropertyInfo(Variant::STRING, "symbol")));
+
+	/* Refactoring */
+	ADD_SIGNAL(MethodInfo("symbol_rename", PropertyInfo(Variant::STRING, "symbol"), PropertyInfo(Variant::STRING, "new_name"), PropertyInfo(Variant::INT, "line"), PropertyInfo(Variant::INT, "column")));
 }
 
 /* Auto brace completion */

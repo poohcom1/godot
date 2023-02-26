@@ -940,6 +940,38 @@ void ScriptTextEditor::_lookup_symbol(const String &p_symbol, int p_row, int p_c
 	}
 }
 
+void ScriptTextEditor::_find_symbol_references(const String &p_symbol, int p_row, int p_column) {
+	Node *base = get_tree()->get_edited_scene_root();
+	if (base) {
+		base = _find_node_for_script(base, base, script);
+	}
+
+	List<ScriptLanguage::LookupResult> results;
+	String code_text = code_editor->get_text_editor()->get_text_with_cursor_char(p_row, p_column);
+	if (script->get_language()->find_references(code_text, p_symbol, script->get_path(), base, results) == OK) {
+		for (ScriptLanguage::LookupResult result : results) {
+			print_line(String(Variant(result.location)) + ":" + String(Variant(result.column)));
+		}
+	};
+}
+
+void ScriptTextEditor::_rename_symbol(const String &p_symbol, const String &p_new_name, int p_row, int p_column) {
+	print_line("Renaming " + p_symbol + " to " + p_new_name);
+
+	Node *base = get_tree()->get_edited_scene_root();
+	if (base) {
+		base = _find_node_for_script(base, base, script);
+	}
+
+	List<ScriptLanguage::LookupResult> results;
+	String code_text = code_editor->get_text_editor()->get_text_with_cursor_char(p_row, p_column);
+	if (script->get_language()->find_references(code_text, p_symbol, script->get_path(), base, results) == OK) {
+		for (ScriptLanguage::LookupResult result : results) {
+			print_line(String(Variant(result.location)) + ":" + String(Variant(result.column)));
+		}
+	};
+}
+
 void ScriptTextEditor::_validate_symbol(const String &p_symbol) {
 	CodeEdit *text_edit = code_editor->get_text_editor();
 
@@ -1457,6 +1489,15 @@ void ScriptTextEditor::_edit_option(int p_op) {
 				_lookup_symbol(text, tx->get_caret_line(0), tx->get_caret_column(0));
 			}
 		} break;
+		case RENAME_SYMBOL: {
+			String text = tx->get_word_under_caret(0);
+			if (text.is_empty()) {
+				text = tx->get_selected_text(0);
+			}
+			if (!text.is_empty()) {
+				_rename_symbol(text, String("test"), tx->get_caret_line(0), tx->get_caret_column(0));
+			}
+		}
 	}
 }
 
@@ -1976,8 +2017,11 @@ void ScriptTextEditor::_make_context_menu(bool p_selection, bool p_color, bool p
 		context_menu->add_shortcut(ED_GET_SHORTCUT("script_text_editor/toggle_fold_line"), EDIT_TOGGLE_FOLD_LINE);
 	}
 
+	context_menu->add_separator();
+
+	context_menu->add_item(TTR("Rename"), RENAME_SYMBOL);
+
 	if (p_color || p_open_docs || p_goto_definition) {
-		context_menu->add_separator();
 		if (p_open_docs) {
 			context_menu->add_item(TTR("Lookup Symbol"), LOOKUP_SYMBOL);
 		}
@@ -2009,6 +2053,7 @@ void ScriptTextEditor::_enable_code_editor() {
 	code_editor->connect("validate_script", callable_mp(this, &ScriptTextEditor::_validate_script));
 	code_editor->connect("load_theme_settings", callable_mp(this, &ScriptTextEditor::_load_theme_settings));
 	code_editor->get_text_editor()->connect("symbol_lookup", callable_mp(this, &ScriptTextEditor::_lookup_symbol));
+	code_editor->get_text_editor()->connect("symbol_rename", callable_mp(this, &ScriptTextEditor::_rename_symbol));
 	code_editor->get_text_editor()->connect("symbol_validate", callable_mp(this, &ScriptTextEditor::_validate_symbol));
 	code_editor->get_text_editor()->connect("gutter_added", callable_mp(this, &ScriptTextEditor::_update_gutter_indexes));
 	code_editor->get_text_editor()->connect("gutter_removed", callable_mp(this, &ScriptTextEditor::_update_gutter_indexes));
