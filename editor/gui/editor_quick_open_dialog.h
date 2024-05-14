@@ -82,7 +82,7 @@ class QuickOpenResultContainer : public VBoxContainer {
 	GDCLASS(QuickOpenResultContainer, VBoxContainer)
 
 public:
-	void init(const Vector<StringName> &p_base_types);
+	void init(const Vector<StringName> &p_base_types, const String &p_interface_hint);
 	void handle_search_box_input(const Ref<InputEvent> &p_ie);
 	void set_query_and_update(const String &p_query);
 	void update_results();
@@ -105,6 +105,7 @@ private:
 	Vector<FuzzySearchResult> search_results;
 	Vector<StringName> base_types;
 	Vector<String> filepaths;
+	String interface_hint_string;
 	OAHashMap<String, StringName> filetypes;
 	Vector<QuickOpenResultCandidate> candidates;
 
@@ -239,7 +240,7 @@ class EditorQuickOpenDialog : public AcceptDialog {
 	GDCLASS(EditorQuickOpenDialog, AcceptDialog);
 
 public:
-	void popup_dialog(const Vector<StringName> &p_base_types, const Callable &p_item_selected_callback);
+	void popup_dialog(const Vector<StringName> &p_base_types, const Callable &p_item_selected_callback, const String &p_interface_hint = String());
 	EditorQuickOpenDialog();
 
 protected:

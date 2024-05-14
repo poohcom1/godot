@@ -2944,7 +2944,12 @@
 		<constant name="PROPERTY_HINT_ONESHOT" value="40" enum="PropertyHint">
 			Hints that a property will be changed on its own after setting, such as [member AudioStreamPlayer.playing] or [member GPUParticles3D.emitting].
 		</constant>
-		<constant name="PROPERTY_HINT_MAX" value="41" enum="PropertyHint">
+		<constant name="PROPERTY_HINT_INTERFACE" value="41" enum="PropertyHint">
+			Hints that an Object property is an instance of a type that implements the specified interface.
+			The language and interfaces must be specified by a comma separated hint string, where the first token is the language name and subsequent tokens are interfaces (e.g. [code]"C#,InterfaceA"[/code]).
+			The inspector will allow any Resource or Node (if the edited object is also a Node) that implements the interface to be selected.
+		</constant>
+		<constant name="PROPERTY_HINT_MAX" value="42" enum="PropertyHint">
 			Represents the size of the [enum PropertyHint] enum.
 		</constant>
 		<constant name="PROPERTY_USAGE_NONE" value="0" enum="PropertyUsageFlags" is_bitfield="true">

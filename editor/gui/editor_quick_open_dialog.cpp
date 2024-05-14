@@ -140,13 +140,13 @@ String EditorQuickOpenDialog::get_dialog_title(const Vector<StringName> &p_base_
 	return TTR("Select") + " " + p_base_types[0];
 }
 
-void EditorQuickOpenDialog::popup_dialog(const Vector<StringName> &p_base_types, const Callable &p_item_selected_callback) {
+void EditorQuickOpenDialog::popup_dialog(const Vector<StringName> &p_base_types, const Callable &p_item_selected_callback, const String &p_interface_hint) {
 	ERR_FAIL_COND(p_base_types.is_empty());
 	ERR_FAIL_COND(!p_item_selected_callback.is_valid());
 
 	item_selected_callback = p_item_selected_callback;
 
-	container->init(p_base_types);
+	container->init(p_base_types, p_interface_hint);
 	get_ok_button()->set_disabled(container->has_nothing_selected());
 
 	set_title(get_dialog_title(p_base_types));
@@ -289,9 +289,10 @@ void QuickOpenResultContainer::_ensure_result_vector_capacity() {
 	}
 }
 
-void QuickOpenResultContainer::init(const Vector<StringName> &p_base_types) {
+void QuickOpenResultContainer::init(const Vector<StringName> &p_base_types, const String &p_interface_hint) {
 	_ensure_result_vector_capacity();
 	base_types = p_base_types;
+	interface_hint_string = p_interface_hint;
 
 	const int display_mode_behavior = EDITOR_GET("filesystem/quick_open_dialog/default_display_mode");
 	const bool adaptive_display_mode = (display_mode_behavior == 0);
@@ -345,6 +346,9 @@ void QuickOpenResultContainer::_find_filepaths_in_folder(EditorFileSystemDirecto
 
 		for (const StringName &parent_type : base_types) {
 			bool is_valid = ClassDB::is_parent_class(engine_type, parent_type) || (!is_engine_type && EditorNode::get_editor_data().script_class_is_parent(script_type, parent_type));
+			if (!interface_hint_string.is_empty() && !EditorNode::get_editor_data().script_class_implements_interface(script_type, interface_hint_string)) {
+				is_valid = false;
+			}
 
 			if (is_valid) {
 				filepaths.append(file_path);
