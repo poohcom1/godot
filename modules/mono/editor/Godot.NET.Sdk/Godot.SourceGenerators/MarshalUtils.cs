@@ -371,6 +371,9 @@ namespace Godot.SourceGenerators
                 MarshalType.GodotGenericArray =>
                     source.Append(inputExpr, ".AsGodotArray<",
                         ((INamedTypeSymbol)typeSymbol).TypeArguments[0].FullQualifiedNameIncludeGlobal(), ">()"),
+                // We need a special case for interfaces as it fails during recompilation
+                MarshalType.GodotObjectInterface =>
+                    source.Append(inputExpr, ".AsGodotObject() as ", typeSymbol.FullQualifiedNameIncludeGlobal()),
                 _ => source.Append(inputExpr, ".As<",
                     typeSymbol.FullQualifiedNameIncludeGlobal(), ">()")
             };
