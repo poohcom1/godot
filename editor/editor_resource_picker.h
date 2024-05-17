@@ -101,7 +101,6 @@ class EditorResourcePicker : public HBoxContainer {
 
 	String _get_resource_type(const Ref<Resource> &p_resource) const;
 	void _get_allowed_types(bool p_with_convert, HashSet<StringName> *p_vector) const;
-	bool _is_drop_valid(const Dictionary &p_drag_data) const;
 	bool _is_type_valid(const String &p_type_name, const HashSet<StringName> &p_allowed_types) const;
 
 	Variant get_drag_data_fw(const Point2 &p_point, Control *p_from);
@@ -114,6 +113,8 @@ class EditorResourcePicker : public HBoxContainer {
 
 protected:
 	virtual void _update_resource();
+	virtual bool _is_drop_valid(const Dictionary &p_drag_data) const;
+	virtual void _drop_data(const Dictionary &p_drag_data);
 
 	Button *get_assign_button() { return assign_button; }
 	static void _bind_methods();
@@ -231,6 +232,9 @@ class EditorInterfacePicker : public EditorResourcePicker {
 	void _node_selected(const NodePath &p_path);
 
 	virtual void _update_resource() override;
+
+	virtual bool _is_drop_valid(const Dictionary &p_drag_data) const override;
+	virtual void _drop_data(const Dictionary &p_drag_data) override;
 
 protected:
 	static void _bind_methods();

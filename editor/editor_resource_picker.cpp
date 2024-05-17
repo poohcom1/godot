@@ -165,9 +165,11 @@ void EditorResourcePicker::_file_selected(const String &p_path) {
 		}
 
 		if (!interface_type_hint_string.is_empty()) {
-			if (!EditorNode::get_editor_data().script_class_implements_interface(res_type, interface_type_hint_string)) {
+			if (!EditorNode::get_editor_data().script_object_implements_interface(res_script, interface_type_hint_string)) {
 				any_type_matches = false;
-				EditorNode::get_singleton()->show_warning(vformat(TTR("The selected resource (%s) does not match the required interface types: (%s)."), res_type, interface_type_hint_string));
+
+				String interface_name = interface_type_hint_string.split(",")[1];
+				EditorNode::get_singleton()->show_warning(vformat(TTR("The selected resource (%s) does not implement the required interface for this property (%s)."), res_type, interface_name));
 				return;
 			}
 		}
@@ -629,98 +631,20 @@ void EditorResourcePicker::_get_allowed_types(bool p_with_convert, HashSet<Strin
 	}
 }
 
-bool EditorResourcePicker::_is_drop_valid(const Dictionary &p_drag_data) const {
-	{
-		const ObjectID source_picker = p_drag_data.get("source_picker", ObjectID());
-		if (source_picker == get_instance_id()) {
-			return false;
-		}
-	}
-
-	if (base_type.is_empty()) {
-		return true;
-	}
-
-	Dictionary drag_data = p_drag_data;
-
-	Ref<Resource> res;
-	if (drag_data.has("type") && String(drag_data["type"]) == "script_list_element") {
-		ScriptEditorBase *se = Object::cast_to<ScriptEditorBase>(drag_data["script_list_element"]);
-		if (se) {
-			res = se->get_edited_resource();
-		}
-	} else if (drag_data.has("type") && String(drag_data["type"]) == "resource") {
-		res = drag_data["resource"];
-	} else if (drag_data.has("type") && String(drag_data["type"]) == "files") {
-		Vector<String> files = drag_data["files"];
-
-		// TODO: Extract the typename of the dropped filepath's resource in a more performant way, without fully loading it.
-		if (files.size() == 1) {
-			res = ResourceLoader::load(files[0]);
-		}
-	}
-
-	HashSet<StringName> allowed_types;
-	_get_allowed_types(true, &allowed_types);
-
-	if (res.is_valid()) {
-		String res_type = _get_resource_type(res);
-
-		if (_is_type_valid(res_type, allowed_types)) {
-			return true;
-		}
-
-		StringName custom_class = EditorNode::get_singleton()->get_object_custom_type_name(res.ptr());
-		if (_is_type_valid(custom_class, allowed_types)) {
-			return true;
-		}
-	}
-
-	return false;
-}
-
-bool EditorResourcePicker::_is_type_valid(const String &p_type_name, const HashSet<StringName> &p_allowed_types) const {
-	for (const StringName &E : p_allowed_types) {
-		String at = E;
-		if (p_type_name == at || ClassDB::is_parent_class(p_type_name, at) || EditorNode::get_editor_data().script_class_is_parent(p_type_name, at)) {
-			return true;
-		}
-	}
-
-	return false;
-}
-
-Variant EditorResourcePicker::get_drag_data_fw(const Point2 &p_point, Control *p_from) {
-	if (edited_resource.is_valid()) {
-		Dictionary drag_data = EditorNode::get_singleton()->drag_resource(edited_resource, p_from);
-		drag_data["source_picker"] = get_instance_id();
-		return drag_data;
-	}
-
-	return Variant();
-}
-
-bool EditorResourcePicker::can_drop_data_fw(const Point2 &p_point, const Variant &p_data, Control *p_from) const {
-	return editable && _is_drop_valid(p_data);
-}
-
-void EditorResourcePicker::drop_data_fw(const Point2 &p_point, const Variant &p_data, Control *p_from) {
-	ERR_FAIL_COND(!_is_drop_valid(p_data));
-
-	Dictionary drag_data = p_data;
-
+void EditorResourcePicker::_drop_data(const Dictionary &p_drag_data) {
+	ERR_FAIL_COND(!_is_drop_valid(p_drag_data));
 	Ref<Resource> dropped_resource;
-	if (drag_data.has("type") && String(drag_data["type"]) == "script_list_element") {
-		ScriptEditorBase *se = Object::cast_to<ScriptEditorBase>(drag_data["script_list_element"]);
+	if (p_drag_data.has("type") && String(p_drag_data["type"]) == "script_list_element") {
+		ScriptEditorBase *se = Object::cast_to<ScriptEditorBase>(p_drag_data["script_list_element"]);
 		if (se) {
 			dropped_resource = se->get_edited_resource();
 		}
-	} else if (drag_data.has("type") && String(drag_data["type"]) == "resource") {
-		dropped_resource = drag_data["resource"];
+	} else if (p_drag_data.has("type") && String(p_drag_data["type"]) == "resource") {
+		dropped_resource = p_drag_data["resource"];
 	}
 
-	if (!dropped_resource.is_valid() && drag_data.has("type") && String(drag_data["type"]) == "files") {
-		Vector<String> files = drag_data["files"];
+	if (!dropped_resource.is_valid() && p_drag_data.has("type") && String(p_drag_data["type"]) == "files") {
+		Vector<String> files = p_drag_data["files"];
 
 		if (files.size() == 1) {
 			dropped_resource = ResourceLoader::load(files[0]);
@@ -775,6 +699,89 @@ void EditorResourcePicker::drop_data_fw(const Point2 &p_point, const Variant &p_
 		emit_signal(SNAME("resource_changed"), edited_resource);
 		_update_resource();
 	}
+}
+
+bool EditorResourcePicker::_is_drop_valid(const Dictionary &p_drag_data) const {
+	{
+		const ObjectID source_picker = p_drag_data.get("source_picker", ObjectID());
+		if (source_picker == get_instance_id()) {
+			return false;
+		}
+	}
+
+	if (base_type.is_empty()) {
+		return true;
+	}
+
+	Dictionary drag_data = p_drag_data;
+
+	Ref<Resource> res;
+	if (drag_data.has("type") && String(drag_data["type"]) == "script_list_element") {
+		ScriptEditorBase *se = Object::cast_to<ScriptEditorBase>(drag_data["script_list_element"]);
+		if (se) {
+			res = se->get_edited_resource();
+		}
+	} else if (drag_data.has("type") && String(drag_data["type"]) == "resource") {
+		res = drag_data["resource"];
+	} else if (drag_data.has("type") && String(drag_data["type"]) == "files") {
+		Vector<String> files = drag_data["files"];
+
+		// TODO: Extract the typename of the dropped filepath's resource in a more performant way, without fully loading it.
+		if (files.size() == 1) {
+			res = ResourceLoader::load(files[0]);
+		}
+	}
+
+	HashSet<StringName> allowed_types;
+	_get_allowed_types(true, &allowed_types);
+
+	if (res.is_valid()) {
+		String res_type = _get_resource_type(res);
+
+		if (_is_type_valid(res_type, allowed_types)) {
+			return true;
+		}
+
+		StringName custom_class = EditorNode::get_singleton()->get_object_custom_type_name(res.ptr());
+		if (_is_type_valid(custom_class, allowed_types)) {
+			return true;
+		}
+
+		if (!interface_type_hint_string.is_empty() && EditorNode::get_editor_data().script_object_implements_interface(res->get_script(), interface_type_hint_string)) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+bool EditorResourcePicker::_is_type_valid(const String &p_type_name, const HashSet<StringName> &p_allowed_types) const {
+	for (const StringName &E : p_allowed_types) {
+		String at = E;
+		if (p_type_name == at || ClassDB::is_parent_class(p_type_name, at) || EditorNode::get_editor_data().script_class_is_parent(p_type_name, at)) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+Variant EditorResourcePicker::get_drag_data_fw(const Point2 &p_point, Control *p_from) {
+	if (edited_resource.is_valid()) {
+		Dictionary drag_data = EditorNode::get_singleton()->drag_resource(edited_resource, p_from);
+		drag_data["source_picker"] = get_instance_id();
+		return drag_data;
+	}
+
+	return Variant();
+}
+
+bool EditorResourcePicker::can_drop_data_fw(const Point2 &p_point, const Variant &p_data, Control *p_from) const {
+	return editable && _is_drop_valid(p_data);
+}
+
+void EditorResourcePicker::drop_data_fw(const Point2 &p_point, const Variant &p_data, Control *p_from) {
+	_drop_data(p_data);
 }
 
 void EditorResourcePicker::_bind_methods() {
@@ -1379,7 +1386,8 @@ void EditorInterfacePicker::set_create_options(Object *p_menu_node) {
 	if (!menu_node) {
 		return;
 	}
-
+	// Set list of resources regularly
+	EditorResourcePicker::set_create_options(p_menu_node);
 	// Only Nodes can be assigned to NodePath properties.
 	if (is_editing_node) {
 		menu_node->add_icon_item(get_editor_theme_icon(SNAME("Node")), TTR("Assign a node..."), OBJ_MENU_SELECT_NODE);
@@ -1389,8 +1397,6 @@ void EditorInterfacePicker::set_create_options(Object *p_menu_node) {
 
 		menu_node->add_separator();
 	}
-
-	EditorResourcePicker::set_create_options(p_menu_node);
 }
 
 bool EditorInterfacePicker::handle_menu_selected(int p_which) {
@@ -1430,6 +1436,49 @@ void EditorInterfacePicker::_update_resource() {
 		get_assign_button()->set_text(edited_node->get_name());
 		get_assign_button()->set_icon(EditorNode::get_singleton()->get_object_icon(edited_node, SNAME("Node")));
 		get_assign_button()->set_tooltip_text("");
+	}
+}
+
+bool EditorInterfacePicker::_is_drop_valid(const Dictionary &p_drag_data) const {
+	if (EditorResourcePicker::_is_drop_valid(p_drag_data)) {
+		return true;
+	}
+
+	if (is_editing_node) {
+		if (p_drag_data.has("type") && p_drag_data["type"] != "nodes") {
+			return false;
+		}
+
+		Array nodes = p_drag_data["nodes"];
+		if (nodes.size() != 1) {
+			return false;
+		}
+
+		Node *dropped_node = get_tree()->get_edited_scene_root()->get_node(nodes[0]);
+		ERR_FAIL_NULL_V(dropped_node, false);
+		Ref<Script> node_script = dropped_node->get_script();
+		if (node_script.is_valid()) {
+			String interface_hint_string = get_interface_hint_string();
+			if (!interface_hint_string.is_empty() && EditorNode::get_editor_data().script_object_implements_interface(node_script, interface_hint_string)) {
+				return true;
+			}
+		}
+	}
+
+	return false;
+}
+
+void EditorInterfacePicker::_drop_data(const Dictionary &p_drag_data) {
+	ERR_FAIL_COND(!_is_drop_valid(p_drag_data));
+
+	if (p_drag_data.has("type") && p_drag_data["type"] == "nodes") {
+		Array nodes = p_drag_data["nodes"];
+		Node *dropped_node = get_tree()->get_edited_scene_root()->get_node(nodes[0]);
+		if (dropped_node) {
+			_node_selected(dropped_node->get_path());
+		}
+	} else {
+		EditorResourcePicker::_drop_data(p_drag_data);
 	}
 }
 
