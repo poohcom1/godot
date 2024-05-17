@@ -1419,6 +1419,10 @@ void EditorInterfacePicker::_update_resource() {
 		edited_node = nullptr;
 	}
 
+	if (edited_node != nullptr && !edited_node->is_inside_tree()) {
+		edited_node = nullptr;
+	}
+
 	EditorResourcePicker::_update_resource();
 
 	// Update the button text/icon if property is a Node
