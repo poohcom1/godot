@@ -467,9 +467,7 @@ void SceneTreeEditor::_add_nodes(Node *p_node, TreeItem *p_parent) {
 	}
 
 	if (interface_hint_string.size()) {
-		Ref<Script> scr = p_node->get_script();
-
-		if (!EditorNode::get_editor_data().script_object_implements_interface(scr, interface_hint_string)) {
+		if (!EditorNode::get_editor_data().object_implements_interface(p_node, interface_hint_string)) {
 			valid = false;
 		}
 	}
@@ -683,9 +681,7 @@ bool SceneTreeEditor::_update_filter(TreeItem *p_parent, bool p_scroll_to_select
 		}
 
 		if (!interface_hint_string.is_empty()) {
-			Ref<Script> scr = n->get_script();
-
-			if (!EditorNode::get_editor_data().script_object_implements_interface(scr, interface_hint_string)) {
+			if (!EditorNode::get_editor_data().object_implements_interface(n, interface_hint_string)) {
 				selectable = false;
 			}
 		}

@@ -35,6 +35,7 @@
 #include "core/io/file_access.h"
 #include "core/io/image_loader.h"
 #include "core/io/resource_loader.h"
+#include "core/object/script_language.h"
 #include "editor/editor_node.h"
 #include "editor/editor_undo_redo_manager.h"
 #include "editor/multi_node_edit.h"
@@ -974,6 +975,16 @@ bool EditorData::script_class_is_parent(const String &p_class, const String &p_i
 	return true;
 }
 
+bool EditorData::native_class_implements_interface(const String &p_class, const String &p_interface_hint_string) {
+	// If language bindings generate interface types for native classes, non-script objects can still implement interfaces
+	for (int i = 0; i < ScriptServer::get_language_count(); i++) {
+		if (ScriptServer::get_language(i)->native_class_implements_interface(p_class, p_interface_hint_string)) {
+			return true;
+		}
+	}
+	return false;
+}
+
 bool EditorData::script_class_implements_interface(const String &p_class, const String &p_interface_hint_string) {
 	Ref<Script> script = script_class_load_script(p_class);
 	return script_object_implements_interface(script, p_interface_hint_string);
@@ -1002,6 +1013,28 @@ bool EditorData::script_object_implements_interface(const Ref<Script> &p_script,
 		}
 	}
 	return true;
+}
+
+bool EditorData::object_implements_interface(const Object *p_object, const String &p_interface_hint_string) {
+	String native_class = p_object->get_class();
+
+	if (native_class_implements_interface(native_class, p_interface_hint_string)) {
+		return true;
+	}
+
+	Ref<Script> script = p_object->get_script();
+	return script_object_implements_interface(script, p_interface_hint_string);
+}
+
+bool EditorData::resource_implements_interface(const Ref<Resource> &p_resource, const String &p_interface_hint_string) {
+	String native_class = p_resource->get_class();
+
+	if (native_class_implements_interface(native_class, p_interface_hint_string)) {
+		return true;
+	}
+
+	Ref<Script> script = p_resource->get_script();
+	return script_object_implements_interface(script, p_interface_hint_string);
 }
 
 StringName EditorData::script_class_get_base(const String &p_class) const {

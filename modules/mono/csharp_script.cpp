@@ -535,6 +535,18 @@ void CSharpLanguage::pre_unsafe_unreference(Object *p_obj) {
 #endif
 }
 
+bool CSharpLanguage::native_class_implements_interface(const String &p_class, const String &p_interface_hint_string) const {
+	Vector<String> interface_info = p_interface_hint_string.split(",");
+	String language = interface_info[0];
+	String interface = interface_info[1];
+	if (language == "C#" && interface.begins_with("Godot.Interfaces.")) {
+		String interface_class = interface.split(".")[2];
+		return "I" + p_class == interface_class;
+	}
+
+	return false;
+}
+
 void CSharpLanguage::frame() {
 	if (gdmono && gdmono->is_runtime_initialized() && GDMonoCache::godot_api_cache_updated) {
 		GDMonoCache::managed_callbacks.ScriptManagerBridge_FrameCallback();

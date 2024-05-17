@@ -421,6 +421,8 @@ public:
 	virtual bool handles_global_class_type(const String &p_type) const { return false; }
 	virtual String get_global_class_name(const String &p_path, String *r_base_type = nullptr, String *r_icon_path = nullptr) const { return String(); }
 
+	virtual bool native_class_implements_interface(const String &p_type, const String &p_interface_hint_string) const { return false; }
+
 	virtual ~ScriptLanguage() {}
 };
 

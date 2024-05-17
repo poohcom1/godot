@@ -585,6 +585,8 @@ public:
 	void post_unsafe_reference(Object *p_obj);
 	void pre_unsafe_unreference(Object *p_obj);
 
+	virtual bool native_class_implements_interface(const String &p_type, const String &p_interface_hint_string) const override;
+
 	CSharpLanguage();
 	~CSharpLanguage();
 };

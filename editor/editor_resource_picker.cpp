@@ -165,7 +165,7 @@ void EditorResourcePicker::_file_selected(const String &p_path) {
 		}
 
 		if (!interface_type_hint_string.is_empty()) {
-			if (!EditorNode::get_editor_data().script_object_implements_interface(res_script, interface_type_hint_string)) {
+			if (!EditorNode::get_editor_data().resource_implements_interface(loaded_resource, interface_type_hint_string)) {
 				any_type_matches = false;
 
 				String interface_name = interface_type_hint_string.split(",")[1];
@@ -579,8 +579,12 @@ static void _add_allowed_type(const StringName &p_type, const String &p_interfac
 		return;
 	}
 
-	if (ClassDB::class_exists(p_type) && p_interface_hint_string.is_empty()) { // Engine classes cannot implement interfaces
+	if (ClassDB::class_exists(p_type)) { // Engine classes cannot implement interfaces
 		// Engine class,
+
+		if (!p_interface_hint_string.is_empty() && !EditorNode::get_editor_data().native_class_implements_interface(p_type, p_interface_hint_string)) {
+			return;
+		}
 
 		if (!ClassDB::is_virtual(p_type)) {
 			p_vector->insert(p_type);
@@ -747,7 +751,7 @@ bool EditorResourcePicker::_is_drop_valid(const Dictionary &p_drag_data) const {
 			return true;
 		}
 
-		if (!interface_type_hint_string.is_empty() && EditorNode::get_editor_data().script_object_implements_interface(res->get_script(), interface_type_hint_string)) {
+		if (!interface_type_hint_string.is_empty() && EditorNode::get_editor_data().resource_implements_interface(res, interface_type_hint_string)) {
 			return true;
 		}
 	}
@@ -1456,12 +1460,9 @@ bool EditorInterfacePicker::_is_drop_valid(const Dictionary &p_drag_data) const 
 
 		Node *dropped_node = get_tree()->get_edited_scene_root()->get_node(nodes[0]);
 		ERR_FAIL_NULL_V(dropped_node, false);
-		Ref<Script> node_script = dropped_node->get_script();
-		if (node_script.is_valid()) {
-			String interface_hint_string = get_interface_hint_string();
-			if (!interface_hint_string.is_empty() && EditorNode::get_editor_data().script_object_implements_interface(node_script, interface_hint_string)) {
-				return true;
-			}
+		String interface_hint_string = get_interface_hint_string();
+		if (!interface_hint_string.is_empty() && EditorNode::get_editor_data().object_implements_interface(dropped_node, interface_hint_string)) {
+			return true;
 		}
 	}
 

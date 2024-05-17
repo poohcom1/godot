@@ -1680,9 +1680,11 @@ Error BindingsGenerator::generate_cs_core_project(const String &p_proj_dir) {
 	da->change_dir(p_proj_dir);
 	da->make_dir("Generated");
 	da->make_dir("Generated/GodotObjects");
+	da->make_dir("Generated/GodotObjects/Interfaces");
 
 	String base_gen_dir = path::join(p_proj_dir, "Generated");
 	String godot_objects_gen_dir = path::join(base_gen_dir, "GodotObjects");
+	String godot_interfaces_gen_dir = path::join(godot_objects_gen_dir, "Interfaces");
 
 	Vector<String> compile_items;
 
@@ -1721,6 +1723,31 @@ Error BindingsGenerator::generate_cs_core_project(const String &p_proj_dir) {
 
 		String output_file = path::join(godot_objects_gen_dir, itype.proxy_name + ".cs");
 		Error err = _generate_cs_type(itype, output_file);
+
+		if (err == ERR_SKIP) {
+			continue;
+		}
+
+		if (err != OK) {
+			return err;
+		}
+
+		compile_items.push_back(output_file);
+	}
+
+	for (const KeyValue<StringName, TypeInterface> &E : obj_types) {
+		const TypeInterface &itype = E.value;
+
+		if (itype.api_type == ClassDB::API_EDITOR) {
+			continue;
+		}
+		if (itype.is_singleton) {
+			continue;
+		}
+
+		String output_file = path::join(godot_interfaces_gen_dir, "I" + itype.proxy_name + ".cs");
+
+		Error err = _generate_cs_interface(itype, output_file);
 
 		if (err == ERR_SKIP) {
 			continue;
@@ -1979,6 +2006,7 @@ Error BindingsGenerator::_generate_cs_type(const TypeInterface &itype, const Str
 	output.append("using System.ComponentModel;\n"); // EditorBrowsable
 	output.append("using System.Diagnostics;\n"); // DebuggerBrowsable
 	output.append("using Godot.NativeInterop;\n");
+	output.append("using Godot.Interfaces;\n");
 
 	output.append("\n#nullable disable\n");
 
@@ -2026,6 +2054,7 @@ Error BindingsGenerator::_generate_cs_type(const TypeInterface &itype, const Str
 	}
 	output.append(itype.proxy_name);
 
+	bool inherited = false;
 	if (is_derived_type && !itype.is_singleton) {
 		if (obj_types.has(itype.base_name)) {
 			TypeInterface base_type = obj_types[itype.base_name];
@@ -2035,10 +2064,20 @@ Error BindingsGenerator::_generate_cs_type(const TypeInterface &itype, const Str
 				// If the type is a singleton, use the instance type.
 				output.append(CS_SINGLETON_INSTANCE_SUFFIX);
 			}
+			inherited = true;
 		} else {
 			ERR_PRINT("Base type '" + itype.base_name.operator String() + "' does not exist, for class '" + itype.name + "'.");
 			return ERR_INVALID_DATA;
 		}
+	}
+
+	if (!itype.is_singleton && itype.api_type != ClassDB::API_EDITOR) {
+		if (!inherited) {
+			output.append(" : ");
+		} else {
+			output.append(", ");
+		}
+		output.append("Godot.Interfaces.I" + itype.proxy_name);
 	}
 
 	output.append("\n{");
@@ -2496,6 +2535,99 @@ Error BindingsGenerator::_generate_cs_type(const TypeInterface &itype, const Str
 	return _save_file(p_output_file, output);
 }
 
+Error BindingsGenerator::_generate_cs_interface(const TypeInterface &itype, const String &p_output_file) {
+	CRASH_COND(!itype.is_object_type);
+
+	bool is_derived_type = itype.base_name != StringName();
+
+	if (!is_derived_type) {
+		// Some GodotObject assertions
+		CRASH_COND(itype.cname != name_cache.type_Object);
+		CRASH_COND(!itype.is_instantiable);
+		CRASH_COND(itype.api_type != ClassDB::API_CORE);
+		CRASH_COND(itype.is_ref_counted);
+		CRASH_COND(itype.is_singleton);
+	}
+
+	_log("Generating I%s.cs...\n", itype.proxy_name.utf8().get_data());
+
+	StringBuilder output;
+
+	output.append("namespace " BINDINGS_NAMESPACE_INTERFACES ";\n\n");
+
+	output.append("using System.ComponentModel;\n"); // EditorBrowsable
+	output.append("using System.Diagnostics;\n"); // DebuggerBrowsable
+	output.append("using Godot;\n");
+	output.append("using Godot.NativeInterop;\n");
+
+	output.append("\n#nullable disable\n");
+
+	const DocData::ClassDoc *class_doc = itype.class_doc;
+
+	if (class_doc && class_doc->description.size()) {
+		String xml_summary = bbcode_to_xml(fix_doc_description(class_doc->description), &itype);
+		Vector<String> summary_lines = xml_summary.length() ? xml_summary.split("\n") : Vector<String>();
+
+		if (summary_lines.size()) {
+			output.append("/// <summary>\n");
+
+			for (int i = 0; i < summary_lines.size(); i++) {
+				output.append("/// ");
+				output.append(summary_lines[i]);
+				output.append("\n");
+			}
+
+			output.append("/// </summary>\n");
+		}
+	}
+
+	output.append("public interface I" + itype.proxy_name);
+
+	if (is_derived_type) {
+		if (obj_types.has(itype.base_name)) {
+			TypeInterface base_type = obj_types[itype.base_name];
+			output.append(" : ");
+			output.append("I" + base_type.proxy_name);
+			if (base_type.is_singleton) {
+				// If the type is a singleton, use the instance type.
+				output.append(CS_SINGLETON_INSTANCE_SUFFIX);
+			}
+		} else {
+			ERR_PRINT("Base type '" + itype.base_name.operator String() + "' does not exist, for class '" + itype.name + "'.");
+			return ERR_INVALID_DATA;
+		}
+	}
+
+	output.append("\n{");
+	for (const PropertyInterface &iprop : itype.properties) {
+		Error prop_err = _generate_cs_interface_property(itype, iprop, output);
+		ERR_FAIL_COND_V_MSG(prop_err != OK, prop_err,
+				"Failed to generate property '" + iprop.cname.operator String() +
+						"' for class '" + itype.name + "'.");
+	}
+
+	// Methods
+
+	int method_bind_count = 0;
+	for (const MethodInterface &imethod : itype.methods) {
+		Error method_err = _generate_cs_method_signature(itype, imethod, method_bind_count, output);
+		ERR_FAIL_COND_V_MSG(method_err != OK, method_err,
+				"Failed to generate method '" + imethod.name + "' for class '" + itype.name + "'.");
+	}
+
+	// TODO: Signals
+
+	// for (const SignalInterface &isignal : itype.signals_) {
+	// 	Error method_err = _generate_cs_signal(itype, isignal, output);
+	// 	ERR_FAIL_COND_V_MSG(method_err != OK, method_err,
+	// 			"Failed to generate signal '" + isignal.name + "' for class '" + itype.name + "'.");
+	// }
+
+	output.append("\n" CLOSE_BLOCK /* class */);
+
+	return _save_file(p_output_file, output);
+}
+
 Error BindingsGenerator::_generate_cs_property(const BindingsGenerator::TypeInterface &p_itype, const PropertyInterface &p_iprop, StringBuilder &p_output) {
 	const MethodInterface *setter = p_itype.find_method_by_name(p_iprop.setter);
 
@@ -2637,6 +2769,115 @@ Error BindingsGenerator::_generate_cs_property(const BindingsGenerator::TypeInte
 			}
 		}
 		p_output.append("value);\n" CLOSE_BLOCK_L2);
+	}
+
+	p_output.append(CLOSE_BLOCK_L1);
+
+	return OK;
+}
+
+Error BindingsGenerator::_generate_cs_interface_property(const BindingsGenerator::TypeInterface &p_itype, const PropertyInterface &p_iprop, StringBuilder &p_output) {
+	const MethodInterface *setter = p_itype.find_method_by_name(p_iprop.setter);
+
+	// Search it in base types too
+	const TypeInterface *current_type = &p_itype;
+	while (!setter && current_type->base_name != StringName()) {
+		HashMap<StringName, TypeInterface>::Iterator base_match = obj_types.find(current_type->base_name);
+		ERR_FAIL_COND_V_MSG(!base_match, ERR_BUG, "Type not found '" + current_type->base_name + "'. Inherited by '" + current_type->name + "'.");
+		current_type = &base_match->value;
+		setter = current_type->find_method_by_name(p_iprop.setter);
+	}
+
+	const MethodInterface *getter = p_itype.find_method_by_name(p_iprop.getter);
+
+	// Search it in base types too
+	current_type = &p_itype;
+	while (!getter && current_type->base_name != StringName()) {
+		HashMap<StringName, TypeInterface>::Iterator base_match = obj_types.find(current_type->base_name);
+		ERR_FAIL_COND_V_MSG(!base_match, ERR_BUG, "Type not found '" + current_type->base_name + "'. Inherited by '" + current_type->name + "'.");
+		current_type = &base_match->value;
+		getter = current_type->find_method_by_name(p_iprop.getter);
+	}
+
+	ERR_FAIL_COND_V(!setter && !getter, ERR_BUG);
+
+	if (setter) {
+		int setter_argc = p_iprop.index != -1 ? 2 : 1;
+		ERR_FAIL_COND_V(setter->arguments.size() != setter_argc, ERR_BUG);
+	}
+
+	if (getter) {
+		int getter_argc = p_iprop.index != -1 ? 1 : 0;
+		ERR_FAIL_COND_V(getter->arguments.size() != getter_argc, ERR_BUG);
+	}
+
+	if (getter && setter) {
+		const ArgumentInterface &setter_first_arg = setter->arguments.back()->get();
+		if (getter->return_type.cname != setter_first_arg.type.cname) {
+			// Special case for Node::set_name
+			bool whitelisted = getter->return_type.cname == name_cache.type_StringName &&
+					setter_first_arg.type.cname == name_cache.type_String;
+
+			ERR_FAIL_COND_V_MSG(!whitelisted, ERR_BUG,
+					"Return type from getter doesn't match first argument of setter for property: '" +
+							p_itype.name + "." + String(p_iprop.cname) + "'.");
+		}
+	}
+
+	const TypeReference &proptype_name = getter ? getter->return_type : setter->arguments.back()->get().type;
+
+	const TypeInterface *prop_itype = _get_type_or_singleton_or_null(proptype_name);
+	ERR_FAIL_NULL_V(prop_itype, ERR_BUG); // Property type not found
+
+	ERR_FAIL_COND_V_MSG(prop_itype->is_singleton, ERR_BUG,
+			"Property type is a singleton: '" + p_itype.name + "." + String(p_iprop.cname) + "'.");
+
+	if (p_itype.api_type == ClassDB::API_CORE) {
+		ERR_FAIL_COND_V_MSG(prop_itype->api_type == ClassDB::API_EDITOR, ERR_BUG,
+				"Property '" + p_itype.name + "." + String(p_iprop.cname) + "' has type '" + prop_itype->name +
+						"' from the editor API. Core API cannot have dependencies on the editor API.");
+	}
+
+	if (p_iprop.prop_doc && p_iprop.prop_doc->description.size()) {
+		String xml_summary = bbcode_to_xml(fix_doc_description(p_iprop.prop_doc->description), &p_itype);
+		Vector<String> summary_lines = xml_summary.length() ? xml_summary.split("\n") : Vector<String>();
+
+		if (summary_lines.size()) {
+			p_output.append(MEMBER_BEGIN "/// <summary>\n");
+
+			for (int i = 0; i < summary_lines.size(); i++) {
+				p_output.append(INDENT1 "/// ");
+				p_output.append(summary_lines[i]);
+				p_output.append("\n");
+			}
+
+			p_output.append(INDENT1 "/// </summary>");
+		}
+	}
+
+	if (p_iprop.is_hidden) {
+		p_output.append(MEMBER_BEGIN "[EditorBrowsable(EditorBrowsableState.Never)]");
+	}
+
+	p_output.append(MEMBER_BEGIN "public ");
+
+	// if (prop_allowed_inherited_member_hiding.has(p_itype.proxy_name + "." + p_iprop.proxy_name)) {
+	// 	p_output.append("new ");
+	// }
+
+	String prop_cs_type = prop_itype->cs_type + _get_generic_type_parameters(*prop_itype, proptype_name.generic_type_parameters);
+
+	p_output.append(prop_cs_type);
+	p_output.append(" ");
+	p_output.append(p_iprop.proxy_name);
+	p_output.append("\n" OPEN_BLOCK_L1);
+
+	if (getter) {
+		p_output.append(INDENT2 "get;\n");
+	}
+
+	if (setter) {
+		p_output.append(INDENT2 "set;\n");
 	}
 
 	p_output.append(CLOSE_BLOCK_L1);
@@ -2920,6 +3161,201 @@ Error BindingsGenerator::_generate_cs_method(const BindingsGenerator::TypeInterf
 		}
 
 		p_output.append(CLOSE_BLOCK_L1);
+	}
+
+	p_method_bind_count++;
+
+	return OK;
+}
+
+Error BindingsGenerator::_generate_cs_method_signature(const BindingsGenerator::TypeInterface &p_itype, const BindingsGenerator::MethodInterface &p_imethod, int &p_method_bind_count, StringBuilder &p_output) {
+	const TypeInterface *return_type = _get_type_or_singleton_or_null(p_imethod.return_type);
+	ERR_FAIL_NULL_V(return_type, ERR_BUG); // Return type not found
+
+	ERR_FAIL_COND_V_MSG(return_type->is_singleton, ERR_BUG,
+			"Method return type is a singleton: '" + p_itype.name + "." + p_imethod.name + "'.");
+
+	if (p_itype.api_type == ClassDB::API_CORE) {
+		ERR_FAIL_COND_V_MSG(return_type->api_type == ClassDB::API_EDITOR, ERR_BUG,
+				"Method '" + p_itype.name + "." + p_imethod.name + "' has return type '" + return_type->name +
+						"' from the editor API. Core API cannot have dependencies on the editor API.");
+	}
+
+	String method_bind_field = CS_STATIC_FIELD_METHOD_BIND_PREFIX + itos(p_method_bind_count);
+
+	String arguments_sig;
+	StringBuilder cs_in_statements;
+
+	String icall_params = method_bind_field;
+
+	if (!p_imethod.is_static) {
+		String self_reference = "this";
+		if (p_itype.is_singleton) {
+			self_reference = CS_PROPERTY_SINGLETON;
+		}
+
+		if (p_itype.cs_in.size()) {
+			cs_in_statements << sformat(p_itype.cs_in, p_itype.c_type, self_reference,
+					String(), String(), String(), INDENT2);
+		}
+
+		icall_params += ", " + sformat(p_itype.cs_in_expr, self_reference);
+	}
+
+	StringBuilder default_args_doc;
+
+	// Retrieve information from the arguments
+	const ArgumentInterface &first = p_imethod.arguments.front()->get();
+	for (const ArgumentInterface &iarg : p_imethod.arguments) {
+		const TypeInterface *arg_type = _get_type_or_singleton_or_null(iarg.type);
+		ERR_FAIL_NULL_V(arg_type, ERR_BUG); // Argument type not found
+
+		ERR_FAIL_COND_V_MSG(arg_type->is_singleton, ERR_BUG,
+				"Argument type is a singleton: '" + iarg.name + "' of method '" + p_itype.name + "." + p_imethod.name + "'.");
+
+		if (p_itype.api_type == ClassDB::API_CORE) {
+			ERR_FAIL_COND_V_MSG(arg_type->api_type == ClassDB::API_EDITOR, ERR_BUG,
+					"Argument '" + iarg.name + "' of method '" + p_itype.name + "." + p_imethod.name + "' has type '" +
+							arg_type->name + "' from the editor API. Core API cannot have dependencies on the editor API.");
+		}
+
+		if (iarg.default_argument.size()) {
+			CRASH_COND_MSG(!_arg_default_value_is_assignable_to_type(iarg.def_param_value, *arg_type),
+					"Invalid default value for parameter '" + iarg.name + "' of method '" + p_itype.name + "." + p_imethod.name + "'.");
+		}
+
+		String arg_cs_type = arg_type->cs_type + _get_generic_type_parameters(*arg_type, iarg.type.generic_type_parameters);
+
+		// Add the current arguments to the signature
+		// If the argument has a default value which is not a constant, we will make it Nullable
+		{
+			if (&iarg != &first) {
+				arguments_sig += ", ";
+			}
+
+			if (iarg.def_param_mode == ArgumentInterface::NULLABLE_VAL) {
+				arguments_sig += "System.Nullable<";
+			}
+
+			arguments_sig += arg_cs_type;
+
+			if (iarg.def_param_mode == ArgumentInterface::NULLABLE_VAL) {
+				arguments_sig += "> ";
+			} else {
+				arguments_sig += " ";
+			}
+
+			arguments_sig += iarg.name;
+
+			if (!p_imethod.is_compat && iarg.default_argument.size()) {
+				if (iarg.def_param_mode != ArgumentInterface::CONSTANT) {
+					arguments_sig += " = null";
+				} else {
+					arguments_sig += " = " + sformat(iarg.default_argument, arg_type->cs_type);
+				}
+			}
+		}
+
+		icall_params += ", ";
+
+		if (iarg.default_argument.size() && iarg.def_param_mode != ArgumentInterface::CONSTANT) {
+			// The default value of an argument must be constant. Otherwise we make it Nullable and do the following:
+			// Type arg_in = arg.HasValue ? arg.Value : <non-const default value>;
+			String arg_or_defval_local = iarg.name;
+			arg_or_defval_local += "OrDefVal";
+
+			cs_in_statements << INDENT2 << arg_cs_type << " " << arg_or_defval_local << " = " << iarg.name;
+
+			if (iarg.def_param_mode == ArgumentInterface::NULLABLE_VAL) {
+				cs_in_statements << ".HasValue ? ";
+			} else {
+				cs_in_statements << " != null ? ";
+			}
+
+			cs_in_statements << iarg.name;
+
+			if (iarg.def_param_mode == ArgumentInterface::NULLABLE_VAL) {
+				cs_in_statements << ".Value : ";
+			} else {
+				cs_in_statements << " : ";
+			}
+
+			String cs_type = arg_cs_type;
+			if (cs_type.ends_with("[]")) {
+				cs_type = cs_type.substr(0, cs_type.length() - 2);
+			}
+
+			String def_arg = sformat(iarg.default_argument, cs_type);
+
+			cs_in_statements << def_arg << ";\n";
+
+			if (arg_type->cs_in.size()) {
+				cs_in_statements << sformat(arg_type->cs_in, arg_type->c_type, arg_or_defval_local,
+						String(), String(), String(), INDENT2);
+			}
+
+			if (arg_type->cs_in_expr.is_empty()) {
+				icall_params += arg_or_defval_local;
+			} else {
+				icall_params += sformat(arg_type->cs_in_expr, arg_or_defval_local, arg_type->c_type);
+			}
+
+			// Apparently the name attribute must not include the @
+			String param_tag_name = iarg.name.begins_with("@") ? iarg.name.substr(1, iarg.name.length()) : iarg.name;
+			// Escape < and > in the attribute default value
+			String param_def_arg = def_arg.replacen("<", "&lt;").replacen(">", "&gt;");
+
+			default_args_doc.append(MEMBER_BEGIN "/// <param name=\"" + param_tag_name + "\">If the parameter is null, then the default value is <c>" + param_def_arg + "</c>.</param>");
+		} else {
+			if (arg_type->cs_in.size()) {
+				cs_in_statements << sformat(arg_type->cs_in, arg_type->c_type, iarg.name,
+						String(), String(), String(), INDENT2);
+			}
+
+			icall_params += arg_type->cs_in_expr.is_empty() ? iarg.name : sformat(arg_type->cs_in_expr, iarg.name, arg_type->c_type);
+		}
+	}
+
+	// Collect caller name for MethodBind
+	if (p_imethod.is_vararg) {
+		icall_params += ", (godot_string_name)MethodName." + p_imethod.proxy_name + ".NativeValue";
+	}
+
+	// Generate method
+	{
+		if (p_itype.is_singleton || p_imethod.is_static || p_imethod.is_internal || p_imethod.is_hidden) {
+			return OK;
+		}
+
+		if (p_imethod.method_doc && p_imethod.method_doc->description.size()) {
+			String xml_summary = bbcode_to_xml(fix_doc_description(p_imethod.method_doc->description), &p_itype);
+			Vector<String> summary_lines = xml_summary.length() ? xml_summary.split("\n") : Vector<String>();
+
+			if (summary_lines.size()) {
+				p_output.append(MEMBER_BEGIN "/// <summary>\n");
+
+				for (int i = 0; i < summary_lines.size(); i++) {
+					p_output.append(INDENT1 "/// ");
+					p_output.append(summary_lines[i]);
+					p_output.append("\n");
+				}
+
+				p_output.append(INDENT1 "/// </summary>");
+			}
+		}
+
+		if (default_args_doc.get_string_length()) {
+			p_output.append(default_args_doc.as_string());
+		}
+
+		p_output.append(MEMBER_BEGIN);
+		p_output.append("public ");
+
+		String return_cs_type = return_type->cs_type + _get_generic_type_parameters(*return_type, p_imethod.return_type.generic_type_parameters);
+
+		p_output.append(return_cs_type + " ");
+		p_output.append(p_imethod.proxy_name + "(");
+		p_output.append(arguments_sig + ");");
 	}
 
 	p_method_bind_count++;
