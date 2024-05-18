@@ -579,14 +579,11 @@ static void _add_allowed_type(const StringName &p_type, const String &p_interfac
 		return;
 	}
 
-	if (ClassDB::class_exists(p_type)) { // Engine classes cannot implement interfaces
+	if (ClassDB::class_exists(p_type)) {
 		// Engine class,
 
-		if (!p_interface_hint_string.is_empty() && !EditorNode::get_editor_data().native_class_implements_interface(p_type, p_interface_hint_string)) {
-			return;
-		}
-
-		if (!ClassDB::is_virtual(p_type)) {
+		bool implements_interface = p_interface_hint_string.is_empty() || EditorNode::get_editor_data().native_class_implements_interface(p_type, p_interface_hint_string);
+		if (!ClassDB::is_virtual(p_type) && implements_interface) {
 			p_vector->insert(p_type);
 		}
 
