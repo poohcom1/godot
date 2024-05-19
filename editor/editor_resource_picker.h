@@ -43,6 +43,8 @@ class TextureRect;
 class Tree;
 class TreeItem;
 
+static HashMap<String, HashSet<StringName>> native_class_interface_cache; // Cache interface for native classes (i.e. RayCast2D -> Godot.Interfaces.IRaycast2D)
+
 class EditorResourcePicker : public HBoxContainer {
 	GDCLASS(EditorResourcePicker, HBoxContainer);
 

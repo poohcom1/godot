@@ -439,6 +439,8 @@ class CSharpLanguage : public ScriptLanguage {
 	static void _editor_init_callback();
 #endif
 
+	HashMap<StringName, HashSet<String>> native_interface_cache;
+
 	static void *_instance_binding_create_callback(void *p_token, void *p_instance);
 	static void _instance_binding_free_callback(void *p_token, void *p_instance, void *p_binding);
 	static GDExtensionBool _instance_binding_reference_callback(void *p_token, void *p_binding, GDExtensionBool p_reference);

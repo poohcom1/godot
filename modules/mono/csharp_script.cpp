@@ -125,6 +125,28 @@ void CSharpLanguage::init() {
 	EditorNode::add_init_callback(&_editor_init_callback);
 #endif
 
+	// Generate native interface cache
+	HashMap<StringName, String> interface_hints;
+
+	List<StringName> classes;
+	ClassDB::get_class_list(&classes);
+
+	for (const StringName &S : classes) {
+		interface_hints.insert(S, "C#,Godot.Interfaces.I" + S);
+	}
+
+	for (const StringName &S : classes) {
+		StringName cls = S;
+		native_interface_cache.insert(S, HashSet<String>());
+		while (cls) {
+			if (interface_hints.has(cls)) {
+				native_interface_cache[S].insert(interface_hints[cls]);
+			}
+
+			cls = ClassDB::get_parent_class_nocheck(cls);
+		}
+	}
+
 	gdmono = memnew(GDMono);
 
 	// Initialize only if the project uses C#.
@@ -536,15 +558,11 @@ void CSharpLanguage::pre_unsafe_unreference(Object *p_obj) {
 }
 
 bool CSharpLanguage::native_class_implements_interface(const String &p_class, const String &p_interface_hint_string) const {
-	Vector<String> interface_info = p_interface_hint_string.split(",");
-	String language = interface_info[0];
-	String interface = interface_info[1];
-	if (language == "C#" && interface.begins_with("Godot.Interfaces.")) {
-		String interface_class = interface.split(".")[2];
-		return "I" + p_class == interface_class;
+	if (!native_interface_cache.has(p_class)) {
+		return false;
 	}
 
-	return false;
+	return native_interface_cache[p_class].has(p_interface_hint_string);
 }
 
 void CSharpLanguage::frame() {
