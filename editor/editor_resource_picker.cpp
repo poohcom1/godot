@@ -580,30 +580,37 @@ static void _add_allowed_type(const StringName &p_type, const String &p_interfac
 	}
 
 	String cache_key = String(p_type) + ":" + p_interface_hint_string;
-	bool is_native = false;
 
 	if (ClassDB::class_exists(p_type)) {
 		// Engine class,
 
-		is_native = true;
-		if (!p_interface_hint_string.is_empty()) {
-			if (native_class_interface_cache.has(cache_key)) {
-				for (const StringName &S : native_class_interface_cache[cache_key]) {
-					p_vector->insert(S);
-				}
-				return;
+		if (!p_interface_hint_string.is_empty() && native_class_interface_cache.has(cache_key)) {
+			// Cache hit for interfaces
+			for (const StringName &S : native_class_interface_cache[cache_key]) {
+				p_vector->insert(S);
 			}
-		}
+		} else {
+			bool implements_interface = p_interface_hint_string.is_empty() || EditorNode::get_editor_data().native_class_implements_interface(p_type, p_interface_hint_string);
+			if (!ClassDB::is_virtual(p_type) && implements_interface) {
+				p_vector->insert(p_type);
+			}
 
-		bool implements_interface = p_interface_hint_string.is_empty() || EditorNode::get_editor_data().native_class_implements_interface(p_type, p_interface_hint_string);
-		if (!ClassDB::is_virtual(p_type) && implements_interface) {
-			p_vector->insert(p_type);
-		}
+			List<StringName> inheriters;
+			ClassDB::get_inheriters_from_class(p_type, &inheriters);
+			for (const StringName &S : inheriters) {
+				_add_allowed_type(S, p_interface_hint_string, p_vector);
+			}
 
-		List<StringName> inheriters;
-		ClassDB::get_inheriters_from_class(p_type, &inheriters);
-		for (const StringName &S : inheriters) {
-			_add_allowed_type(S, p_interface_hint_string, p_vector);
+			// Store cache if interface hint is present.
+			if (!p_interface_hint_string.is_empty()) {
+				HashSet<StringName> interface_classes;
+				for (const StringName &S : *p_vector) {
+					if (ClassDB::class_exists(S)) {
+						interface_classes.insert(S);
+					}
+				}
+				native_class_interface_cache[cache_key] = interface_classes;
+			}
 		}
 	} else {
 		// Script class.
@@ -621,14 +628,6 @@ static void _add_allowed_type(const StringName &p_type, const String &p_interfac
 	ScriptServer::get_inheriters_list(p_type, &inheriters);
 	for (const StringName &S : inheriters) {
 		_add_allowed_type(S, p_interface_hint_string, p_vector);
-	}
-
-	if (is_native && !p_interface_hint_string.is_empty()) {
-		HashSet<StringName> interface_classes;
-		for (const StringName &S : *p_vector) {
-			interface_classes.insert(S);
-		}
-		native_class_interface_cache[cache_key] = interface_classes;
 	}
 }
 
