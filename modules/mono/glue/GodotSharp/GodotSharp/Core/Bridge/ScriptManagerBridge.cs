@@ -685,6 +685,18 @@ namespace Godot.Bridge
 
             godot_string iconPath = Marshaling.ConvertStringToNative(iconAttr?.Path);
 
+            // Interfaces
+            using var interfaces = new Collections.Array();
+
+            var interfaceAttributes = scriptType.GetCustomAttributes(inherit: true)
+                .OfType<ScriptInterfaceAttribute>()
+                .ToArray();
+
+            foreach (var interfaceAttribute in interfaceAttributes)
+            {
+                interfaces.Add(new StringName(interfaceAttribute.Name));
+            }
+
             outTypeInfo->ClassName = className;
             outTypeInfo->IconPath = iconPath;
             outTypeInfo->IsTool = isTool.ToGodotBool();
@@ -692,6 +704,7 @@ namespace Godot.Bridge
             outTypeInfo->IsAbstract = scriptType.IsAbstract.ToGodotBool();
             outTypeInfo->IsGenericTypeDefinition = scriptType.IsGenericTypeDefinition.ToGodotBool();
             outTypeInfo->IsConstructedGenericType = scriptType.IsConstructedGenericType.ToGodotBool();
+            outTypeInfo->Interfaces = NativeFuncs.godotsharp_array_new_copy((godot_array)interfaces.NativeValue);
 
         }
 
@@ -706,6 +719,18 @@ namespace Godot.Bridge
                 Debug.Assert(!scriptType.IsGenericTypeDefinition, $"Script type must be a constructed generic type or not generic at all. Type: {scriptType}.");
 
                 GetScriptTypeInfo(scriptType, outTypeInfo);
+
+                // Interfaces
+                using var interfaces = new Collections.Array();
+
+                var interfaceAttributes = scriptType.GetCustomAttributes(inherit: true)
+                    .OfType<ScriptInterfaceAttribute>()
+                    .ToArray();
+
+                foreach (var interfaceAttribute in interfaceAttributes)
+                {
+                    interfaces.Add(new StringName(interfaceAttribute.Name));
+                }
 
                 Type native = GodotObject.InternalGetClassNativeBase(scriptType);
 
